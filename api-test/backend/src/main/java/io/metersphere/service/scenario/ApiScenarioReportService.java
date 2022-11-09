@@ -174,6 +174,43 @@ public class ApiScenarioReportService {
                     && !request.getFilters().get(CommonConstants.TRIGGER_MODE).contains(ReportTriggerMode.JENKINS_RUN_TEST_PLAN.name())) {
                 request.getFilters().get(CommonConstants.TRIGGER_MODE).add(ReportTriggerMode.JENKINS_RUN_TEST_PLAN.name());
             }
+
+            if (StringUtils.startsWith(request.getSelectDataRange(), "scheduleExecution")) {
+                if (request.getFilters() == null) {
+                    request.setFilters(new HashMap<>() {{
+                        this.put(CommonConstants.TRIGGER_MODE, new ArrayList<>() {{
+                            this.add(ReportTriggerMode.SCHEDULE.name());
+                        }});
+                    }});
+                } else {
+                    if (request.getFilters().containsKey(CommonConstants.TRIGGER_MODE)
+                            && request.getFilters().get(CommonConstants.TRIGGER_MODE).contains(ReportTriggerMode.SCHEDULE.name())) {
+                        request.getFilters().get(CommonConstants.TRIGGER_MODE).add(ReportTriggerMode.SCHEDULE.name());
+                    } else {
+                        request.getFilters().put(CommonConstants.TRIGGER_MODE, new ArrayList<>() {{
+                            this.add(ReportTriggerMode.SCHEDULE.name());
+                        }});
+                    }
+                }
+                List<String> statusList = request.getFilters().get(CommonConstants.STATUS);
+                if (statusList == null) {
+                    statusList = new ArrayList<>();
+                }
+                switch (request.getSelectDataRange()) {
+                    case "scheduleExecutionPass":
+                        statusList.add(ApiReportStatus.SUCCESS.name());
+                        break;
+                    case "scheduleExecutionFakeError":
+                        statusList.add(ApiReportStatus.FAKE_ERROR.name());
+                        break;
+                    case "scheduleExecutionFailed":
+                        statusList.add(ApiReportStatus.ERROR.name());
+                        break;
+                }
+                if (CollectionUtils.isNotEmpty(statusList)) {
+                    request.getFilters().put(CommonConstants.STATUS, statusList);
+                }
+            }
         }
         return request;
     }

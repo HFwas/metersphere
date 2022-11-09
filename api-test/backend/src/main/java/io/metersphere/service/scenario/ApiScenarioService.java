@@ -3,7 +3,7 @@ package io.metersphere.service.scenario;
 import io.metersphere.api.dto.*;
 import io.metersphere.api.dto.automation.*;
 import io.metersphere.api.dto.datacount.ApiDataCountResult;
-import io.metersphere.api.dto.datacount.response.CoverageDTO;
+import io.metersphere.api.dto.datacount.response.CoveredDTO;
 import io.metersphere.api.dto.definition.ApiTestCaseInfo;
 import io.metersphere.api.dto.definition.RunDefinitionRequest;
 import io.metersphere.api.dto.definition.request.*;
@@ -1744,17 +1744,17 @@ public class ApiScenarioService {
      * @param apiList        接口集合（id / path 必须有数据）
      * @return
      */
-    public CoverageDTO countInterfaceCoverage(String projectId, Map<String, Map<String, String>> scenarioUrlMap, List<ApiDefinition> apiList) {
-        CoverageDTO coverage = new CoverageDTO();
+    public CoveredDTO countInterfaceCoverage(String projectId, Map<String, Map<String, String>> scenarioUrlMap, List<ApiDefinition> apiList) {
+        CoveredDTO coverage = new CoveredDTO();
         if (CollectionUtils.isEmpty(apiList)) {
             return coverage;
         }
         int urlContainsCount = this.getApiIdInScenario(projectId, scenarioUrlMap, apiList).size();
-        coverage.setCoverage(urlContainsCount);
-        coverage.setNotCoverage(apiList.size() - urlContainsCount);
+        coverage.setCovered(urlContainsCount);
+        coverage.setNotCovered(apiList.size() - urlContainsCount);
         float coverageRageNumber = (float) urlContainsCount * 100 / apiList.size();
         DecimalFormat df = new DecimalFormat("0.0");
-        coverage.setRateOfCoverage(df.format(coverageRageNumber) + "%");
+        coverage.setRateOfCovered(df.format(coverageRageNumber) + "%");
         return coverage;
     }
 
