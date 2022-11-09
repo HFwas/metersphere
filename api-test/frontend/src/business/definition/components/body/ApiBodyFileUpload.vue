@@ -9,7 +9,8 @@
     <div class="upload-default" @click.stop>
       <el-popover
         placement="right"
-        trigger="hover">
+        trigger="hover"
+      >
         <div>
           <el-upload
             action="#"
@@ -17,12 +18,15 @@
             :http-request="upload"
             :beforeUpload="uploadValidate"
             ref="uploadLocal">
-            <el-button type="text" :disabled="isReadOnly"> {{ $t('permission.project_file.local_upload') }}</el-button>
+            <el-button type="text" :disabled="isReadOnly"
+                       v-if="!isReadOnly"> {{ $t('permission.project_file.local_upload') }}</el-button>
             <span slot="file"/>
           </el-upload>
         </div>
         <el-button type="text" @click="associationFile"
-                   :disabled="isReadOnly">{{ $t('permission.project_file.associated_files') }}</el-button>
+                   :disabled="isReadOnly" v-if="!isReadOnly">{{
+            $t('permission.project_file.associated_files')
+          }}</el-button>
         <i class="el-icon-plus" slot="reference"/>
       </el-popover>
     </div>
