@@ -28,7 +28,8 @@ import java.util.*;
 @Transactional(rollbackFor = Exception.class)
 public class JarConfigService {
 
-    private static final String JAR_FILE_DIR = "/opt/metersphere/data/jar";
+//    private static final String JAR_FILE_DIR = "/opt/metersphere/data/jar";
+    private static final String JAR_FILE_DIR = "/Users/houfei/workspace/metersphere/data/jar";
 
     @Resource
     BaseJarConfigMapper baseJarConfigMapper;

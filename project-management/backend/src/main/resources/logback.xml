@@ -2,7 +2,8 @@
 <configuration debug="true">
     <property resource="application.properties"/>
     <property resource="commons.properties"/>
-    <property file="/opt/metersphere/conf/metersphere.properties"/>
+<!--    <property file="/opt/metersphere/conf/metersphere.properties"/>-->
+    <property file="/Users/houfei/workspace/metersphere/metersphere.properties"/>
     <appender name="console" class="ch.qos.logback.core.ConsoleAppender">
         <encoder>
             <pattern>%d %5p %40.40c:%4L - %m%n</pattern>
