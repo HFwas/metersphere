@@ -51,6 +51,7 @@
     "pinia": "^2.0.14",
     "pinia-plugin-persistedstate": "^1.6.3",
     "sha.js": "^2.4.11",
+    "stream-browserify": "^3.0.0",
     "vue": "^2.7.3",
     "vue-calendar-heatmap": "^0.8.4",
     "vue-clipboard2": "^0.3.1",
