@@ -1,5 +1,6 @@
 package io.metersphere.api.dto.shell.filter;
 
+import io.metersphere.commons.constants.ElementConstants;
 import io.metersphere.commons.exception.MSException;
 import io.metersphere.plugin.core.utils.LogUtil;
 import org.apache.commons.io.IOUtils;
@@ -28,13 +29,13 @@ public class ScriptFilter {
     }
 
     public static void verify(String language, String label, String script) {
-        if(language == null){
+        if (language == null) {
             language = "";
         }
         if (StringUtils.isNotEmpty(script)) {
             final StringBuffer buffer = new StringBuffer();
             switch (language) {
-                case "beanshell":
+                case ElementConstants.BEANSHELL:
                     blackList(buffer, script, beanshell);
                     break;
                 case "python":

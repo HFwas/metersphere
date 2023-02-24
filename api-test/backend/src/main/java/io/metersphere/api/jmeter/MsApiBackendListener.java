@@ -3,12 +3,8 @@ package io.metersphere.api.jmeter;
 
 import io.metersphere.api.exec.queue.PoolExecBlockingQueueUtil;
 import io.metersphere.api.jmeter.utils.ReportStatusUtil;
-import io.metersphere.cache.JMeterEngineCache;
 import io.metersphere.commons.constants.CommonConstants;
-import io.metersphere.commons.utils.CommonBeanFactory;
-import io.metersphere.commons.utils.FileUtils;
-import io.metersphere.commons.utils.FixedCapacityUtil;
-import io.metersphere.commons.utils.JSON;
+import io.metersphere.commons.utils.*;
 import io.metersphere.commons.vo.ResultVO;
 import io.metersphere.constants.BackendListenerConstants;
 import io.metersphere.constants.RunModeConstants;
@@ -68,7 +64,6 @@ public class MsApiBackendListener extends AbstractBackendListenerClient implemen
             sampleResults = RetryResultUtil.clearLoops(sampleResults);
             JMeterBase.resultFormatting(sampleResults, dto);
             testResultService.saveResults(dto);
-
             resultVO = ReportStatusUtil.getStatus(dto, resultVO);
             dto.getArbitraryData().put(CommonConstants.LOCAL_STATUS_KEY, resultVO);
             sampleResults.clear();
@@ -113,6 +108,8 @@ public class MsApiBackendListener extends AbstractBackendListenerClient implemen
                 apiExecutionQueueService.testPlanReportTestEnded(dto.getTestPlanReportId());
             }
             LoggerUtil.info("TEST-END处理结果集完成", dto.getReportId());
+
+            JvmUtil.memoryInfo();
         } catch (Exception e) {
             LoggerUtil.error("结果集处理异常", dto.getReportId(), e);
         } finally {
@@ -121,9 +118,6 @@ public class MsApiBackendListener extends AbstractBackendListenerClient implemen
             if (FileServer.getFileServer() != null) {
                 LoggerUtil.info("进入监听，开始关闭CSV", dto.getReportId());
                 FileServer.getFileServer().closeCsv(dto.getReportId());
-            }
-            if (JMeterEngineCache.runningEngine.containsKey(dto.getReportId())) {
-                JMeterEngineCache.runningEngine.remove(dto.getReportId());
             }
         }
     }
@@ -163,6 +157,4 @@ public class MsApiBackendListener extends AbstractBackendListenerClient implemen
         }
         return reportId;
     }
-
-
 }

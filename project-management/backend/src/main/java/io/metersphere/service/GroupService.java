@@ -5,8 +5,8 @@ import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import io.metersphere.base.domain.*;
 import io.metersphere.base.mapper.*;
-import io.metersphere.base.mapper.ext.ExtGroupMapper;
 import io.metersphere.base.mapper.ext.BaseUserGroupMapper;
+import io.metersphere.base.mapper.ext.ExtGroupMapper;
 import io.metersphere.commons.constants.MicroServiceName;
 import io.metersphere.commons.constants.RedisKey;
 import io.metersphere.commons.constants.UserGroupConstants;
@@ -67,6 +67,8 @@ public class GroupService {
     private UserMapper userMapper;
     @Resource
     private MicroService microService;
+    @Resource
+    private BaseUserService baseUserService;
     private static final String GLOBAL = "global";
 
     // 服务权限拼装顺序
@@ -86,22 +88,27 @@ public class GroupService {
         put(UserGroupType.PROJECT, "项目");
     }};
 
-    public Pager<List<GroupDTO>> getGroupList(EditGroupRequest request) {
+    public Pager<List<GroupDTO>> getProjectGroupList(EditGroupRequest request) {
         SessionUser user = SessionUtils.getUser();
         List<UserGroupDTO> userGroup = baseUserGroupMapper.getUserGroup(Objects.requireNonNull(user).getId(), request.getProjectId());
         List<String> groupTypeList = userGroup.stream().map(UserGroupDTO::getType).distinct().collect(Collectors.toList());
+        if (groupTypeList.isEmpty()) {
+            if (baseUserService.isSuperUser(user.getId())) {
+                groupTypeList.add(UserGroupType.PROJECT);
+            }
+        }
         return getGroups(groupTypeList, request);
     }
 
-    public void buildUserInfo(List<GroupDTO> testCases) {
-        if (CollectionUtils.isEmpty(testCases)) {
+    public void buildUserInfo(List<GroupDTO> groups) {
+        if (CollectionUtils.isEmpty(groups)) {
             return;
         }
-        List<String> userIds = testCases.stream().map(GroupDTO::getCreator).collect(Collectors.toList());
+        List<String> userIds = groups.stream().map(GroupDTO::getCreator).collect(Collectors.toList());
         if (!userIds.isEmpty()) {
             Map<String, String> userMap = ServiceUtils.getUserNameMap(userIds);
-            testCases.forEach(caseResult -> {
-                caseResult.setCreator(userMap.get(caseResult.getCreator()));
+            groups.forEach(caseResult -> {
+                caseResult.setCreator(userMap.getOrDefault(caseResult.getCreator(), caseResult.getCreator()));
             });
         }
     }
@@ -142,6 +149,9 @@ public class GroupService {
     }
 
     public void editGroup(EditGroupRequest request) {
+        if (StringUtils.equals(request.getId(), UserGroupConstants.SUPER_GROUP)) {
+            MSException.throwException("超级管理员无法编辑！");
+        }
         if (StringUtils.equals(request.getId(), UserGroupConstants.ADMIN)) {
             MSException.throwException("系统管理员无法编辑！");
         }
@@ -149,6 +159,7 @@ public class GroupService {
         Group group = new Group();
         request.setScopeId(null);
         BeanUtils.copyBean(group, request);
+        group.setCreator(SessionUtils.getUserId());
         group.setUpdateTime(System.currentTimeMillis());
         groupMapper.updateByPrimaryKeySelective(group);
     }
@@ -212,6 +223,9 @@ public class GroupService {
     }
 
     public void editGroupPermission(EditGroupRequest request) {
+        if (StringUtils.equals(request.getUserGroupId(), UserGroupConstants.SUPER_GROUP)) {
+            return;
+        }
         List<GroupPermission> permissions = request.getPermissions();
         if (CollectionUtils.isEmpty(permissions)) {
             return;
@@ -449,6 +463,15 @@ public class GroupService {
     }
 
     public void removeGroupMember(String userId, String groupId) {
+        Group group = groupMapper.selectByPrimaryKey(groupId);
+        if (group == null) {
+            MSException.throwException("group does not exist!");
+            return;
+        }
+        if (!StringUtils.equals(group.getType(), UserGroupType.PROJECT)) {
+            MSException.throwException("no permission to remove non-project type group users!");
+            return;
+        }
         UserGroupExample userGroupExample = new UserGroupExample();
         userGroupExample.createCriteria()
                 .andGroupIdEqualTo(groupId)
@@ -495,29 +518,10 @@ public class GroupService {
             return;
         }
 
-        if (StringUtils.equals(group.getType(), UserGroupType.SYSTEM)) {
-            this.addSystemGroupUser(group, request.getUserIds());
+        if (!StringUtils.equals(group.getType(), UserGroupType.SYSTEM) && CollectionUtils.isNotEmpty(request.getSourceIds())) {
+            this.addNotSystemGroupUser(group, request.getUserIds(), request.getSourceIds());
         } else {
-            if (CollectionUtils.isNotEmpty(request.getSourceIds())) {
-                this.addNotSystemGroupUser(group, request.getUserIds(), request.getSourceIds());
-            }
-        }
-    }
-
-    private void addSystemGroupUser(Group group, List<String> userIds) {
-        for (String userId : userIds) {
-            User user = userMapper.selectByPrimaryKey(userId);
-            if (user == null) {
-                continue;
-            }
-            UserGroupExample userGroupExample = new UserGroupExample();
-            userGroupExample.createCriteria().andUserIdEqualTo(userId).andGroupIdEqualTo(group.getId());
-            List<UserGroup> userGroups = userGroupMapper.selectByExample(userGroupExample);
-            if (userGroups.size() <= 0) {
-                UserGroup userGroup = new UserGroup(UUID.randomUUID().toString(), userId, group.getId(),
-                        "system", System.currentTimeMillis(), System.currentTimeMillis());
-                userGroupMapper.insertSelective(userGroup);
-            }
+            LogUtil.warn("no permission to add system group!");
         }
     }
 

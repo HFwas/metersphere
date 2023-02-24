@@ -158,6 +158,13 @@
                 </if>
             </foreach>
         </if>
+        <if test="request.combine != null">
+            <include refid="combine">
+                <property name="condition" value="request.combine"/>
+                <property name="name" value="request.name"/>
+                <property name="objectKey" value="request.combine.tags"/>
+            </include>
+        </if>
         <include refid="queryVersionCondition">
             <property name="versionTable" value="a"/>
         </include>
@@ -179,6 +186,52 @@
         </if>
 
     </select>
+
+    <sql id="combine">
+        <if test='${condition}.name != null and (${name} == null or ${name} == "")'>
+            and c.name
+            <include refid="io.metersphere.base.mapper.ext.ExtBaseMapper.condition">
+                <property name="object" value="${condition}.name"/>
+            </include>
+        </if>
+        <if test="${condition}.updateTime != null">
+            and t.update_time
+            <include refid="io.metersphere.base.mapper.ext.ExtBaseMapper.condition">
+                <property name="object" value="${condition}.updateTime"/>
+            </include>
+        </if>
+        <if test="${condition}.createTime != null">
+            and t.create_time
+            <include refid="io.metersphere.base.mapper.ext.ExtBaseMapper.condition">
+                <property name="object" value="${condition}.createTime"/>
+            </include>
+        </if>
+        <if test="${condition}.priority != null">
+            and c.priority
+            <include refid="io.metersphere.base.mapper.ext.ExtBaseMapper.condition">
+                <property name="object" value="${condition}.priority"/>
+            </include>
+        </if>
+        <if test="${condition}.path != null">
+            and c.path
+            <include refid="io.metersphere.base.mapper.ext.ExtBaseMapper.condition">
+                <property name="object" value="${condition}.path"/>
+            </include>
+        </if>
+        <if test="${condition}.status != null">
+            and c.status
+            <include refid="io.metersphere.base.mapper.ext.ExtBaseMapper.condition">
+                <property name="object" value="${condition}.status"/>
+            </include>
+        </if>
+        <if test="${condition}.case_status != null">
+            and c.case_status
+            <include refid="io.metersphere.base.mapper.ext.ExtBaseMapper.condition">
+                <property name="object" value="${condition}.case_status"/>
+            </include>
+        </if>
+
+    </sql>
     <select id="selectIds" resultType="java.lang.String">
         select
         t.id
@@ -419,10 +472,20 @@
 
     </select>
 
+    <select id="selectProjectId" resultType="java.lang.String">
+        SELECT project_id FROM test_plan WHERE id IN (
+            SELECT test_plan_id FROM  test_plan_api_case WHERE id = #{0}
+            )
+    </select>
     <select id="selectTestPlanByRelevancy" resultType="io.metersphere.api.dto.automation.TestPlanDTO"
             parameterType="io.metersphere.api.dto.QueryReferenceRequest">
-        SELECT * FROM test_plan p
+        SELECT p.id , p.name, project.name as projectName , w.name as workspaceName ,p.workspace_id AS workspaceId, p.project_id AS projectId FROM test_plan p
+        LEFT JOIN project ON p.project_id = project.id
+        LEFT JOIN `workspace` w ON  p.workspace_id = w.id
         <where>
+            <if test="request.workspaceId != null">
+                and p.workspace_id = #{request.workspaceId}
+            </if>
             <if test="request.scenarioId != null">
                 AND p.id IN (SELECT test_plan_id FROM test_plan_api_scenario WHERE api_scenario_id =
                 #{request.scenarioId} )
@@ -433,6 +496,63 @@
             <if test="request.loadId != null">
                 AND p.id IN (SELECT test_plan_id FROM test_plan_load_case WHERE load_case_id = #{request.loadId})
             </if>
+            <if test="request.filters != null and request.filters.size() > 0">
+                <foreach collection="request.filters.entrySet()" index="key" item="values">
+                    <if test="values != null and values.size() > 0">
+                        <choose>
+                            <when test="key=='project_id'">
+                                and p.project_id in
+                                <foreach collection="values" item="value" separator="," open="(" close=")">
+                                    #{value}
+                                </foreach>
+                            </when>
+                            <when test="key=='workspace_id'">
+                                and p.workspace_id in
+                                <foreach collection="values" item="value" separator="," open="(" close=")">
+                                    #{value}
+                                </foreach>
+                            </when>
+                        </choose>
+                    </if>
+                </foreach>
+            </if>
         </where>
+        <if test="request.orders != null and request.orders.size() > 0">
+            order by
+            <foreach collection="request.orders" separator="," item="order">
+                <if test="order.name != ''">
+                    p.${order.name} ${order.type}
+                </if>
+            </foreach>
+        </if>
+    </select>
+    <select id="selectNameByIdIn" resultType="java.lang.String">
+        select name from test_plan where id in
+        <foreach collection="ids" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+    </select>
+    <select id="selectByRefIds" resultType="io.metersphere.base.domain.TestPlanApiCase">
+        SELECT
+        plan.*
+        FROM
+        test_plan_api_case plan
+        INNER JOIN test_plan on plan.test_plan_id = test_plan.id
+        WHERE
+        plan.api_case_id IN
+        <foreach collection="ids" item="v" separator="," open="(" close=")">
+            #{v}
+        </foreach>
+    </select>
+
+    <select id="selectByPlanCaseIds" resultType="io.metersphere.api.dto.plan.TestPlanApiCaseInfoDTO">
+        SELECT a.project_id, t.*
+        FROM test_plan_api_case t
+                 INNER JOIN api_test_case a ON t.api_case_id = a.id
+        WHERE  t.id in
+        <foreach collection="planCaseIds" item="id" separator="," open="(" close=")">
+            #{id}
+        </foreach>
+        ORDER BY t.order DESC
     </select>
 </mapper>

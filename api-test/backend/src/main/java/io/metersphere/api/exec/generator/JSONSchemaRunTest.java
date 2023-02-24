@@ -3,16 +3,15 @@ package io.metersphere.api.exec.generator;
 
 import com.google.gson.*;
 import io.metersphere.commons.constants.PropertyConstant;
-import io.metersphere.commons.utils.EnumPropertyUtil;
+import io.metersphere.commons.utils.JSONUtil;
 import io.metersphere.jmeter.utils.ScriptEngineUtils;
-import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.util.NumberUtils;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -241,7 +240,7 @@ public class JSONSchemaRunTest {
             concept.put(propertyName, obj);
             analyzeObject(object, obj, map);
         } else if (StringUtils.equalsIgnoreCase(propertyObjType, "null")) {
-            concept.put(propertyName, StringUtils.EMPTY);
+            concept.put(propertyName, JSONObject.NULL);
         }
     }
 
@@ -250,12 +249,6 @@ public class JSONSchemaRunTest {
             if (isMock(object)) {
                 String value = ScriptEngineUtils.buildFunctionCallString(object.get(PropertyConstant.MOCK).getAsJsonObject().get(PropertyConstant.MOCK).getAsString());
                 return value;
-            } else if (object.has(PropertyConstant.ENUM)) {
-                List<Object> list = EnumPropertyUtil.analyzeEnumProperty(object);
-                if (CollectionUtils.isNotEmpty(list)) {
-                    int index = (int) (Math.random() * list.size());
-                    return list.get(index);
-                }
             }
         } catch (Exception e) {
             return object.get(PropertyConstant.MOCK).getAsJsonObject().get(PropertyConstant.MOCK);
@@ -293,12 +286,17 @@ public class JSONSchemaRunTest {
             }
             Map<String, String> map = new HashMap<>();
             String json = formerJson(jsonSchema, map);
-            if (!map.isEmpty()) {
+            if (MapUtils.isNotEmpty(map)) {
                 for (String str : map.keySet()) {
                     json = json.replace(str, map.get(str));
                 }
             }
-            return json;
+            String value = StringUtils.chomp(json.trim());
+            if (StringUtils.startsWith(value, "[") && StringUtils.endsWith(value, "]")) {
+                return JSONUtil.parserArray(value);
+            } else {
+                return JSONUtil.parserObject(value);
+            }
         } catch (Exception ex) {
             return jsonSchema;
         }

@@ -86,17 +86,15 @@
     <select id="getCountByStatus" resultType="io.metersphere.dto.IssuesStatusCountDao">
         select count(1) as `count`, if(i.platform = 'Local', cfi.value, i.platform_status) as statusValue, i.platform
         from issues i
-        inner join project p
-            on i.project_id = p.id and p.workspace_id = #{request.workspaceId}
-        left join custom_field_issues cfi
-            on i.id = cfi.resource_id and field_id in (
-              select cf.id
-              from custom_field cf
-              left join project pr
-                on cf.project_id = pr.id
-              where cf.scene = 'ISSUE' and cf.name = '状态'
-                and (pr.workspace_id = #{request.workspaceId} or global = true)
-            )
+                 inner join project p
+                            on i.project_id = p.id and p.workspace_id = #{request.workspaceId}
+                 left join custom_field_issues cfi
+                           on i.id = cfi.resource_id and field_id in (select cf.id
+                                                                      from custom_field cf
+                                                                               inner join custom_field_template cft on cft.template_id = p.issue_template_id
+                                                                      where cf.scene = 'ISSUE'
+                                                                        and cf.name = '状态'
+                                                                        and (p.workspace_id = #{request.workspaceId} or cf.global = true))
         where i.creator = #{request.creator}
         group by statusValue;
     </select>
@@ -112,7 +110,7 @@
         group by issues.id
     </select>
     <select id="getIssueForSync" resultType="io.metersphere.xpack.track.dto.IssuesDao">
-        select id, platform, platform_id, create_time
+        select id, platform, platform_id, create_time, update_time
         from issues
         where project_id = #{projectId} and platform = #{platform} and (platform_status != 'delete' or platform_status is null);
     </select>
@@ -152,7 +150,7 @@
                    when 'textarea' then cfi.text_value
                    else cfi.value end as value
         from custom_field_issues cfi
-        join custom_field cf on cf.id = cfi.field_id
+        left join custom_field cf on cf.id = cfi.field_id
         where cfi.resource_id = #{issueId}
     </select>
     <select id="getPlatformIssueByIds" resultType="io.metersphere.xpack.track.dto.IssuesDao">
@@ -161,6 +159,32 @@
             #{value}
         </foreach>
     </select>
+
+    <select id="getThisWeekIssueCount" resultType="java.lang.Long">
+        select count(*) from issues where project_id = #{projectId} and date_sub(curdate(), interval 7 day) &lt;= from_unixtime(round(create_time / 1000, 0)) and id in
+        <foreach collection="ids" item="value" separator="," open="(" close=")">
+            #{value}
+        </foreach>
+    </select>
+
+    <select id="getTestPlanThisWeekIssue" resultType="java.lang.String">
+        select distinct tci.issues_id
+        from test_plan_test_case tptc
+        join test_plan tp on tp.id = tptc.plan_id
+        join test_case_issues tci on tptc.id = tci.resource_id
+        where tptc.is_del != 1 and date_sub(curdate(), interval 7 day) &lt;= from_unixtime(round(tci.relate_time / 1000, 0))
+          and tp.project_id = #{projectId}
+    </select>
+
+    <select id="getTestPlanIssue" resultType="java.lang.String">
+        select distinct tci.issues_id
+        from test_plan_test_case tptc
+                 join test_plan tp on tp.id = tptc.plan_id
+                 join test_case_issues tci on tptc.id = tci.resource_id
+                 join issues on tci.issues_id = issues.id
+        where tptc.is_del != 1 and tp.project_id = #{projectId}
+    </select>
+
     <select id="getIssueCustomFields" resultType="io.metersphere.xpack.track.dto.IssuesDao">
         select cfi.field_id           as fieldId,
                cf.type fieldType,
@@ -229,7 +253,18 @@
                     #{value}
                 </foreach>
             </if>
-
+            <if test="request.filterIds != null and request.filterIds.size() > 0">
+                and issues.id in
+                <foreach collection="request.filterIds" item="value" separator="," open="(" close=")">
+                    #{value}
+                </foreach>
+            </if>
+            <if test="!request.selectAll and request.exportIds != null and request.exportIds.size > 0">
+                and issues.id in
+                <foreach collection="request.exportIds" item="value" separator="," open="(" close=")">
+                    #{value}
+                </foreach>
+            </if>
             <if test="request.filters != null and request.filters.size() > 0">
                 <foreach collection="request.filters.entrySet()" index="key" item="values">
                     <if test="values != null and values.size() > 0">

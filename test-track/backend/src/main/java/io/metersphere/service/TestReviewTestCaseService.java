@@ -48,15 +48,13 @@ public class TestReviewTestCaseService {
     @Resource
     TestCaseReviewMapper testCaseReviewMapper;
     @Resource
-    io.metersphere.service.TestCaseReviewService testCaseReviewService;
+    TestCaseReviewService testCaseReviewService;
     @Resource
     TestCaseMapper testCaseMapper;
     @Resource
-    io.metersphere.service.TestCaseService testCaseService;
-//    @Resource
-//    ExtTestPlanTestCaseMapper extTestPlanTestCaseMapper;
+    TestCaseService testCaseService;
     @Resource
-    io.metersphere.service.TestCaseCommentService testCaseCommentService;
+    TestCaseCommentService testCaseCommentService;
 
     public List<TestReviewCaseDTO> list(QueryCaseReviewRequest request) {
         request.setOrders(ServiceUtils.getDefaultSortOrder(request.getOrders()));
@@ -113,7 +111,6 @@ public class TestReviewTestCaseService {
     }
 
     public int deleteTestCase(DeleteRelevanceRequest request) {
-        checkReviewer(request.getReviewId());
         return testCaseReviewTestCaseMapper.deleteByPrimaryKey(request.getId());
     }
 
@@ -132,21 +129,7 @@ public class TestReviewTestCaseService {
         return testCaseReviewTestCaseMapper.updateByExampleSelective(record, example);
     }
 
-    private void checkReviewer(String reviewId) {
-        List<String> userIds = testCaseReviewService.getTestCaseReviewerIds(reviewId);
-        String currentId = SessionUtils.getUser().getId();
-        TestCaseReview caseReview = testCaseReviewMapper.selectByPrimaryKey(reviewId);
-        String creator = StringUtils.EMPTY;
-        if (caseReview != null) {
-            creator = caseReview.getCreator();
-        }
-        if (!userIds.contains(currentId) && !StringUtils.equals(creator, currentId)) {
-            MSException.throwException("没有权限，不能解除用例关联！");
-        }
-    }
-
     public void deleteTestCaseBatch(TestReviewCaseBatchRequest request) {
-        checkReviewer(request.getReviewId());
         ServiceUtils.getSelectAllIds(request, request.getCondition(),
                 (query) -> extTestReviewCaseMapper.selectIds((QueryCaseReviewRequest) query));
 

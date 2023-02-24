@@ -1,12 +1,15 @@
 package io.metersphere.listener;
 
-import io.metersphere.service.ext.ExtApiScheduleService;
 import io.metersphere.base.domain.*;
 import io.metersphere.base.mapper.*;
 import io.metersphere.base.mapper.ext.ExtApiScenarioReportResultMapper;
 import io.metersphere.base.mapper.ext.ExtApiScenarioReportStructureMapper;
 import io.metersphere.commons.constants.KafkaTopicConstants;
 import io.metersphere.commons.utils.LogUtil;
+import io.metersphere.service.definition.ApiCaseExecutionInfoService;
+import io.metersphere.service.definition.ApiExecutionInfoService;
+import io.metersphere.service.ext.ExtApiScheduleService;
+import io.metersphere.service.scenario.ApiScenarioExecutionInfoService;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -18,7 +21,6 @@ import javax.annotation.Resource;
 @Component
 @Transactional(rollbackFor = Exception.class)
 public class ProjectDeletedListener {
-
     @Resource
     private ExtApiScheduleService scheduleService;
     @Resource
@@ -39,6 +41,12 @@ public class ProjectDeletedListener {
     private ExtApiScenarioReportStructureMapper extApiScenarioReportStructureMapper;
     @Resource
     private ApiScenarioMapper apiScenarioMapper;
+    @Resource
+    private ApiExecutionInfoService apiExecutionInfoService;
+    @Resource
+    private ApiCaseExecutionInfoService apiCaseExecutionInfoService;
+    @Resource
+    private ApiScenarioExecutionInfoService apiScenarioExecutionInfoService;
 
     public static final String CONSUME_ID = "project-deleted";
 
@@ -69,6 +77,14 @@ public class ProjectDeletedListener {
         ApiScenarioExample apiScenarioExample = new ApiScenarioExample();
         apiScenarioExample.createCriteria().andProjectIdEqualTo(projectId);
         apiScenarioMapper.deleteByExample(apiScenarioExample);
+        //删除执行记录
+        this.deleteExecutionInfo(projectId);
+    }
+
+    private void deleteExecutionInfo(String projectId) {
+        apiExecutionInfoService.deleteByProjectId(projectId);
+        apiCaseExecutionInfoService.deleteByProjectId(projectId);
+        apiScenarioExecutionInfoService.deleteByProjectId(projectId);
     }
 
     private void delReport(String projectId) {

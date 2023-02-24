@@ -82,6 +82,10 @@ export function testCasePublicBatchDeleteToGc(param) {
   return post(BASE_URL + 'batch/movePublic/deleteToGc', param);
 }
 
+export function testCaseBatchRelateDemand(param) {
+  return post(BASE_URL + 'batch/relate/demand', param);
+}
+
 export function getTestCaseFollow(id) {
   return get(BASE_URL + `follow/${id}`);
 }
@@ -229,6 +233,10 @@ export function getTestCaseRelevanceScenarioList(pageNum, pageSize, param) {
   return post(BASE_URL + "relevance/scenario/list/" + pageNum + "/" + pageSize, param);
 }
 
+export function getTestCaseRelevanceUiScenarioList(pageNum, pageSize, param) {
+  return post(BASE_URL + "relevance/uiScenario/list/" + pageNum + "/" + pageSize, param);
+}
+
 export function getTestCaseRelevanceLoadList(pageNum, pageSize, param) {
   return post(BASE_URL + "relevance/load/list/" + pageNum + "/" + pageSize, param);
 }
@@ -239,6 +247,10 @@ export function saveCaseRelevanceApi(caseId, param) {
 
 export function saveCaseRelevanceScenario(caseId, param) {
   return post(BASE_URL + "relate/test/automation/" + caseId, param);
+}
+
+export function saveUiCaseRelevanceScenario(caseId, param) {
+  return post(BASE_URL + "relate/test/uiAutomation/" + caseId, param);
 }
 
 export function saveCaseRelevanceLoad(caseId, param) {

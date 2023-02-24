@@ -8,21 +8,25 @@
           :clear-tip="$t('api_test.request.assertions.json_path_clear')"
           :isReadOnly="isReadOnly"
           @open="suggestJsonOpen"
-          @clear="clearJson"/>
+          @clear="clearJson" />
       </span>
     </el-row>
     <div class="assertion-add" :draggable="draggable">
       <el-row :gutter="10">
         <el-col :span="4">
-          <el-select :disabled="isReadOnly" class="assertion-item" v-model="type"
-                     :placeholder="$t('api_test.request.assertions.select_type')" size="small">
-            <el-option :label="$t('api_test.request.assertions.text')" :value="options.TEXT"/>
-            <el-option :label="$t('api_test.request.assertions.regex')" :value="options.REGEX"/>
-            <el-option :label="'JSONPath'" :value="options.JSON_PATH"/>
-            <el-option :label="'XPath'" :value="options.XPATH2"/>
-            <el-option :label="$t('api_test.request.assertions.response_time')" :value="options.DURATION"/>
-            <el-option :label="$t('api_test.request.assertions.jsr223')" :value="options.JSR223"/>
-            <el-option :label="$t('api_test.definition.request.document_structure')" :value="options.DOCUMENT"/>
+          <el-select
+            :disabled="isReadOnly"
+            class="assertion-item"
+            v-model="type"
+            :placeholder="$t('api_test.request.assertions.select_type')"
+            size="small">
+            <el-option :label="$t('api_test.request.assertions.text')" :value="options.TEXT" />
+            <el-option :label="$t('api_test.request.assertions.regex')" :value="options.REGEX" />
+            <el-option :label="'JSONPath'" :value="options.JSON_PATH" />
+            <el-option :label="'XPath'" :value="options.XPATH2" />
+            <el-option :label="$t('api_test.request.assertions.response_time')" :value="options.DURATION" />
+            <el-option :label="$t('api_test.request.assertions.jsr223')" :value="options.JSR223" />
+            <el-option :label="$t('api_test.definition.request.document_structure')" :value="options.DOCUMENT" />
           </el-select>
         </el-col>
         <el-col :span="20">
@@ -30,88 +34,83 @@
             :is-read-only="isReadOnly"
             :list="assertions.regex"
             :callback="after"
-            v-if="type === options.TEXT"
-          />
+            v-if="type === options.TEXT" />
           <ms-api-assertion-regex
             :is-read-only="isReadOnly"
             :list="assertions.regex"
             :callback="after"
             @callback="after"
-            v-if="type === options.REGEX"
-          />
+            v-if="type === options.REGEX" />
           <ms-api-assertion-json-path
             :is-read-only="isReadOnly"
             :list="assertions.jsonPath"
             :callback="after"
-            v-if="type === options.JSON_PATH"
-          />
+            v-if="type === options.JSON_PATH" />
           <ms-api-assertion-x-path2
             :is-read-only="isReadOnly"
             :list="assertions.xpath2"
             :callback="after"
-            v-if="type === options.XPATH2"
-          />
+            v-if="type === options.XPATH2" />
           <ms-api-assertion-duration
             v-model="time"
             :is-read-only="isReadOnly"
             :duration="assertions.duration"
             :callback="after"
-            v-if="type === options.DURATION"
-          />
+            v-if="type === options.DURATION" />
           <ms-api-assertion-jsr223
             :is-read-only="isReadOnly"
             :list="assertions.jsr223"
             :callback="after"
-            v-if="type === options.JSR223"
-          />
+            v-if="type === options.JSR223" />
           <ms-api-assertion-document
             :is-read-only="isReadOnly"
             v-model="time"
             :document="assertions.document"
             :callback="after"
-            v-if="type === options.DOCUMENT"
-          />
-          <el-button v-if="!type" :disabled="true" type="primary" size="mini"
-                     style="background-color: var(--primary_color); border-color:var(--primary_color); ">
+            v-if="type === options.DOCUMENT" />
+          <el-button
+            v-if="!type"
+            :disabled="true"
+            type="primary"
+            size="mini"
+            style="background-color: var(--primary_color); border-color: var(--primary_color)">
             {{ $t('api_test.request.assertions.add') }}
           </el-button>
         </el-col>
       </el-row>
     </div>
 
-
     <ms-api-assertions-edit
       :is-read-only="isReadOnly"
       :assertions="assertions"
       :apiId="apiId"
       :reloadData="reloadData"
-      style="margin-bottom: 20px"/>
+      style="margin-bottom: 20px" />
 
     <ms-api-jsonpath-suggest
       :tip="$t('api_test.request.extract.suggest_tip')"
       @addSuggest="addJsonPathSuggest"
-      ref="jsonpathSuggest"/>
-
+      ref="jsonpathSuggest" />
   </el-card>
 </template>
 
 <script>
-import MsApiAssertionText from "./ApiAssertionText";
-import MsApiAssertionRegex from "./ApiAssertionRegex";
-import MsApiAssertionDuration from "./ApiAssertionDuration";
-import {ASSERTION_TYPE, JSONPath} from "../../model/ApiTestModel";
-import MsApiAssertionsEdit from "./ApiAssertionsEdit";
-import MsApiAssertionJsonPath from "./ApiAssertionJsonPath";
-import MsApiAssertionJsr223 from "./ApiAssertionJsr223";
-import MsApiAssertionXPath2 from "./ApiAssertionXPath2";
-import {getUUID} from "metersphere-frontend/src/utils";
-import ApiJsonPathSuggestButton from "./ApiJsonPathSuggestButton";
-import MsApiJsonpathSuggest from "./ApiJsonpathSuggest";
-import ApiBaseComponent from "../../../automation/scenario/common/ApiBaseComponent";
-import MsApiAssertionDocument from "./document/DocumentHeader";
+import MsApiAssertionText from './ApiAssertionText';
+import MsApiAssertionRegex from './ApiAssertionRegex';
+import MsApiAssertionDuration from './ApiAssertionDuration';
+import { ASSERTION_TYPE, JSONPath } from '../../model/ApiTestModel';
+import MsApiAssertionsEdit from './ApiAssertionsEdit';
+import MsApiAssertionJsonPath from './ApiAssertionJsonPath';
+import MsApiAssertionJsr223 from './ApiAssertionJsr223';
+import MsApiAssertionXPath2 from './ApiAssertionXPath2';
+import { getUUID } from 'metersphere-frontend/src/utils';
+import ApiJsonPathSuggestButton from './ApiJsonPathSuggestButton';
+import MsApiJsonpathSuggest from './ApiJsonpathSuggest';
+import ApiBaseComponent from '../../../automation/scenario/common/ApiBaseComponent';
+import MsApiAssertionDocument from './document/DocumentHeader';
 
 export default {
-  name: "MsApiAssertions",
+  name: 'MsApiAssertions',
   components: {
     ApiBaseComponent,
     MsApiJsonpathSuggest,
@@ -149,35 +148,43 @@ export default {
     response: {},
     customizeStyle: {
       type: String,
-      default: "margin-top: 10px"
+      default: 'margin-top: 10px',
     },
     isReadOnly: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
   data() {
     return {
       options: ASSERTION_TYPE,
-      time: "",
-      type: "",
+      time: '',
+      type: '',
       loading: false,
-      reloadData: "",
-    }
+      reloadData: '',
+    };
   },
   watch: {
     assertions: {
       handler(v) {
         this.computeStep();
       },
-      deep: true
+      deep: true,
     },
   },
   methods: {
     computeStep() {
       let ruleSize = 0;
-      ruleSize = (this.assertions.jsonPath.length + this.assertions.jsr223.length + this.assertions.regex.length + this.assertions.xpath2.length);
-      if (this.assertions && this.assertions.document.data && (this.assertions.document.data.json.length > 0 || this.assertions.document.data.xml.length > 0)) {
+      ruleSize =
+        this.assertions.jsonPath.length +
+        this.assertions.jsr223.length +
+        this.assertions.regex.length +
+        this.assertions.xpath2.length;
+      if (
+        this.assertions &&
+        this.assertions.document.data &&
+        (this.assertions.document.data.json.length > 0 || this.assertions.document.data.xml.length > 0)
+      ) {
         ruleSize++;
       }
       if (this.assertions.duration && this.assertions.duration.value > 0) {
@@ -189,7 +196,7 @@ export default {
     },
 
     after() {
-      this.type = "";
+      this.type = '';
       this.reloadData = getUUID().substring(0, 8);
       this.reload();
     },
@@ -204,13 +211,13 @@ export default {
           return;
         }
         this.$refs.jsonpathSuggest.open(this.response.responseResult.body);
-      })
+      });
     },
     reload() {
-      this.loading = true
+      this.loading = true;
       this.$nextTick(() => {
-        this.loading = false
-      })
+        this.loading = false;
+      });
     },
     active() {
       this.assertions.active = !this.assertions.active;
@@ -226,10 +233,20 @@ export default {
       jsonItem.setJSONPathDescription();
       let expect = jsonItem.expect;
       if (expect) {
-        expect = expect.replaceAll('\\', "\\\\").replaceAll('(', "\\(").replaceAll(')', "\\)")
-          .replaceAll('+', "\\+").replaceAll('[', "\\[").replaceAll(']', "\\]")
-          .replaceAll('?', "\\?").replaceAll('/', "\\/").replaceAll('*', "\\*")
-          .replaceAll('^', "\\^").replaceAll('{', "\\{").replaceAll('}', "\\}").replaceAll('$', "\\$");
+        expect = expect
+          .replaceAll('\\', '\\\\')
+          .replaceAll('(', '\\(')
+          .replaceAll(')', '\\)')
+          .replaceAll('+', '\\+')
+          .replaceAll('[', '\\[')
+          .replaceAll(']', '\\]')
+          .replaceAll('?', '\\?')
+          .replaceAll('/', '\\/')
+          .replaceAll('*', '\\*')
+          .replaceAll('^', '\\^')
+          .replaceAll('{', '\\{')
+          .replaceAll('}', '\\}')
+          .replaceAll('$', '\\$');
       }
       jsonItem.expect = expect;
       jsonItem.enable = true;
@@ -237,9 +254,9 @@ export default {
     },
     clearJson() {
       this.assertions.jsonPath = [];
-    }
-  }
-}
+    },
+  },
+};
 </script>
 
 <style scoped>
@@ -251,7 +268,7 @@ export default {
   padding: 10px;
   margin: 5px 0;
   border-radius: 5px;
-  border: #DCDFE6 solid 1px;
+  border: #dcdfe6 solid 1px;
 }
 
 .icon.is-active {

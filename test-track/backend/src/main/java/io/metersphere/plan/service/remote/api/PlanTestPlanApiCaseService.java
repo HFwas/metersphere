@@ -1,5 +1,7 @@
 package io.metersphere.plan.service.remote.api;
 
+import io.metersphere.base.domain.ApiDefinitionExecResultWithBLOBs;
+import io.metersphere.base.domain.ApiScenarioReportWithBLOBs;
 import io.metersphere.commons.constants.MicroServiceName;
 import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.utils.LogUtil;
@@ -44,7 +46,11 @@ public class PlanTestPlanApiCaseService extends ApiTestService {
             calculatePlanReport(report, planReportCaseDTOS);
             //记录接口用例的运行环境信息
             List<String> idList = planReportCaseDTOS.stream().map(PlanReportCaseDTO::getId).collect(Collectors.toList());
-            report.setProjectEnvMap(getPlanProjectEnvMap(idList));
+            try {
+                report.setProjectEnvMap(getPlanProjectEnvMap(idList));
+            } catch (Exception e) {
+                LogUtil.error(e);
+            }
         }
     }
 
@@ -87,7 +93,12 @@ public class PlanTestPlanApiCaseService extends ApiTestService {
     }
 
     public List<MsExecResponseDTO> run(BatchRunDefinitionRequest request) {
-        return microService.postForDataArray(serviceName, BASE_UEL + "/run", request, MsExecResponseDTO.class);
+        try {
+            return microService.postForDataArray(serviceName, BASE_UEL + "/run", request, MsExecResponseDTO.class);
+        } catch (Exception e) {
+            LogUtil.info("调用API服务执行用例失败", e);
+            return new ArrayList<>();
+        }
     }
 
     public RunModeConfigDTO setApiCaseEnv(String planId, RunModeConfigDTO runModeConfig) {
@@ -126,6 +137,10 @@ public class PlanTestPlanApiCaseService extends ApiTestService {
         return (Map<String, List<String>>) microService.getForData(serviceName, BASE_UEL + "/get/env/" + planId);
     }
 
+    public List<String> getApiCaseProjectIds(String planId) {
+        return (List<String>) microService.getForData(serviceName, BASE_UEL + "/get/project/ids/" + planId);
+    }
+
     public Boolean isCaseExecuting(String planId) {
         return (Boolean) microService.getForData(serviceName, BASE_UEL + "/is/executing/" + planId);
     }
@@ -143,11 +158,22 @@ public class PlanTestPlanApiCaseService extends ApiTestService {
     }
 
     public List<TestPlanFailureApiDTO> buildResponse(List<TestPlanFailureApiDTO> apiAllCases) {
+        if (CollectionUtils.isEmpty(apiAllCases)) {
+            return null;
+        }
         return microService.postForDataArray(serviceName, BASE_UEL + "/build/response", apiAllCases, TestPlanFailureApiDTO.class);
     }
 
     public Object relevanceList(int pageNum, int pageSize, ApiTestCaseRequest request) {
         request.setAllowedRepeatCase(testPlanService.isAllowedRepeatCase(request.getPlanId()));
         return microService.postForData(serviceName, BASE_UEL + String.format("/relevance/list/%s/%s", pageNum, pageSize), request);
+    }
+
+    public List<ApiDefinitionExecResultWithBLOBs> selectExtForPlanReport(String planId) {
+        return microService.getForDataArray(serviceName, BASE_UEL + "/get/report/ext/" + planId, ApiDefinitionExecResultWithBLOBs.class);
+    }
+
+    public List<ApiScenarioReportWithBLOBs> selectExtForPlanScenarioReport(String planId) {
+        return microService.getForDataArray(serviceName, BASE_UEL + "/get/report/scenario/ext/" + planId, ApiScenarioReportWithBLOBs.class);
     }
 }

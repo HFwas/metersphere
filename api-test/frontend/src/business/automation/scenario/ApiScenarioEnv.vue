@@ -5,15 +5,19 @@
     width="30%"
     :destroy-on-close="true"
     :before-close="handleClose">
-
     <div v-loading="result">
-      <div v-for="pe in data" :key="pe.id" style="margin-left: 20px;">
+      <div v-for="pe in data" :key="pe.id" style="margin-left: 20px">
         {{ getProjectName(pe.id) }}
-        <el-select v-model="pe['selectEnv']" placeholder="请选择环境" style="margin-left:10px; margin-top: 10px;"
-                   size="small">
-          <el-option v-for="(environment, index) in pe.envs" :key="index"
-                     :label="environment.name"
-                     :value="environment.id"/>
+        <el-select
+          v-model="pe['selectEnv']"
+          placeholder="请选择环境"
+          style="margin-left: 10px; margin-top: 10px"
+          size="small">
+          <el-option
+            v-for="(environment, index) in pe.envs"
+            :key="index"
+            :label="environment.name"
+            :value="environment.id" />
           <el-button class="ms-scenario-button" size="mini" type="primary" @click="openEnvironmentConfig(pe.id)">
             {{ $t('api_test.environment.environment_config') }}
           </el-button>
@@ -34,23 +38,22 @@
     </span>
 
     <!-- 环境配置 -->
-    <api-environment-config ref="environmentConfig" @close="environmentConfigClose"/>
-
+    <api-environment-config ref="environmentConfig" @close="environmentConfigClose" />
   </el-dialog>
 </template>
 
 <script>
-import {parseEnvironment} from "@/business/environment/model/EnvironmentModel";
-import ApiEnvironmentConfig from "metersphere-frontend/src/components/environment/ApiEnvironmentConfig";
-import {getEnvironmentByProjectId} from "metersphere-frontend/src/api/environment";
+import { parseEnvironment } from '@/business/environment/model/EnvironmentModel';
+import ApiEnvironmentConfig from 'metersphere-frontend/src/components/environment/ApiEnvironmentConfig';
+import { getEnvironmentByProjectId } from 'metersphere-frontend/src/api/environment';
 
 export default {
-  name: "ApiScenarioEnv",
-  components: {ApiEnvironmentConfig},
+  name: 'ApiScenarioEnv',
+  components: { ApiEnvironmentConfig },
   props: {
     envMap: Map,
     projectIds: Set,
-    projectList: Array
+    projectList: Array,
   },
   data() {
     return {
@@ -59,28 +62,28 @@ export default {
       projects: [],
       environmentId: '',
       environments: [],
-      dialogVisible: false
-    }
+      dialogVisible: false,
+    };
   },
   methods: {
     handleClose() {
       this.dialogVisible = false;
     },
     init() {
-      this.projectIds.forEach(id => {
-        let item = {id: id, envs: [], selectEnv: ""};
+      this.projectIds.forEach((id) => {
+        let item = { id: id, envs: [], selectEnv: '' };
         this.data.push(item);
-        this.result = getEnvironmentByProjectId(id).then(res => {
+        this.result = getEnvironmentByProjectId(id).then((res) => {
           let envs = res.data;
-          envs.forEach(environment => {
+          envs.forEach((environment) => {
             parseEnvironment(environment);
           });
           // 固定环境列表渲染顺序
-          let temp = this.data.find(dt => dt.id === id);
+          let temp = this.data.find((dt) => dt.id === id);
           temp.envs = envs;
           temp.selectEnv = this.envMap.get(id);
-        })
-      })
+        });
+      });
     },
     open() {
       this.data = [];
@@ -90,8 +93,8 @@ export default {
       }
     },
     getProjectName(id) {
-      const project = this.projectList.find(p => p.id === id);
-      return project ? project.name : "";
+      const project = this.projectList.find((p) => p.id === id);
+      return project ? project.name : '';
     },
     openEnvironmentConfig(projectId) {
       if (!projectId) {
@@ -103,15 +106,15 @@ export default {
     handleConfirm() {
       let map = new Map();
       let sign = true;
-      this.data.forEach(dt => {
+      this.data.forEach((dt) => {
         if (!dt.selectEnv) {
           sign = false;
           return;
         }
         map.set(dt.id, dt.selectEnv);
-      })
+      });
       if (!sign) {
-        this.$warning("请为当前场景选择一个运行环境！");
+        this.$warning('请为当前场景选择一个运行环境！');
         return;
       }
       this.$emit('setProjectEnvMap', map);
@@ -120,18 +123,18 @@ export default {
     checkEnv() {
       let sign = true;
       if (this.data.length > 0) {
-        this.data.forEach(dt => {
+        this.data.forEach((dt) => {
           if (!dt.selectEnv) {
             sign = false;
             return false;
           }
-        })
+        });
       } else {
         sign = false;
       }
 
       if (!sign) {
-        this.$warning("请为当前场景选择一个运行环境！");
+        this.$warning('请为当前场景选择一个运行环境！');
         return false;
       }
       return true;
@@ -139,9 +142,9 @@ export default {
     environmentConfigClose() {
       this.data = [];
       this.init();
-    }
-  }
-}
+    },
+  },
+};
 </script>
 
 <style scoped>

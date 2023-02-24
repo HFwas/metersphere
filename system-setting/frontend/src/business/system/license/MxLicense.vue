@@ -8,6 +8,10 @@
         <div class="license-content">
           <div v-if="license.status !== 'Fail'">
             <table>
+              <tr v-if="license.serialNo">
+                <th>{{ $t('license.serial_num') }}</th>
+                <td>{{ license.serialNo }}</td>
+              </tr>
               <tr>
                 <th>{{ $t('license.corporation') }}</th>
                 <td>{{ license.corporation }}</td>
@@ -49,6 +53,10 @@
                   <label class="ms-license-label" v-else>{{ $t('license.invalid') }}</label>
                 </td>
               </tr>
+              <tr v-if="license.remark">
+                <th>{{ $t('license.remark') }}</th>
+                <td>{{ license.remark }}</td>
+              </tr>
             </table>
           </div>
           <el-link type="primary" class="license-update" @click="create()" :disabled="disabled">
@@ -63,8 +71,9 @@
 
 <script>
 import MsValidLicense from "./ValidLicense";
-import {hasPermission} from "metersphere-frontend/src/utils/permission";
-import {getLicense, saveLicense} from "../../../api/license";
+import {hasPermission, saveLicense, hasLicense} from "metersphere-frontend/src/utils/permission";
+import {getLicense} from "../../../api/license";
+import {getModuleList} from "metersphere-frontend/src/api/module";
 
 export default {
   name: "MxLicense",
@@ -91,7 +100,9 @@ export default {
     search() {
       this.result = getLicense()
         .then(response => {
-          this.license = response.data.license;
+          if (response.data.license) {
+            this.license = response.data.license;
+          }
           this.status = response.data.status;
         })
     },
@@ -107,8 +118,20 @@ export default {
         this.license.licenseVersion = value.license.licenseVersion;
         this.license.licenseCount = value.license.licenseCount;
         this.license.status = value.status;
+        this.license.serialNo = value.license.serialNo;
+        this.license.remark = value.license.remark;
         saveLicense(value.status);
-        window.location.reload();
+        if (hasLicense()) {
+          getModuleList()
+            .then(response => {
+              let modules = {};
+              response.data.forEach(m => {
+                modules[m.key] = m.status;
+              });
+              localStorage.setItem('modules', JSON.stringify(modules));
+              location.reload();
+            })
+        }
       }
     },
   }
@@ -125,7 +148,6 @@ export default {
 
 .license-container {
   margin: auto;
-  height: 400px;
   position: relative;
 }
 

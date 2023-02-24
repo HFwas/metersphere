@@ -13,31 +13,35 @@
           :useEnvironment="environment"
           :is-case-edit="isCaseEdit"
           :button-text="saveButtonText"
-          ref="header" v-if="refreshHeader"/>
+          ref="header"
+          v-if="refreshHeader" />
       </template>
 
       <el-container>
         <el-main>
-          <div v-for="item in apiCaseList" :key="item.id ? item.id : item.uuid">
-            <api-case-item
-              :loading="singleLoading && singleRunId ===item.id || batchLoadingIds.indexOf(item.id) > -1"
-              @refresh="refresh"
-              @singleRun="singleRun"
-              @stop="stop"
-              @refreshModule="refreshModule"
-              @copyCase="copyCase"
-              @showExecResult="showExecResult"
-              @showHistory="showHistory"
-              @reLoadCase="reLoadCase"
-              :environment="environment"
-              @setSelectedCaseId="setSelectedCaseId"
-              :is-case-edit="isCaseEdit"
-              :api="api"
-              :currentApi="currentApi"
-              :loaded="loaded"
-              :maintainerOptions="maintainerOptions"
-              :api-case="item" ref="apiCaseItem"/>
-          </div>
+          <fieldset :disabled="loaded">
+            <div v-for="item in apiCaseList" :key="item.id ? item.id : item.uuid">
+              <api-case-item
+                :loading="(singleLoading && singleRunId === item.id) || batchLoadingIds.indexOf(item.id) > -1"
+                @refresh="refresh"
+                @singleRun="singleRun"
+                @stop="stop"
+                @refreshModule="refreshModule"
+                @copyCase="copyCase"
+                @showExecResult="showExecResult"
+                @showHistory="showHistory"
+                @reLoadCase="reLoadCase"
+                :environment="environment"
+                @setSelectedCaseId="setSelectedCaseId"
+                :is-case-edit="isCaseEdit"
+                :api="api"
+                :currentApi="currentApi"
+                :loaded="loaded"
+                :maintainerOptions="maintainerOptions"
+                :api-case="item"
+                ref="apiCaseItem" />
+            </div>
+          </fieldset>
         </el-main>
       </el-container>
     </ms-drawer>
@@ -50,25 +54,25 @@
       :env-map="envMap"
       :edit-case-request="true"
       @runRefresh="runRefresh"
-      @errorRefresh="errorRefresh" ref="runTest"/>
-    <ms-task-center ref="taskCenter" :show-menu="false"/>
+      @errorRefresh="errorRefresh"
+      ref="runTest" />
+    <ms-task-center ref="taskCenter" :show-menu="false" />
   </div>
 </template>
 <script>
-
-import {apiTestCaseList, editApiCaseByParam, getCaseById} from "@/api/api-test-case";
-import {getMaintainer} from "@/api/project";
-import ApiCaseHeader from "./ApiCaseHeader";
-import {getCurrentProjectID} from "metersphere-frontend/src/utils/token";
-import {getUUID} from "metersphere-frontend/src/utils";
-import MsDrawer from "metersphere-frontend/src/components/MsDrawer";
-import {CASE_ORDER} from "../../model/JsonData";
-import {API_CASE_CONFIGS} from "metersphere-frontend/src/components/search/search-components";
-import {parseEnvironment} from "@/business/environment/model/EnvironmentModel";
-import {Body} from "@/business/definition/model/ApiTestModel";
-import {getEnvironmentByProjectId} from "metersphere-frontend/src/api/environment";
-import {execBatchStop} from "@/api/scenario";
-import {useApiStore} from "@/store";
+import { apiTestCaseList, editApiCaseByParam, getCaseById } from '@/api/api-test-case';
+import { getMaintainer } from '@/api/project';
+import ApiCaseHeader from './ApiCaseHeader';
+import { getCurrentProjectID } from 'metersphere-frontend/src/utils/token';
+import { getUUID } from 'metersphere-frontend/src/utils';
+import MsDrawer from 'metersphere-frontend/src/components/MsDrawer';
+import { CASE_ORDER } from '../../model/JsonData';
+import { API_CASE_CONFIGS } from 'metersphere-frontend/src/components/search/search-components';
+import { parseEnvironment } from '@/business/environment/model/EnvironmentModel';
+import { Body } from '@/business/definition/model/ApiTestModel';
+import { getEnvironmentByProjectId } from 'metersphere-frontend/src/api/environment';
+import { execBatchStop } from '@/api/scenario';
+import { useApiStore } from '@/store';
 
 const store = useApiStore();
 export default {
@@ -76,48 +80,48 @@ export default {
   components: {
     MsDrawer,
     ApiCaseHeader,
-    MsRun: () => import("../Run"),
-    ApiCaseItem: () => import("./ApiCaseItem"),
-    MsTaskCenter: () => import("metersphere-frontend/src/components/task/TaskCenter"),
+    MsRun: () => import('../Run'),
+    ApiCaseItem: () => import('./ApiCaseItem'),
+    MsTaskCenter: () => import('metersphere-frontend/src/components/task/TaskCenter'),
   },
   props: {
     createCase: String,
     loaded: {
       type: Boolean,
-      default: false
+      default: false,
     },
     saveButtonText: String,
     refreshSign: String,
     currentApi: {
-      type: Object
+      type: Object,
     },
   },
   data() {
     return {
       apiStore: useApiStore(),
       result: false,
-      environment: "",
+      environment: '',
       priorities: CASE_ORDER,
       apiCaseList: [],
       batchLoadingIds: [],
       singleLoading: false,
-      singleRunId: "",
+      singleRunId: '',
       runData: [],
-      reportId: "",
-      testCaseId: "",
+      reportId: '',
+      testCaseId: '',
       visible: false,
       condition: {
-        components: API_CASE_CONFIGS
+        components: API_CASE_CONFIGS,
       },
       api: {},
-      envMap: new Map,
+      envMap: new Map(),
       maintainerOptions: [],
       environments: [],
-      refreshHeader: true
+      refreshHeader: true,
     };
   },
   watch: {
-    'storeUseEnvironment': function () {
+    storeUseEnvironment: function () {
       this.setEnvironment(store.useEnvironment);
     },
     refreshSign() {
@@ -152,7 +156,7 @@ export default {
   },
   methods: {
     getMaintainerOptions() {
-      getMaintainer().then(response => {
+      getMaintainer().then((response) => {
         this.maintainerOptions = response.data;
       });
     },
@@ -165,7 +169,7 @@ export default {
       this.api = api;
       // testCaseId 不为空则为用例编辑页面
       this.testCaseId = testCaseId;
-      this.condition = {components: API_CASE_CONFIGS};
+      this.condition = { components: API_CASE_CONFIGS };
       this.getApiTest(true, true);
       this.visible = true;
       store.currentApiCase = undefined;
@@ -179,8 +183,8 @@ export default {
     },
     add(api) {
       this.api = api;
-      this.api.source = "editCase";
-      this.condition = {components: API_CASE_CONFIGS};
+      this.api.source = 'editCase';
+      this.condition = { components: API_CASE_CONFIGS };
       this.sysAddition();
       this.visible = true;
       this.$nextTick(() => {
@@ -191,18 +195,18 @@ export default {
       this.api.id = apiCase.apiDefinitionId;
       this.api.versionId = apiCase.versionId;
       if (apiCase && apiCase.request) {
-        if (apiCase.request.type === "HTTPSamplerProxy") {
-          this.api.protocol = "HTTP";
-          this.api.source = "editCase";
+        if (apiCase.request.type === 'HTTPSamplerProxy') {
+          this.api.protocol = 'HTTP';
+          this.api.source = 'editCase';
         }
-        this.api.method = apiCase.request.method
+        this.api.method = apiCase.request.method;
         this.api.name = apiCase.request.name;
         this.api.path = apiCase.request.path;
       }
       if (apiCase.tags) {
         apiCase.tags = JSON.parse(apiCase.tags);
       }
-      this.condition = {components: API_CASE_CONFIGS};
+      this.condition = { components: API_CASE_CONFIGS };
       this.sysAddition(apiCase);
       this.visible = true;
 
@@ -219,7 +223,7 @@ export default {
         });
         this.api = api;
         this.testCaseId = testCaseId;
-        this.condition = {components: API_CASE_CONFIGS};
+        this.condition = { components: API_CASE_CONFIGS };
         this.getTestCase().then(() => {
           this.singleRun(this.apiCaseList[0]);
         });
@@ -230,6 +234,9 @@ export default {
       this.selectCaseId = caseId;
     },
     saveCase(hideAlert) {
+      if (this.loaded) {
+        this.close();
+      }
       let index = 0;
       if (this.selectCaseId && this.selectCaseId !== '') {
         for (let i = 0; i < this.apiCaseList.length; i++) {
@@ -284,34 +291,42 @@ export default {
     },
     apiCaseClose() {
       if (this.apiCaseList && this.apiCaseList.length > 0) {
-        let message = "";
+        let message = '';
         if (store.apiCaseMap.has(this.apiCaseList[0].id) && store.apiCaseMap.get(this.apiCaseList[0].id) > 1) {
-          message += this.apiCaseList[0].name + "，";
+          message += this.apiCaseList[0].name + '，';
         }
         if (this.apiCaseList[0].type === 'AddCase') {
-          message += this.apiCaseList[0].name + "，";
+          message += this.apiCaseList[0].name + '，';
         }
-        if (message !== "") {
-          this.$alert(this.$t('commons.api_case') + " [ " + message.substr(0, message.length - 1) + " ] " + this.$t('commons.confirm_info'), '', {
-            confirmButtonText: this.$t('commons.confirm'),
-            cancelButtonText: this.$t('commons.cancel'),
-            callback: (action) => {
-              if (action === 'confirm') {
-                store.apiCaseMap.delete(this.apiCaseList[0].id);
-                this.apiCaseList = [];
-                this.visible = false;
-                if (this.$route.fullPath !== this.$route.path) {
-                  this.$router.replace({path: '/api/definition'});
+        if (message !== '') {
+          this.$alert(
+            this.$t('commons.api_case') +
+              ' [ ' +
+              message.substr(0, message.length - 1) +
+              ' ] ' +
+              this.$t('commons.confirm_info'),
+            '',
+            {
+              confirmButtonText: this.$t('commons.confirm'),
+              cancelButtonText: this.$t('commons.cancel'),
+              callback: (action) => {
+                if (action === 'confirm') {
+                  store.apiCaseMap.delete(this.apiCaseList[0].id);
+                  this.apiCaseList = [];
+                  this.visible = false;
+                  if (this.$route.fullPath !== this.$route.path) {
+                    this.$router.replace({ path: '/api/definition' });
+                  }
+                  this.$emit('refresh');
                 }
-                this.$emit('refresh');
-              }
+              },
             }
-          });
+          );
         } else {
           this.apiCaseList = [];
           this.visible = false;
           if (this.$route.fullPath !== this.$route.path) {
-            this.$router.replace({path: '/api/definition'});
+            this.$router.replace({ path: '/api/definition' });
           }
           this.$emit('refresh');
         }
@@ -319,18 +334,17 @@ export default {
         this.apiCaseList = [];
         this.visible = false;
         if (this.$route.fullPath !== this.$route.path) {
-          this.$router.replace({path: '/api/definition'});
+          this.$router.replace({ path: '/api/definition' });
         }
         this.$emit('refresh');
       }
-
     },
     refreshModule() {
       this.$emit('refreshModule');
     },
     setNewSource(environment, obj) {
       if (environment.config && environment.config.databaseConfigs && environment.config.databaseConfigs.length > 0) {
-        let dataSources = environment.config.databaseConfigs.filter(item => item.name === obj.targetDataSourceName);
+        let dataSources = environment.config.databaseConfigs.filter((item) => item.name === obj.targetDataSourceName);
         if (dataSources && dataSources.length > 0) {
           obj.dataSourceId = dataSources[0].id;
         } else {
@@ -340,7 +354,7 @@ export default {
     },
     getEnvironments(obj, env) {
       if (this.environments.length === 0) {
-        getEnvironmentByProjectId(this.projectId).then(response => {
+        getEnvironmentByProjectId(this.projectId).then((response) => {
           this.environments = response.data;
           // 获取原数据源名称
           if (env === obj.originalEnvironmentId && obj.originalDataSourceId) {
@@ -355,7 +369,7 @@ export default {
           // 设置新环境
           obj.environmentId = env;
           // 设置新数据源
-          let envs = this.environments.filter(tab => tab.id === env);
+          let envs = this.environments.filter((tab) => tab.id === env);
           if (envs && envs.length > 0) {
             this.setNewSource(envs[0], obj);
           }
@@ -373,19 +387,19 @@ export default {
         // 设置新环境
         obj.environmentId = env;
         // 设置新数据源
-        let envs = this.environments.filter(tab => tab.id === env);
+        let envs = this.environments.filter((tab) => tab.id === env);
         if (envs && envs.length > 0) {
           this.setNewSource(envs[0], obj);
         }
       }
     },
     getTargetSourceName(environments, obj) {
-      environments.forEach(environment => {
+      environments.forEach((environment) => {
         parseEnvironment(environment);
         // 找到原始环境和数据源名称
         if (environment.id === obj.environmentId) {
           if (environment.config && environment.config.databaseConfigs) {
-            environment.config.databaseConfigs.forEach(item => {
+            environment.config.databaseConfigs.forEach((item) => {
               if (item.id === obj.dataSourceId) {
                 obj.targetDataSourceName = item.name;
               }
@@ -396,7 +410,7 @@ export default {
     },
     setOwnEnvironment(scenarioDefinition, env) {
       for (let i in scenarioDefinition) {
-        let typeArray = ["JDBCPostProcessor", "JDBCSampler", "JDBCPreProcessor"]
+        let typeArray = ['JDBCPostProcessor', 'JDBCSampler', 'JDBCPreProcessor'];
         if (typeArray.indexOf(scenarioDefinition[i].type) !== -1) {
           this.getEnvironments(scenarioDefinition[i], env);
         }
@@ -408,20 +422,20 @@ export default {
     runRefresh(data) {
       this.batchLoadingIds = [];
       this.singleLoading = false;
-      this.singleRunId = "";
+      this.singleRunId = '';
       this.apiCaseList[0].active = true;
       if (data) {
-        let status = data.status === 'FAKE_ERROR' ? data.status : data.error > 0 ? "Error" : "Success";
+        let status = data.status === 'FAKE_ERROR' ? data.status : data.error > 0 ? 'Error' : 'Success';
         this.apiCaseList[0].execResult = status;
         this.apiCaseList[0].responseData = data;
         this.$refs.apiCaseItem.runLoading = false;
-        store.currentApiCase = {refresh: true, id: data.id, status: status};
+        store.currentApiCase = { refresh: true, id: data.id, status: status };
       }
     },
     errorRefresh() {
       this.batchLoadingIds = [];
       this.singleLoading = false;
-      this.singleRunId = "";
+      this.singleRunId = '';
       this.$refs.apiCaseItem.runLoading = false;
     },
     refresh() {
@@ -434,7 +448,12 @@ export default {
       if (apiCase.tags && apiCase.tags.length > 0) {
         apiCase.tags = JSON.parse(apiCase.tags);
       }
-      if (Object.prototype.toString.call(apiCase.request).match(/\[object (\w+)\]/)[1].toLowerCase() !== 'object') {
+      if (
+        Object.prototype.toString
+          .call(apiCase.request)
+          .match(/\[object (\w+)\]/)[1]
+          .toLowerCase() !== 'object'
+      ) {
         apiCase.request = JSON.parse(apiCase.request);
         if (apiCase.request.protocol === 'HTTP') {
           if (!apiCase.request.body) {
@@ -449,14 +468,14 @@ export default {
           if (!apiCase.request.arguments) {
             apiCase.request.arguments = [
               {
-                contentType: "text/plain",
+                contentType: 'text/plain',
                 enable: true,
                 file: false,
                 required: false,
-                type: "text",
+                type: 'text',
                 urlEncode: false,
-                valid: false
-              }
+                valid: false,
+              },
             ];
           }
         }
@@ -464,11 +483,11 @@ export default {
       if (!apiCase.request.hashTree) {
         apiCase.request.hashTree = [];
       }
-      const index = this.runData.findIndex(d => d.name === apiCase.id);
+      const index = this.runData.findIndex((d) => d.name === apiCase.id);
       if (index !== -1) {
         apiCase.active = true;
       } else {
-        if (this.condition.id && this.condition.id != "") {
+        if (this.condition.id && this.condition.id != '') {
           apiCase.active = true;
         }
       }
@@ -476,18 +495,26 @@ export default {
         this.environment = apiCase.request.useEnvironment;
       }
       if (apiCase.request && apiCase.request.hashTree) {
-        apiCase.request.hashTree.forEach(item => {
-          if (item.type === "Assertions" && !item.document) {
-            item.document = {type: "JSON", data: {xmlFollowAPI: false, jsonFollowAPI: false, json: [], xml: []}};
+        apiCase.request.hashTree.forEach((item) => {
+          if (item.type === 'Assertions' && !item.document) {
+            item.document = {
+              type: 'JSON',
+              data: {
+                xmlFollowAPI: false,
+                jsonFollowAPI: false,
+                json: [],
+                xml: [],
+              },
+            };
           }
-        })
+        });
       }
     },
     getTestCase(openCase) {
       return new Promise((resolve) => {
         let commonUseEnvironment = store.useEnvironment;
-        this.environment = commonUseEnvironment ? commonUseEnvironment : "";
-        getCaseById(this.testCaseId).then(response => {
+        this.environment = commonUseEnvironment ? commonUseEnvironment : '';
+        getCaseById(this.testCaseId).then((response) => {
           let apiCase = response.data;
           if (apiCase) {
             this.formatCase(apiCase);
@@ -504,10 +531,10 @@ export default {
       if (this.api) {
         this.condition.projectId = this.projectId;
         this.condition.apiDefinitionId = this.api.id;
-        this.result = apiTestCaseList(this.condition).then(response => {
+        this.result = apiTestCaseList(this.condition).then((response) => {
           let data = response.data;
           if (data && data.length > 0) {
-            data.forEach(apiCase => {
+            data.forEach((apiCase) => {
               this.formatCase(apiCase);
             });
             this.apiCaseList = data;
@@ -554,7 +581,7 @@ export default {
           tags: [],
           uuid: newUuid,
           caseStatus: 'Underway',
-          type: 'AddCase'
+          type: 'AddCase',
         };
         request.projectId = getCurrentProjectID();
         obj.request = request;
@@ -575,7 +602,11 @@ export default {
     },
     singleRun(row) {
       let methods = ['SQL', 'DUBBO', 'dubbo://'];
-      if (row.apiMethod && methods.indexOf(row.apiMethod) === -1 && (!this.environment || this.environment === undefined)) {
+      if (
+        row.apiMethod &&
+        methods.indexOf(row.apiMethod) === -1 &&
+        (!this.environment || this.environment === undefined)
+      ) {
         this.$warning(this.$t('api_test.environment.select_environment'));
         return;
       }
@@ -599,8 +630,8 @@ export default {
     },
 
     stop(id) {
-      let obj = {type: 'API', reportId: this.reportId};
-      execBatchStop([obj]).then(response => {
+      let obj = { type: 'API', reportId: this.reportId };
+      execBatchStop([obj]).then((response) => {
         this.$emit('stop', id);
         this.singleLoading = false;
         this.$success(this.$t('report.test_stop_success'));
@@ -629,18 +660,28 @@ export default {
     },
     showHistory(id) {
       this.$refs.taskCenter.openHistory(id);
-    }
-  }
+    },
+  },
 };
 </script>
 
 <style scoped>
-
 .ms-drawer :deep(.ms-drawer-body) {
   margin-top: 40px;
 }
 
 .ms-drawer-case-header :deep(.ms-drawer-header) {
   margin-left: 0px;
+}
+fieldset {
+  padding: 0px;
+  margin: 0px;
+  min-width: 100%;
+  min-inline-size: 0px;
+  border: 0px;
+}
+
+.ms-fieldset .ms-step-tree-cell::-webkit-scrollbar {
+  width: 0 !important;
 }
 </style>

@@ -1,11 +1,14 @@
 package io.metersphere.metadata.repository;
 
+import io.metersphere.commons.utils.FileUtils;
 import io.metersphere.commons.utils.LogUtil;
 import io.metersphere.config.MinioProperties;
 import io.metersphere.dto.FileInfoDTO;
 import io.metersphere.metadata.vo.FileRequest;
 import io.minio.*;
+import io.minio.messages.Item;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -25,6 +28,7 @@ public class MinIOFileRepository implements FileRepository {
 
     @Override
     public String saveFile(MultipartFile file, FileRequest request) throws Exception {
+        FileUtils.validateFileName(request.getFileName());
         String bucket = minioProperties.getBucket();
         String fileName = request.getProjectId() + "/" + request.getFileName();
         minioClient.putObject(PutObjectArgs.builder()
@@ -38,6 +42,7 @@ public class MinIOFileRepository implements FileRepository {
 
     @Override
     public String saveFile(byte[] bytes, FileRequest request) throws Exception {
+        FileUtils.validateFileName(request.getFileName());
         String bucket = minioProperties.getBucket();
         String fileName = request.getProjectId() + "/" + request.getFileName();
         try (
@@ -47,7 +52,7 @@ public class MinIOFileRepository implements FileRepository {
                     .bucket(bucket) // 存储桶
                     .object(fileName) // 文件名
                     .stream(inputStream, bytes.length, -1) // 文件内容
-//                .contentType(file.getContentType()) // 文件类型
+                    //                .contentType(file.getContentType()) // 文件类型
                     .build());
         }
         return String.format("%s/%s/%s", minioProperties.getEndpoint(), bucket, fileName);
@@ -56,12 +61,55 @@ public class MinIOFileRepository implements FileRepository {
     @Override
     public void delete(FileRequest request) throws Exception {
         String bucket = minioProperties.getBucket();
-        String fileName = request.getProjectId() + "/" + request.getFileName();
+        String fileName = request.getProjectId();
+        if (StringUtils.isNotBlank(request.getFileName())) {
+            fileName += "/" + request.getFileName();
+        }
+        if (fileName.endsWith("/")) {
+            // 删除文件夹
+            removeObjects(bucket, fileName);
+        } else {
+            // 删除单个文件
+            removeObject(bucket, fileName);
+        }
+    }
 
+
+    private boolean removeObject(String bucketName, String objectName) throws Exception {
         minioClient.removeObject(RemoveObjectArgs.builder()
-                .bucket(bucket) // 存储桶
-                .object(fileName) // 文件名
+                .bucket(bucketName) // 存储桶
+                .object(objectName) // 文件名
                 .build());
+        return true;
+    }
+
+    public void removeObjects(String bucketName, String objectName) throws Exception {
+        List<String> objects = listObjects(bucketName, objectName);
+        for (String object : objects) {
+            removeObject(bucketName, object);
+        }
+    }
+
+    /**
+     * 递归获取某路径下的所有文件
+     */
+    public List<String> listObjects(String bucketName, String objectName) throws Exception {
+        List<String> list = new ArrayList<>(12);
+        Iterable<Result<Item>> results = minioClient.listObjects(
+                ListObjectsArgs.builder()
+                        .bucket(bucketName)
+                        .prefix(objectName)
+                        .build());
+        for (Result<Item> result : results) {
+            Item item = result.get();
+            if (item.isDir()) {
+                List<String> files = listObjects(bucketName, item.objectName());
+                list.addAll(files);
+            } else {
+                list.add(item.objectName());
+            }
+        }
+        return list;
     }
 
     @Override

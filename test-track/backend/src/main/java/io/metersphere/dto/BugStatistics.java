@@ -5,12 +5,22 @@ import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Getter
 @Setter
 public class BugStatistics {
 
-    private long bugTotalSize;
-    private String rage;
+    private long bugUnclosedCount;
+    private long bugTotalCount;
+    private long caseTotalCount;
+    private long newCount;
+    private long resolvedCount;
+    private long rejectedCount;
+    private long unKnownCount;
+    private long thisWeekCount;
+    private String unClosedRage;
+    private String bugCaseRage;
     private List<TestPlanBugCount> list = new ArrayList<>();
+    private Map<String, Integer> chartData;
 }

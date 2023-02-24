@@ -35,7 +35,8 @@ import io.metersphere.plan.service.TestPlanTestCaseService;
 import io.metersphere.request.OrderRequest;
 import io.metersphere.request.ProjectVersionRequest;
 import io.metersphere.request.ResetOrderRequest;
-import io.metersphere.request.attachment.AttachmentRequest;
+import io.metersphere.service.remote.ui.RelevanceUiCaseService;
+import io.metersphere.xpack.track.dto.AttachmentRequest;
 import io.metersphere.request.member.QueryMemberRequest;
 import io.metersphere.request.testcase.*;
 import io.metersphere.service.issue.platform.IssueFactory;
@@ -145,6 +146,8 @@ public class TestCaseService {
     private RelevanceApiCaseService relevanceApiCaseService;
     @Resource
     private RelevanceLoadCaseService relevanceLoadCaseService;
+    @Resource
+    private RelevanceUiCaseService relevanceUiCaseService;
     //    @Resource
     //    @Lazy
     //    private ApiTestCaseService apiTestCaseService;
@@ -381,11 +384,15 @@ public class TestCaseService {
         checkTestCustomNum(testCase);
         testCase.setUpdateTime(System.currentTimeMillis());
 
-        // 同步缺陷与需求的关联关系
-        updateThirdPartyIssuesLink(testCase);
+        try {
+            // 同步缺陷与需求的关联关系
+            updateThirdPartyIssuesLink(testCase);
 
-        // 同步用例与需求的关联关系
-        addDemandHyperLink(testCase, "edit");
+            // 同步用例与需求的关联关系
+            addDemandHyperLink(testCase, "edit");
+        } catch (Exception e) {
+            LogUtil.error(e);
+        }
 
         if (StringUtils.isEmpty(testCase.getDemandId())) {
             testCase.setDemandId(StringUtils.EMPTY);
@@ -422,15 +429,19 @@ public class TestCaseService {
             return;
         }
         Project project = baseProjectService.getProjectById(testCase.getProjectId());
+        if (!StringUtils.equals(project.getPlatform(), IssuesManagePlatform.AzureDevops.name())) {
+            return;
+        }
         IssuesRequest issuesRequest = new IssuesRequest();
         if (!issuesService.isThirdPartTemplate(project)) {
             issuesRequest.setDefaultCustomFields(issuesService.getDefaultCustomFields(testCase.getProjectId()));
         }
         issuesRequest.setProjectId(testCase.getProjectId());
         issuesRequest.setWorkspaceId(project.getWorkspaceId());
-        IssueFactory.createPlatform(issuesService.getPlatform(testCase.getProjectId()), issuesRequest)
-                .updateDemandIssueLink(testCase, project);
-
+        IssuesPlatform platform = IssueFactory.createPlatform(issuesService.getPlatform(testCase.getProjectId()), issuesRequest);
+        if (platform != null) {
+            platform.updateDemandIssueLink(testCase, project);
+        }
     }
 
     /**
@@ -442,6 +453,7 @@ public class TestCaseService {
         if (StringUtils.isBlank(testCase.getVersionId())) {
             return;
         }
+        testCase.setLatest(false);
         TestCaseExample example = new TestCaseExample();
         example.createCriteria().andIdEqualTo(testCase.getId())
                 .andVersionIdEqualTo(testCase.getVersionId());
@@ -459,7 +471,18 @@ public class TestCaseService {
             dealWithOtherInfoOfNewVersion(testCase, oldTestCase.getId());
             testCaseMapper.insertSelective(testCase);
         }
-        checkAndSetLatestVersion(testCase.getRefId());
+        String defaultVersion = baseProjectVersionMapper.getDefaultVersion(testCase.getProjectId());
+        if (StringUtils.equalsIgnoreCase(testCase.getVersionId(), defaultVersion)) {
+            checkAndSetLatestVersion(testCase.getRefId());
+        }
+        if (StringUtils.isNotBlank(testCase.getNodePath())) {
+            //同步修改所有版本的模块路径
+            updateOtherVersionModule(testCase);
+        }
+    }
+
+    private void updateOtherVersionModule(EditTestCaseRequest testCase) {
+        extTestCaseMapper.updateVersionModule(testCase.getRefId(), testCase.getVersionId(), testCase.getNodeId(), testCase.getNodePath());
     }
 
     /**
@@ -486,6 +509,7 @@ public class TestCaseService {
                         t.setId(UUID.randomUUID().toString());
                         t.setResourceId(testCase.getId());
                         t.setIssuesId(issue.getId());
+                        t.setRelateTime(System.currentTimeMillis());
                         testCaseIssuesMapper.insertSelective(t);
                     });
                 }
@@ -699,14 +723,8 @@ public class TestCaseService {
     }
 
     public int deleteToGcBatch(TestCaseBatchRequest request) {
-        List<String> ids = new ArrayList<String>();
-        if (request.getCondition() != null && request.getCondition().isSelectAll()) {
-            List<TestCaseDTO> testCaseDTOS = listTestCase(request.getCondition());
-            ids = testCaseDTOS.stream().map(TestCaseDTO::getId).collect(Collectors.toList());
-        } else {
-            ids = request.getIds();
-        }
-        return deleteToGcBatch(ids, null);
+        ServiceUtils.getSelectAllIds(request, request.getCondition(), (query) -> extTestCaseMapper.selectIds(query));
+        return deleteToGcBatch(request.getIds(), null);
     }
 
     public int deleteToGcBatch(List<String> ids, String projectId) {
@@ -761,8 +779,12 @@ public class TestCaseService {
     }
 
     private void buildCustomField(TestCaseDTO data) {
+        data.setFields(getCustomFieldByCaseId(data.getId()));
+    }
+
+    public List<CustomFieldDao> getCustomFieldByCaseId(String caseId) {
         CustomFieldTestCaseExample example = new CustomFieldTestCaseExample();
-        example.createCriteria().andResourceIdEqualTo(data.getId());
+        example.createCriteria().andResourceIdEqualTo(caseId);
         List<CustomFieldTestCase> customFieldTestCases = customFieldTestCaseMapper.selectByExampleWithBLOBs(example);
         List<CustomFieldDao> fields = new ArrayList<>();
         customFieldTestCases.forEach(i -> {
@@ -772,7 +794,7 @@ public class TestCaseService {
             customFieldDao.setTextValue(i.getTextValue());
             fields.add(customFieldDao);
         });
-        data.setFields(fields);
+        return fields;
     }
 
     private void buildProjectInfoWithoutProject(List<TestCaseDTO> resList) {
@@ -1726,7 +1748,9 @@ public class TestCaseService {
                         List<String> results = new ArrayList<>();
                         List values = (List) value;
                         values.forEach(item -> {
-                            if (MapUtils.isNotEmpty(optionMap) && optionMap.containsKey(item.toString())) {
+                            if (MapUtils.isEmpty(optionMap)) {
+                                results.add(item.toString());
+                            } else if (optionMap.containsKey(item.toString())) {
                                 results.add(optionMap.get(item.toString()));
                             }
                         });
@@ -1769,11 +1793,11 @@ public class TestCaseService {
             for (int j = 0; j < jsonArray.size(); j++) {
                 // 将步骤存储起来，之后生成多条数据，再合并单元格
                 Map item = (Map) jsonArray.get(j);
-                String stepDesc = item.get("desc").toString();
-                String stepResult = item.get("result").toString();
+                String stepDesc = Optional.ofNullable(item.get("desc")).orElse(StringUtils.EMPTY).toString();
+                String stepResult = Optional.ofNullable(item.get("result")).orElse(StringUtils.EMPTY).toString();
                 if (StringUtils.isNotBlank(stepDesc) || StringUtils.isNotBlank(stepResult)) {
-                    stepDescList.add(Optional.ofNullable(stepDesc).orElse(StringUtils.EMPTY));
-                    stepResultList.add(Optional.ofNullable(stepResult).orElse(StringUtils.EMPTY));
+                    stepDescList.add(stepDesc);
+                    stepResultList.add(stepResult);
                 }
             }
         }
@@ -1848,6 +1872,22 @@ public class TestCaseService {
             BeanUtils.copyBean(batchEdit, request);
             batchEdit.setUpdateTime(System.currentTimeMillis());
             bathUpdateByCondition(request, batchEdit);
+            //批量修改选中数据其他版本的模块路径
+            if (request != null && (request.getIds() != null || !request.getIds().isEmpty())) {
+                request.getIds().forEach(testCaseId -> {
+                    TestCaseWithBLOBs testCaseWithBLOBs = testCaseMapper.selectByPrimaryKey(testCaseId);
+                    if (testCaseWithBLOBs == null) {
+                        return;
+                    }
+                    if (StringUtils.isNotEmpty(request.getNodeId()) && StringUtils.isNotEmpty(request.getNodePath())) {
+                        testCaseWithBLOBs.setNodeId(request.getNodeId());
+                        testCaseWithBLOBs.setNodePath(request.getNodePath());
+                        EditTestCaseRequest editTestCaseRequest = new EditTestCaseRequest();
+                        BeanUtils.copyBean(editTestCaseRequest, testCaseWithBLOBs);
+                        updateOtherVersionModule(editTestCaseRequest);
+                    }
+                });
+            }
         }
     }
 
@@ -2429,13 +2469,8 @@ public class TestCaseService {
     }
 
     public void reduction(TestCaseBatchRequest request) {
-        List<String> ids = new ArrayList<>();
-        if (request.getCondition() != null && request.getCondition().isSelectAll()) {
-            List<TestCaseDTO> allReductionTestCases = listTestCase(request.getCondition());
-            ids = allReductionTestCases.stream().map(TestCaseDTO::getId).collect(Collectors.toList());
-        } else {
-            ids = request.getIds();
-        }
+        ServiceUtils.getSelectAllIds(request, request.getCondition(), (query) -> extTestCaseMapper.selectIds(query));
+        List<String> ids = request.getIds();
         if (CollectionUtils.isNotEmpty(ids)) {
             extTestCaseMapper.checkOriginalStatusByIds(ids);
 
@@ -2591,6 +2626,7 @@ public class TestCaseService {
         List<ApiTestCase> apiCases = new ArrayList<>();
         List<ApiScenario> apiScenarios = new ArrayList<>();
         List<LoadTest> apiLoadTests = new ArrayList<>();
+        List<UiScenario> uiScenarios = new ArrayList<>();
 
         if (serviceIdSet.contains(MicroServiceName.API_TEST)) {
             apiCases = relevanceApiCaseService.getApiCaseByIds(
@@ -2608,6 +2644,13 @@ public class TestCaseService {
                     getTestIds(testCaseTests, TestCaseTestType.performance.name()));
             projectIds.addAll(apiLoadTests.stream().map(s -> s.getProjectId()).collect(Collectors.toList()));
             versionIds.addAll(apiLoadTests.stream().map(l -> l.getVersionId()).collect(Collectors.toList()));
+        }
+
+        if (serviceIdSet.contains(MicroServiceName.UI_TEST)) {
+            uiScenarios = relevanceUiCaseService.getUiCaseByIds(
+                    getTestIds(testCaseTests, TestCaseTestType.uiAutomation.name()));
+            projectIds.addAll(uiScenarios.stream().map(s -> s.getProjectId()).collect(Collectors.toList()));
+            versionIds.addAll(uiScenarios.stream().map(l -> l.getVersionId()).collect(Collectors.toList()));
         }
 
 
@@ -2643,6 +2686,10 @@ public class TestCaseService {
         });
         apiLoadTests.forEach(item -> {
             getTestCaseTestDaoList(TestCaseTestType.performance.name(), item.getNum(), item.getName(), item.getId(), projectNameMap.get(item.getProjectId()), versionNameMap.get(item.getVersionId()),
+                    testCaseTestList, testCaseTestsMap);
+        });
+        uiScenarios.forEach(item -> {
+            getTestCaseTestDaoList(TestCaseTestType.uiAutomation.name(), item.getNum(), item.getName(), item.getId(), projectNameMap.get(item.getProjectId()), versionNameMap.get(item.getVersionId()),
                     testCaseTestList, testCaseTestsMap);
         });
         return testCaseTestList;

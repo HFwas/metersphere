@@ -21,14 +21,6 @@ public class IssuesRequest extends BaseQueryRequest {
      * 如果是 PLAN_FUNCTIONAL 则只查询该测试计划用例所关联的缺陷
      */
     private String refType;
-    /**
-     * zentao bug 处理人
-     */
-    private String zentaoUser;
-    /**
-     * zentao bug 影响版本
-     */
-    private List<String> zentaoBuilds;
 
     /**
      * issues id
@@ -59,4 +51,26 @@ public class IssuesRequest extends BaseQueryRequest {
      * 自定义字段ID
      */
     private String customFieldId;
+
+    /**
+     * 缺陷导出勾选ID
+     */
+    private List<String> exportIds;
+
+    /**
+     * 本周测试计划遗留缺陷
+     */
+    private Boolean thisWeekUnClosedTestPlanIssue = false;
+    /**
+     * 测试计划遗留的缺陷
+     */
+    private Boolean unClosedTestPlanIssue = false;
+    /**
+     * 测试计划关联所有缺陷
+     */
+    private Boolean allTestPlanIssue = false;
+    /**
+     * 过滤缺陷ID
+     */
+    private List<String> filterIds;
 }

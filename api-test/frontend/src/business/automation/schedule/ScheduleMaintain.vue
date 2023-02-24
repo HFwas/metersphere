@@ -1,71 +1,81 @@
 <template>
-  <el-dialog :close-on-click-modal="false" width="60%" class="schedule-edit" :visible.sync="dialogVisible"
-             :append-to-body='true'
-             @close="close">
+  <el-dialog
+    :close-on-click-modal="false"
+    width="60%"
+    class="schedule-edit"
+    :visible.sync="dialogVisible"
+    :append-to-body="true"
+    @close="close">
     <template>
-      <div>
+      <div v-loading="loading">
         <el-tabs v-model="activeName">
           <el-tab-pane :label="$t('schedule.task_config')" name="first">
-            <div class="el-step__icon is-text" style="margin-right: 10px;">
+            <div class="el-step__icon is-text" style="margin-right: 10px">
               <div class="el-step__icon-inner">1</div>
             </div>
             <span>{{ $t('schedule.edit_timer_task') }}</span>
-            <el-form :model="form" :rules="rules" ref="from" style="margin-top: 10px;" class="ms-el-form-item__error">
-
-              <el-form-item :label="$t('commons.schedule_cron_title')"
-                            prop="cronValue" style="height: 50px">
+            <el-form :model="form" :rules="rules" ref="from" style="margin-top: 10px" class="ms-el-form-item__error">
+              <el-form-item :label="$t('commons.schedule_cron_title')" prop="cronValue" style="height: 50px">
                 <el-row :gutter="20">
                   <el-col :span="16">
-                    <el-input :disabled="isReadOnly" v-model="form.cronValue" class="inp"
-                              :placeholder="$t('schedule.please_input_cron_expression')" size="mini">
+                    <el-input
+                      :disabled="isReadOnly"
+                      v-model="form.cronValue"
+                      class="inp"
+                      :placeholder="$t('schedule.please_input_cron_expression')"
+                      size="mini">
                       <a :disabled="isReadOnly" @click="showCronDialog" slot="suffix" class="head">
                         {{ $t('schedule.generate_expression') }}
                       </a>
                     </el-input>
 
                     <span>{{ this.$t('commons.schedule_switch') }}</span>
-                    <el-tooltip effect="dark" placement="bottom"
-                                :content="schedule.enable ? $t('commons.close_schedule') : $t('commons.open_schedule')">
+                    <el-tooltip
+                      effect="dark"
+                      placement="bottom"
+                      :content="schedule.enable ? $t('commons.close_schedule') : $t('commons.open_schedule')">
                       <el-switch v-model="schedule.enable" style="margin-left: 20px"></el-switch>
                     </el-tooltip>
                   </el-col>
                   <el-col :span="2">
-                    <el-button :disabled="isReadOnly" type="primary" @click="saveCron" size="mini">{{
-                        $t('commons.save')
-                      }}
+                    <el-button :disabled="isReadOnly" type="primary" @click="saveCron" size="mini"
+                      >{{ $t('commons.save') }}
                     </el-button>
                   </el-col>
                 </el-row>
-
               </el-form-item>
-              <crontab-result :ex="form.cronValue" ref="crontabResult"/>
+              <crontab-result :ex="form.cronValue" ref="crontabResult" />
             </el-form>
-            <div class="el-step__icon is-text" style="margin-right: 10px;">
+            <div class="el-step__icon is-text" style="margin-right: 10px">
               <div class="el-step__icon-inner">2</div>
             </div>
             <span>{{ $t('load_test.runtime_config') }}</span>
-            <div style="padding-top: 10px;">
-              <span class="ms-mode-span">{{ $t("commons.environment") }}：</span>
-              <env-popover :project-ids="projectIds"
-                           :placement="'bottom-start'"
-                           :project-list="projectList"
-                           :env-map="projectEnvListMap"
-                           :environment-type.sync="runConfig.environmentType"
-                           :group-id="runConfig.environmentGroupId"
-                           :has-option-group="true"
-                           @setEnvGroup="setEnvGroup"
-                           @setProjectEnvMap="setProjectEnvMap"
-                           @showPopover="showPopover"
-                           ref="envPopover" class="env-popover"/>
+            <div style="padding-top: 10px">
+              <span class="ms-mode-span">{{ $t('commons.environment') }}：</span>
+              <env-popover
+                :project-ids="projectIds"
+                :placement="'bottom-start'"
+                :project-list="projectList"
+                :env-map="projectEnvListMap"
+                :environment-type.sync="runConfig.environmentType"
+                :group-id="runConfig.environmentGroupId"
+                :has-option-group="true"
+                @setEnvGroup="setEnvGroup"
+                @setProjectEnvMap="setProjectEnvMap"
+                @showPopover="showPopover"
+                ref="envPopover"
+                class="env-popover" />
             </div>
             <div class="ms-mode-div">
-              <span class="ms-mode-span">{{ $t("run_mode.other_config") }}：</span>
-              <el-checkbox v-model="runConfig.runWithinResourcePool">
+              <span class="ms-mode-span">{{ $t('run_mode.other_config') }}：</span>
+              <el-checkbox v-model="runConfig.runWithinResourcePool" :disabled="runMode === 'POOL'">
                 {{ $t('run_mode.run_with_resource_pool') }}
               </el-checkbox>
-              <el-select style="margin-left: 10px" :disabled="!runConfig.runWithinResourcePool"
-                         v-model="runConfig.resourcePoolId"
-                         size="mini">
+              <el-select
+                style="margin-left: 10px"
+                :disabled="!runConfig.runWithinResourcePool"
+                v-model="runConfig.resourcePoolId"
+                size="mini">
                 <el-option
                   v-for="item in resourcePools"
                   :key="item.id"
@@ -76,16 +86,12 @@
               </el-select>
             </div>
 
-
-            <el-dialog width="60%" :title="$t('schedule.generate_expression')" :visible.sync="showCron"
-                       :modal="false">
-              <crontab @hide="showCron=false" @fill="crontabFill" :expression="schedule.value"
-                       ref="crontab"/>
+            <el-dialog width="60%" :title="$t('schedule.generate_expression')" :visible.sync="showCron" :modal="false">
+              <crontab @hide="showCron = false" @fill="crontabFill" :expression="schedule.value" ref="crontab" />
             </el-dialog>
           </el-tab-pane>
           <el-tab-pane :label="$t('schedule.task_notification')" name="second">
-            <ms-schedule-notification :test-id="testId"
-                                      :schedule-receiver-options="scheduleReceiverOptions"/>
+            <ms-schedule-notification :test-id="testId" :schedule-receiver-options="scheduleReceiverOptions" />
           </el-tab-pane>
         </el-tabs>
       </div>
@@ -94,47 +100,48 @@
 </template>
 
 <script>
-import {saveNotice} from "@/api/notice";
-import {apiScenarioEnv, createSchedule, updateSchedule} from "@/api/scenario";
-import {getScheduleByIdAndType, scheduleUpdate} from "@/api/schedule";
-import {getCurrentProjectID, getCurrentUser, getCurrentWorkspaceId} from "metersphere-frontend/src/utils/token";
-import {listenGoBack, objToStrMap, removeGoBackListener, strMapToObj} from "metersphere-frontend/src/utils";
-import Crontab from "metersphere-frontend/src/components/cron/Crontab";
-import CrontabResult from "metersphere-frontend/src/components/cron/CrontabResult";
-import {cronValidate} from "metersphere-frontend/src/utils/cron";
-import MsScheduleNotification from "./ScheduleNotification";
-import ScheduleSwitch from "@/business/automation/schedule/ScheduleSwitch";
-import {ENV_TYPE} from "metersphere-frontend/src/utils/constants";
-import EnvPopover from "@/business/automation/scenario/EnvPopover";
-import {getMaintainer, getOwnerProjects} from "@/api/project";
-import {getTestResourcePools} from "@/api/test-resource-pool";
+import { saveNotice } from '@/api/notice';
+import { apiScenarioEnv, createSchedule, updateSchedule } from '@/api/scenario';
+import { getScheduleByIdAndType, scheduleUpdate } from '@/api/schedule';
+import { getCurrentProjectID, getCurrentUser, getCurrentWorkspaceId } from 'metersphere-frontend/src/utils/token';
+import { listenGoBack, objToStrMap, removeGoBackListener, strMapToObj } from 'metersphere-frontend/src/utils';
+import Crontab from 'metersphere-frontend/src/components/cron/Crontab';
+import CrontabResult from 'metersphere-frontend/src/components/cron/CrontabResult';
+import { cronValidate } from 'metersphere-frontend/src/utils/cron';
+import MsScheduleNotification from './ScheduleNotification';
+import ScheduleSwitch from '@/business/automation/schedule/ScheduleSwitch';
+import { ENV_TYPE } from 'metersphere-frontend/src/utils/constants';
+import EnvPopover from '@/business/automation/scenario/EnvPopover';
+import { getMaintainer, getOwnerProjects, getProjectConfig } from '@/api/project';
+import { getTestResourcePools } from '@/api/test-resource-pool';
+import { getSystemBaseSetting } from 'metersphere-frontend/src/api/system';
+import { hasLicense } from 'metersphere-frontend/src/utils/permission';
 
 function defaultCustomValidate() {
-  return {pass: true};
+  return { pass: true };
 }
 
 export default {
-  name: "MsScheduleMaintain",
+  name: 'MsScheduleMaintain',
   components: {
     CrontabResult,
     ScheduleSwitch,
     Crontab,
     MsScheduleNotification,
-    EnvPopover
+    EnvPopover,
   },
 
   props: {
     customValidate: {
       type: Function,
-      default: defaultCustomValidate
+      default: defaultCustomValidate,
     },
     isReadOnly: {
       type: Boolean,
-      default: false
+      default: false,
     },
-    request: {}
+    request: {},
   },
-
 
   watch: {
     'schedule.value'() {
@@ -144,7 +151,7 @@ export default {
       if (!this.runConfig.runWithinResourcePool) {
         this.runConfig.resourcePoolId = null;
       }
-    }
+    },
   },
   data() {
     const validateCron = (rule, cronValue, callback) => {
@@ -162,42 +169,67 @@ export default {
       }
     };
     return {
+      runMode: '',
+      loading: false,
       scheduleReceiverOptions: [],
       operation: true,
       dialogVisible: false,
       schedule: {
-        value: "",
-        enable: false
+        value: '',
+        enable: false,
       },
-      scheduleTaskType: "",
+      scheduleTaskType: '',
       testId: String,
       showCron: false,
       form: {
-        cronValue: ""
+        cronValue: '',
       },
       paramRow: {},
       activeName: 'first',
       rules: {
-        cronValue: [{required: true, validator: validateCron, trigger: 'blur'}],
+        cronValue: [{ required: true, validator: validateCron, trigger: 'blur' }],
       },
       resourcePools: [],
       runConfig: {
-        reportName: "",
-        mode: "serial",
-        reportType: "iddReport",
+        reportName: '',
+        mode: 'serial',
+        reportType: 'iddReport',
         onSampleError: false,
         runWithinResourcePool: false,
         resourcePoolId: null,
         envMap: {},
-        environmentGroupId: "",
-        environmentType: ENV_TYPE.JSON
+        environmentGroupId: '',
+        environmentType: ENV_TYPE.JSON,
       },
       projectList: [],
       projectIds: new Set(),
-      projectEnvListMap: new Map,
-    }
+      projectEnvListMap: new Map(),
+    };
   },
   methods: {
+    query() {
+      this.loading = true;
+      this.result = getSystemBaseSetting().then((response) => {
+        if (!response.data.runMode) {
+          response.data.runMode = 'LOCAL';
+        }
+        this.runMode = response.data.runMode;
+        if (this.runMode === 'POOL') {
+          this.runConfig.runWithinResourcePool = true;
+          this.getProjectApplication();
+        } else {
+          this.loading = false;
+        }
+      });
+    },
+    getProjectApplication() {
+      getProjectConfig(getCurrentProjectID(), '').then((res) => {
+        if (res.data && res.data.poolEnable && res.data.resourcePoolId) {
+          this.runConfig.resourcePoolId = res.data.resourcePoolId;
+        }
+        this.loading = false;
+      });
+    },
     currentUser: () => {
       return getCurrentUser();
     },
@@ -208,10 +240,8 @@ export default {
       return true;
     },
     changeMode() {
-      this.runConfig.runWithinResourcePool = false;
-      this.runConfig.resourcePoolId = null;
-      this.runConfig.reportType = "iddReport";
-      this.runConfig.reportName = "";
+      this.runConfig.reportType = 'iddReport';
+      this.runConfig.reportName = '';
     },
     setEnvGroup(id) {
       this.runConfig.environmentGroupId = id;
@@ -221,7 +251,7 @@ export default {
     },
     showPopover() {
       this.projectIds.clear();
-      apiScenarioEnv(this.request).then(res => {
+      apiScenarioEnv(this.request).then((res) => {
         let data = res.data;
         if (data) {
           for (let d in data) {
@@ -232,37 +262,36 @@ export default {
       });
     },
     getWsProjects() {
-      getOwnerProjects().then(res => {
+      getOwnerProjects().then((res) => {
         this.projectList = res.data;
-      })
+      });
     },
     getResourcePools() {
-      this.result = getTestResourcePools().then(response => {
+      this.result = getTestResourcePools().then((response) => {
         this.resourcePools = response.data;
       });
     },
     updateTask(param) {
-      this.result = scheduleUpdate(param).then(response => {
-        let paramTestId = "";
+      this.result = scheduleUpdate(param).then((response) => {
+        let paramTestId = '';
         if (this.paramRow.redirectFrom == 'testPlan') {
           paramTestId = this.paramRow.id;
-          this.scheduleTaskType = "TEST_PLAN_TEST";
+          this.scheduleTaskType = 'TEST_PLAN_TEST';
         } else if (this.paramRow.redirectFrom == 'enterpriseReport') {
           paramTestId = this.paramRow.id;
-          this.scheduleTaskType = "ENTERPRISE_REPORT";
+          this.scheduleTaskType = 'ENTERPRISE_REPORT';
         } else {
           paramTestId = this.paramRow.id;
-          this.scheduleTaskType = "API_SCENARIO_TEST";
+          this.scheduleTaskType = 'API_SCENARIO_TEST';
         }
         this.taskID = paramTestId;
         this.findSchedule(paramTestId);
       });
     },
     initUserList() {
-      this.result = getMaintainer().then(response => {
+      this.result = getMaintainer().then((response) => {
         this.scheduleReceiverOptions = response.data;
       });
-
     },
     buildParam() {
       let param = {};
@@ -272,17 +301,17 @@ export default {
     },
     open(row) {
       //测试计划页面跳转来的
-      let paramTestId = "";
+      let paramTestId = '';
       this.paramRow = row;
       if (row.redirectFrom == 'testPlan') {
         paramTestId = row.id;
-        this.scheduleTaskType = "TEST_PLAN_TEST";
+        this.scheduleTaskType = 'TEST_PLAN_TEST';
       } else if (row.redirectFrom == 'enterpriseReport') {
         paramTestId = row.id;
-        this.scheduleTaskType = "ENTERPRISE_REPORT";
+        this.scheduleTaskType = 'ENTERPRISE_REPORT';
       } else {
         paramTestId = row.id;
-        this.scheduleTaskType = "API_SCENARIO_TEST";
+        this.scheduleTaskType = 'API_SCENARIO_TEST';
       }
       this.testId = paramTestId;
       this.findSchedule(paramTestId);
@@ -293,12 +322,15 @@ export default {
       this.activeName = 'first';
       this.getResourcePools();
       this.getWsProjects();
+      if (hasLicense()) {
+        this.query();
+      }
       this.runConfig.environmentType = ENV_TYPE.JSON;
     },
     findSchedule() {
       let scheduleResourceID = this.testId;
       let taskType = this.scheduleTaskType;
-      this.result = getScheduleByIdAndType(scheduleResourceID, taskType).then(response => {
+      this.result = getScheduleByIdAndType(scheduleResourceID, taskType).then((response) => {
         if (response.data != null) {
           this.schedule = response.data;
           if (response.data.config) {
@@ -306,13 +338,13 @@ export default {
             if (this.runConfig.envMap) {
               this.projectEnvListMap = objToStrMap(this.runConfig.envMap);
             } else {
-              this.projectEnvListMap = new Map;
+              this.projectEnvListMap = new Map();
             }
           }
         } else {
           this.schedule = {
             value: '',
-            enable: false
+            enable: false,
           };
         }
       });
@@ -344,7 +376,6 @@ export default {
           setTimeout(() => {
             this.saveSchedule();
           }, 10);
-
         } else {
           return false;
         }
@@ -365,7 +396,10 @@ export default {
         param.workspaceId = getCurrentWorkspaceId();
       }
       if (this.schedule.enable) {
-        if ((this.runConfig.environmentType === 'JSON' && Object.keys(this.runConfig.envMap).length === 0) || (this.runConfig.environmentType === 'GROUP' && !this.runConfig.environmentGroupId)) {
+        if (
+          (this.runConfig.environmentType === 'JSON' && Object.keys(this.runConfig.envMap).length === 0) ||
+          (this.runConfig.environmentType === 'GROUP' && !this.runConfig.environmentGroupId)
+        ) {
           this.$warning(this.$t('workspace.env_group.please_select_env_for_current_scenario'));
           return;
         }
@@ -375,16 +409,16 @@ export default {
         }
       }
       param.config = JSON.stringify(this.runConfig);
-      param.scheduleFrom = "scenario";
+      param.scheduleFrom = 'scenario';
       if (param.id) {
         updateSchedule(param).then(() => {
           this.$success(this.$t('commons.save_success'));
-          this.$emit("refreshTable");
+          this.$emit('refreshTable');
         });
       } else {
         createSchedule(param).then(() => {
           this.$success(this.$t('commons.save_success'));
-          this.$emit("refreshTable");
+          this.$emit('refreshTable');
         });
       }
       this.dialogVisible = false;
@@ -400,12 +434,14 @@ export default {
       let param = this.buildParam();
       this.result = saveNotice(param).then(() => {
         this.$success(this.$t('commons.save_success'));
-      })
+      });
     },
     close() {
       this.dialogVisible = false;
       this.form.cronValue = '';
-      this.$refs['from'].resetFields();
+      if (this.$refs['from']) {
+        this.$refs['from'].resetFields();
+      }
       if (!this.schedule.value) {
         this.$refs.crontabResult.resultList = [];
       }
@@ -431,11 +467,10 @@ export default {
       alert(executeTileArr);
     },
   },
-}
+};
 </script>
 
 <style scoped>
-
 .inp {
   width: 50%;
   margin-right: 20px;
@@ -456,7 +491,7 @@ export default {
 .head {
   border-bottom: 1px solid var(--primary_color);
   color: var(--primary_color);
-  font-family: "Helvetica Neue", Helvetica, "PingFang SC", "Hiragino Sans GB", Arial, sans-serif;
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', Arial, sans-serif;
   font-size: 13px;
   cursor: pointer;
 }
@@ -472,7 +507,7 @@ export default {
 
 .ms-mode-span-label:before {
   content: '*';
-  color: #F56C6C;
+  color: #f56c6c;
   margin-right: 4px;
   margin-left: 10px;
 }

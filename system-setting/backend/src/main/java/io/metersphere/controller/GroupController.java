@@ -44,15 +44,6 @@ public class GroupController {
         return groupService.getGroupList(request);
     }
 
-    @PostMapping("/get/current/project/{goPage}/{pageSize}")
-    @RequiresPermissions(value = {PermissionConstants.PROJECT_GROUP_READ}, logical = Logical.OR)
-    public Pager<List<GroupDTO>> getCurrentProjectGroupList(@PathVariable int goPage, @PathVariable int pageSize, @RequestBody EditGroupRequest request) {
-        request.setOnlyQueryCurrentProject(true);
-        request.setGoPage(goPage);
-        request.setPageSize(pageSize);
-        return groupService.getGroupList(request);
-    }
-
     @GetMapping("/get/all")
     public List<GroupDTO> getAllGroup() {
         return groupService.getAllGroup();
@@ -134,18 +125,8 @@ public class GroupController {
         return PageUtils.setPageInfo(page, groupService.getGroupUser(editGroupRequest));
     }
 
-    @PostMapping("/current/project/user/{goPage}/{pageSize}")
-    @RequiresPermissions(value = {PermissionConstants.PROJECT_GROUP_READ}, logical = Logical.OR)
-    public Pager<List<User>> getCurrentProjectGroupUser(@PathVariable int goPage, @PathVariable int pageSize, @RequestBody EditGroupRequest editGroupRequest) {
-        editGroupRequest.setOnlyQueryCurrentProject(true);
-        if (StringUtils.isBlank(editGroupRequest.getProjectId())) {
-            editGroupRequest.setProjectId(SessionUtils.getCurrentProjectId());
-        }
-        Page<Object> page = PageHelper.startPage(goPage, pageSize, true);
-        return PageUtils.setPageInfo(page, groupService.getGroupUser(editGroupRequest));
-    }
-
     @GetMapping("/rm/{userId}/{groupId}")
+    @RequiresPermissions(PermissionConstants.SYSTEM_GROUP_READ)
     public void removeGroupMember(@PathVariable String userId, @PathVariable String groupId) {
         groupService.removeGroupMember(userId, groupId);
     }

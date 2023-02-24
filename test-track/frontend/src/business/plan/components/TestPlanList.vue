@@ -315,8 +315,8 @@
     <ms-test-plan-schedule-maintain ref="scheduleMaintain" @refreshTable="initTableData" :plan-case-ids="[]"
                                     :type="'plan'" :have-u-i-case="haveUICase"/>
     <ms-test-plan-schedule-batch-switch ref="scheduleBatchSwitch" @refresh="refresh"/>
-    <plan-run-mode-with-env @handleRunBatch="_handleRun" ref="runMode" :plan-case-ids="[]" :type="'plan'"
-                            :plan-id="currentPlanId" :show-save="true" :have-u-i-case="haveUICase"/>
+    <ms-test-plan-run-mode-with-env @handleRunBatch="_handleRun" ref="runMode" :plan-case-ids="[]" :type="'plan'"
+                            :plan-id="currentPlanId" :show-save="true" :have-u-i-case="haveUICase" :have-other-exec-case="haveOtherExecCase"/>
     <test-plan-report-review ref="testCaseReportView"/>
     <ms-task-center ref="taskCenter" :show-menu="false"/>
     <el-dialog
@@ -366,14 +366,14 @@ import MsTestPlanScheduleMaintain from "@/business/plan/components/ScheduleMaint
 import {getCurrentProjectID, getCurrentUser, getCurrentUserId} from "metersphere-frontend/src/utils/token";
 import {hasLicense, hasPermission} from "metersphere-frontend/src/utils/permission";
 import {operationConfirm} from "metersphere-frontend/src/utils";
-import PlanRunModeWithEnv from "@/business/plan/common/PlanRunModeWithEnv";
+import MsTestPlanRunModeWithEnv from "@/business/plan/common/TestPlanRunModeWithEnv";
 import MsTaskCenter from "metersphere-frontend/src/components/task/TaskCenter";
 import {
   getPlanStageOption, testPlanCopy, testPlanDelete, testPlanEdit,
   testPlanEditFollows,
   testPlanEditRunConfig, testPlanGetEnableScheduleCount, testPlanGetFollow, testPlanGetPrincipal, testPlanHaveExecCase,
-  testPlanHaveUiCase, testPlanList, testPlanRunBatch,
-  testPlanRunSave, testPlanUpdateScheduleEnable
+  testPlanHaveUiCase, testPlanList, testPlanRun, testPlanRunBatch,
+  testPlanRunSave, testPlanUpdateScheduleEnable, batchDeletePlan
 } from "@/api/remote/plan/test-plan";
 import MsTableColumn from "metersphere-frontend/src/components/table/MsTableColumn";
 import MsTable from "metersphere-frontend/src/components/table/MsTable";
@@ -397,7 +397,7 @@ export default {
     MsTestPlanScheduleMaintain,
     MsTableOperator, MsTableOperatorButton,
     MsDialogFooter, MsTableHeader,
-    MsTablePagination, PlanRunModeWithEnv, MsTaskCenter,
+    MsTablePagination, MsTestPlanRunModeWithEnv, MsTaskCenter,
     MsTableColumn,
     MsTable,
     MsTestPlanScheduleBatchSwitch
@@ -455,6 +455,11 @@ export default {
           name: this.$t('api_test.automation.batch_execute'),
           handleClick: this.handleBatchExecute,
           permissions: ['PROJECT_TRACK_PLAN:READ+SCHEDULE']
+        },
+        {
+          name: this.$t('commons.delete_batch'),
+          handleClick: this.handleBatchDelete,
+          permissions: ['PROJECT_TRACK_PLAN:READ+BATCH_DELETE']
         }
       ],
       simpleOperators: [
@@ -472,7 +477,10 @@ export default {
         },
       ],
       batchExecuteType: "serial",
-      haveUICase: false
+      //是否有UI执行用例
+      haveUICase: false,
+      //是否有API/性能执行用例
+      haveOtherExecCase: false,
     };
   },
   watch: {
@@ -619,6 +627,32 @@ export default {
       this.$refs.testPlanLitTable.clear();
       this.$refs.testPlanLitTable.isSelectDataAll(false);
       this.initTableData();
+    },
+    handleBatchDelete() {
+      this.$confirm(this.$t('plan.batch_delete_tip').toString(), this.$t('commons.delete_batch').toString(), {
+        confirmButtonText: this.$t('commons.confirm'),
+        cancelButtonText: this.$t('commons.cancel'),
+        type: 'warning',
+      }).then(() => {
+        let ids = [], param = {};
+        param.projectId = getCurrentProjectID();
+        if (this.condition.selectAll) {
+          param.unSelectIds = this.condition.unSelectIds;
+          param.selectAll = true;
+          param.queryTestPlanRequest = this.condition;
+        } else {
+          this.$refs.testPlanLitTable.selectRows.forEach((item) => {
+            ids.push(item.id)
+          });
+        }
+        param.ids = ids;
+        this.cardLoading = batchDeletePlan(param).then(() => {
+          this.refresh();
+          this.$success(this.$t('commons.delete_success'));
+        });
+      }).catch(() => {
+        this.$info(this.$t('commons.delete_cancel'));
+      });
     },
     handleBatchSwitch() {
       let param = [];
@@ -792,8 +826,9 @@ export default {
         .then(() => {
           testPlanHaveExecCase(row.id)
             .then(async res => {
-              const haveExecCase = res.data;
-              if (haveExecCase) {
+              this.haveOtherExecCase = res.data;
+              //因为ui没有资源池，这里必须分离两个变量
+              if (this.haveOtherExecCase || this.haveUICase) {
                 this.$refs.runMode.open('API', row.runModeConfig);
               } else {
                 this.$router.push('/track/plan/view/' + row.id);
@@ -829,7 +864,8 @@ export default {
       param.retryNum = config.retryNum;
       param.browser = config.browser;
       param.headlessEnabled = config.headlessEnabled;
-      if (config.isRun === true) {
+      if (config.executionWay === "runAndSave") {
+        param.executionWay = "RUN_SAVE"
         this.$refs.taskCenter.open();
         this.cardLoading = true;
         testPlanRunSave(param)
@@ -838,13 +874,23 @@ export default {
             this.$success(this.$t('commons.run_success'));
           });
 
-      } else {
+      } else if (config.executionWay === "save") {
+        param.executionWay = "SAVE"
         this.cardLoading = true;
         testPlanEditRunConfig(param)
           .then(() => {
             this.cardLoading = false;
             this.initTableData();
             this.$success(this.$t('commons.save_success'));
+          });
+      } else {
+        param.executionWay = "RUN"
+        this.$refs.taskCenter.open();
+        this.cardLoading = true;
+        testPlanRun(param)
+          .then(() => {
+            this.cardLoading = false;
+            this.$success(this.$t('commons.run_success'));
           });
       }
     },

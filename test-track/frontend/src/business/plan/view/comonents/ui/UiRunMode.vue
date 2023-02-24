@@ -7,6 +7,22 @@
     :visible.sync="runModeVisible"
   >
     <div class="mode-container">
+
+      <div>
+        <div>{{ $t("commons.environment") }}：</div>
+        <env-select-popover :project-ids="projectIds"
+                            :project-list="projectList"
+                            :project-env-map="projectEnvListMap"
+                            :environment-type="'JSON'"
+                            :has-option-group="false"
+                            :show-env-group="false"
+                            :group-id="runConfig.environmentGroupId"
+                            @setProjectEnvMap="setProjectEnvMap"
+                            ref="envSelectPopover"
+                            class="mode-row"
+        ></env-select-popover>
+      </div>
+
       <!-- 浏览器 -->
       <div class="browser-row wrap">
         <div class="title">{{ $t("ui.browser") }}：</div>
@@ -175,11 +191,13 @@
 
 <script>
 import MsDialogFooter from 'metersphere-frontend/src/components/MsDialogFooter'
-import {getOwnerProjects} from "@/business/utils/sdk-utils";
+import {getCurrentProjectID, getOwnerProjects, strMapToObj} from "@/business/utils/sdk-utils";
+import EnvSelectPopover from "@/business/plan/env/EnvSelectPopover";
+import {testPlanUiScenarioCaseEnv} from "@/api/remote/ui/test-plan-ui-scenario-case";
 
 export default {
   name: "UiRunMode",
-  components: {MsDialogFooter},
+  components: {MsDialogFooter, EnvSelectPopover},
   data() {
     return {
       runModeVisible: false,
@@ -207,9 +225,14 @@ export default {
       },
       projectList: [],
       projectIds: new Set(),
+      projectEnvListMap: {},
+      caseIdEnvNameMap: {},
     };
   },
   props: {
+    planCaseIds: {
+      type: Array,
+    },
     request: {
       type: Object,
     },
@@ -262,6 +285,7 @@ export default {
       };
       this.runModeVisible = true;
       this.getWsProjects();
+      this.showPopover();
     },
     changeMode() {
       this.runConfig.runWithinResourcePool = false;
@@ -295,6 +319,29 @@ export default {
 
       this.$emit("handleRunBatch", this.runConfig);
       this.close();
+    },
+    setProjectEnvMap(projectEnvMap) {
+      this.runConfig.envMap = strMapToObj(projectEnvMap);
+    },
+    showPopover() {
+      this.showScenarioPopover();
+    },
+    showScenarioPopover() {
+      let currentProjectID = getCurrentProjectID();
+      this.projectIds.clear();
+      testPlanUiScenarioCaseEnv(this.request.ids).then((res) => {
+        let data = res.data;
+        this.projectEnvListMap = data;
+        if (data) {
+          for (let d in data) {
+            this.projectIds.add(d);
+          }
+        }
+        if (this.projectIds.size === 0) {
+          this.projectIds.add(currentProjectID);
+        }
+        this.$refs.envSelectPopover.open();
+      });
     },
   },
 };

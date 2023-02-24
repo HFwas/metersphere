@@ -11,7 +11,8 @@
                    :label="$t('member.edit_password')"
                    class="setting-item"></el-tab-pane>
       <el-tab-pane
-        v-if="hasPermission('PERSONAL_INFORMATION:READ+THIRD_ACCOUNT')&&(hasJira||hasTapd||hasZentao||hasAzure)&&hasPermission('WORKSPACE_SERVICE:READ')"
+        v-if="hasPermission('PERSONAL_INFORMATION:READ+THIRD_ACCOUNT')
+        &&(platformAccountConfigs.length > 0 || hasTapd || hasAzure) && hasPermission('WORKSPACE_SERVICE:READ')"
         name="third_account" :label="$t('commons.third_account')" class="setting-item"></el-tab-pane>
       <el-tab-pane v-if="hasPermission('PERSONAL_INFORMATION:READ+UI_SETTING') && isXpack" name="commons.ui_setting"
                    :label="$t('commons.ui_setting')"
@@ -24,13 +25,18 @@
       <password-info v-if="activeIndex==='change_password'" :rule-form="ruleForm" @cancel="cancel"></password-info>
       <ui-setting v-if="activeIndex==='commons.ui_setting'" @cancel="cancel"></ui-setting>
       <el-form v-if="activeIndex==='third_account'">
-        <jira-user-info @auth="handleAuth" v-if="hasJira" :data="currentPlatformInfo"/>
+        <div v-for="config in platformAccountConfigs" :key="config.key">
+          <platform-account-config
+            :config="config"
+            :account-config="currentPlatformInfo"
+            v-if="showPlatformConfig(config.key)"
+          />
+        </div>
         <tapd-user-info @auth="handleAuth" v-if="hasTapd" :data="currentPlatformInfo"/>
-        <zentao-user-info @auth="handleAuth" v-if="hasZentao" :data="currentPlatformInfo"/>
         <azure-devops-user-info @auth="handleAuth" v-if="hasAzure" :data="currentPlatformInfo"/>
-        <el-form-item>
-          <el-button @click="cancel">{{ $t('commons.cancel') }}</el-button>
-          <el-button type="primary" @click="updateUser('updateUserForm')" @keydown.enter.native.prevent>
+        <el-form-item class="el-form-item-class">
+          <el-button size="small" @click="cancel">{{ $t('commons.cancel') }}</el-button>
+          <el-button size="small" type="primary" @click="updateUser('updateUserForm')" @keydown.enter.native.prevent>
             {{ $t('commons.confirm') }}
           </el-button>
         </el-form-item>
@@ -49,26 +55,27 @@ import PasswordInfo from "./PasswordInfo";
 import UiSetting from "./UiSetting";
 import {getCurrentUser, getCurrentWorkspaceId} from "../../utils/token";
 import {hasLicense, hasPermission} from "../../utils/permission";
-import ZentaoUserInfo from "./ZentaoUserInfo";
 import TapdUserInfo from "./TapdUserInfo";
-import JiraUserInfo from "./JiraUserInfo";
 import AzureDevopsUserInfo from "./AzureDevopsUserInfo";
 import {getIntegrationService} from "../../api/workspace";
 import {useUserStore} from "@/store";
 import {handleAuth as _handleAuth, getUserInfo, getWsAndPj, updateInfo} from "../../api/user";
+import PlatformAccountConfig from "./PlatformAccountConfig";
+import {getPlatformAccountInfo} from "../../api/platform-plugin";
+import {ISSUE_PLATFORM_OPTION} from "../../utils/table-constants";
+
 
 const userStore = useUserStore();
 
 export default {
   name: "MsPersonRouter",
   components: {
+    PlatformAccountConfig,
     MsMainContainer,
     MsPersonFromSetting,
     MsApiKeys,
     PasswordInfo,
-    ZentaoUserInfo,
     TapdUserInfo,
-    JiraUserInfo,
     AzureDevopsUserInfo,
     UiSetting
   },
@@ -79,9 +86,7 @@ export default {
     return {
       activeIndex: '',
       ruleForm: {},
-      hasJira: false,
       hasTapd: false,
-      hasZentao: false,
       hasAzure: false,
       isXpack: false,
       updatePath: '/user/update/current',
@@ -94,6 +99,7 @@ export default {
         zentaoPassword: '',
         azureDevopsPat: ''
       },
+      platformAccountConfigs: [],
       result: {},
       loading: false,
       workspaceList: [],
@@ -116,26 +122,12 @@ export default {
     currentUser: () => {
       return getCurrentUser();
     },
+    showPlatformConfig(platform) {
+      return ISSUE_PLATFORM_OPTION.map(item => item.value).indexOf(platform) < 0;
+    },
     handleAuth(type) {
       let param = {...this.currentPlatformInfo};
-      if (type === 'Jira') {
-        if (!param.jiraAccount) {
-          this.$error(this.$t('organization.integration.input_api_account'));
-          return
-        } else if (!param.jiraPassword) {
-          this.$error(this.$t('organization.integration.input_api_password'));
-          return
-        }
-
-      } else if (type === 'Zentao') {
-        if (!param.zentaoUserName) {
-          this.$error(this.$t('organization.integration.input_api_account'));
-          return
-        } else if (!param.zentaoPassword) {
-          this.$error(this.$t('organization.integration.input_api_password'));
-          return
-        }
-      } else if (type === 'AzureDevops') {
+      if (type === 'AzureDevops') {
         if (!param.azureDevopsPat) {
           this.$error(this.$t('organization.integration.input_azure_pat'));
           return
@@ -167,12 +159,6 @@ export default {
           if (platforms.indexOf("Tapd") !== -1) {
             this.hasTapd = true;
           }
-          if (platforms.indexOf("Jira") !== -1) {
-            this.hasJira = true;
-          }
-          if (platforms.indexOf("Zentao") !== -1) {
-            this.hasZentao = true;
-          }
           if (platforms.indexOf("AzureDevops") !== -1) {
             this.hasAzure = true;
           }
@@ -194,6 +180,10 @@ export default {
       });
     },
     initTableData() {
+      getPlatformAccountInfo()
+        .then((r) => {
+          this.platformAccountConfigs = r.data;
+        });
       this.result = getUserInfo(encodeURIComponent(this.currentUser().id))
         .then(response => {
           let data = response.data;
@@ -244,5 +234,9 @@ export default {
 .setting-item {
   height: 40px;
   line-height: 40px;
+}
+
+.el-form-item-class {
+  margin-left: 110px;
 }
 </style>

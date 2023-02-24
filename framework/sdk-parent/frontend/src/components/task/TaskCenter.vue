@@ -10,7 +10,7 @@
             <font-awesome-icon class="icon global focusing" :icon="['fas', 'tasks']"/>
           </el-badge>
         </div>
-        <font-awesome-icon @click="showTaskCenter" class="icon global focusing" :icon="['fas', 'tasks']" v-else/>
+        <font-awesome-icon @click="open('API')" class="icon global focusing" :icon="['fas', 'tasks']" v-else/>
       </el-tooltip>
     </div>
     <el-drawer
@@ -44,7 +44,7 @@
             <el-row>
               <el-col :span="12">
                 <el-form-item :label="$t('test_track.report.list.trigger_mode')" prop="runMode">
-                  <el-select size="mini" style="margin-right: 10px" v-model="condition.triggerMode" @change="init(true)"
+                  <el-select size="mini" style="margin-right: 10px" v-model="condition.triggerMode" @change="changeInit"
                              :disabled="isDebugHistory">
                     <el-option v-for="item in runMode" :key="item.id" :value="item.id" :label="item.label"/>
                   </el-select>
@@ -64,7 +64,7 @@
               <el-col :span="12">
                 <el-form-item :label="$t('commons.executor')" prop="status">
                   <el-select v-model="condition.executor" :placeholder="$t('commons.executor')" filterable size="mini"
-                             style="margin-right: 10px" @change="init(true)" :disabled="isDebugHistory">
+                             style="margin-right: 10px" @change="changeInit" :disabled="isDebugHistory">
                     <el-option
                       v-for="item in maintainerOptions"
                       :key="item.id"
@@ -84,7 +84,7 @@
         </div>
         <el-divider direction="horizontal" style="width: 100%"/>
         <el-tabs v-model="activeName" @tab-click="init(true)" v-loading="loading">
-          <el-tab-pane :name="tab.id" :label="tab.label" v-for="tab in tabs" :disabled="isDebugHistory">
+          <el-tab-pane :key="tab.id" :name="tab.id" :label="tab.label" v-for="tab in tabs" :disabled="isDebugHistory">
             <span slot="label">
               <el-badge class="ms-badge-item" v-if="showBadge(tab.id) > 0" :value="showBadge(tab.id)">
                 {{ tab.label }}
@@ -255,7 +255,7 @@ export default {
     },
     initWebSocket() {
       let isLicense = hasLicense();
-      this.websocket = getTaskSocket(isLicense ? isLicense : false);
+      this.websocket = getTaskSocket(this.condition.executor,this.condition.triggerMode,isLicense || false);
       this.websocket.onmessage = this.onMessage;
       this.websocket.onopen = this.onOpen;
       this.websocket.onerror = this.onError;
@@ -299,7 +299,9 @@ export default {
       if (activeName) {
         this.activeName = activeName;
       }
-      this.showTaskCenter();
+      this.init(true);
+      this.taskVisible = true;
+      setTimeout(this.showTaskCenter, 2000);
     },
     getPercentage(status) {
       if (status) {
@@ -387,6 +389,13 @@ export default {
     nextPage(currentPage, pageSize) {
       this.currentPage = currentPage;
       this.pageSize = pageSize;
+      this.init(true);
+    },
+    changeInit(){
+      if (this.websocket && this.websocket.close instanceof Function) {
+        this.websocket.close();
+      }
+      this.getTaskRunning();
       this.init(true);
     },
     init(loading) {

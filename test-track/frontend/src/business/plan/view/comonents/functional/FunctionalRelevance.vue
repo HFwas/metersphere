@@ -10,6 +10,7 @@
 
     <template v-slot:aside>
       <node-tree class="node-tree"
+                 :scroll="true"
                  v-loading="nodeResult.loading"
                  local-suffix="test_case"
                  default-label="未规划用例"
@@ -31,6 +32,9 @@
       :total="page.total"
       :page-size.sync="page.pageSize"
       :screen-height="screenHeight"
+      row-key="id"
+      :reserve-option="true"
+      :page-refresh="pageRefresh"
       @handlePageChange="getTestCases"
       @selectCountChange="setSelectCounts"
       @order="getTestCases"
@@ -93,7 +97,7 @@
 
     </ms-table>
 
-    <ms-table-pagination :change="getTestCases" :current-page.sync="page.currentPage" :page-size.sync="page.pageSize"
+    <ms-table-pagination :change="pageChange" :current-page.sync="page.currentPage" :page-size.sync="page.pageSize"
                          :total="page.total"/>
   </test-case-relevance-base>
 
@@ -122,6 +126,8 @@ import {TEST_CASE_CONFIGS} from "metersphere-frontend/src/components/search/sear
 import MxVersionSelect from "metersphere-frontend/src/components/version/MxVersionSelect";
 import {getProjectApplicationConfig} from "@/api/project-application";
 import {getVersionFilters} from "@/business/utils/sdk-utils";
+import {getTestTemplate} from "@/api/custom-field-template";
+import {initTestCaseConditionComponents} from "@/business/case/test-case";
 
 export default {
   name: "FunctionalRelevance",
@@ -167,7 +173,9 @@ export default {
         {text: 'P2', value: 'P2'},
         {text: 'P3', value: 'P3'}
       ],
-      versionFilters: null
+      versionFilters: null,
+      testCaseTemplate: {},
+      pageRefresh: false
     };
   },
   props: {
@@ -199,7 +207,8 @@ export default {
     selectNodeIds() {
       this.getTestCases();
     },
-    projectId() {
+    projectId(val) {
+      this.pushCustomFieldToCondition(val);
       this.setConditionModuleIdParam();
       this.page.condition.projectId = this.projectId;
       this.page.condition.versionId = null;
@@ -211,7 +220,7 @@ export default {
   },
   methods: {
     open() {
-      this.page.condition = {components: TEST_CASE_CONFIGS};
+      this.page.condition = {custom: false, components: TEST_CASE_CONFIGS};
       this.isSaving = false;
       this.$refs.baseRelevance.open();
       if (this.$refs.table) {
@@ -248,7 +257,8 @@ export default {
       this.getTestCases();
       this.getProjectNode(this.projectId, this.page.condition);
     },
-    getTestCases() {
+    getTestCases(data) {
+      this.pageRefresh = data === "page";
       let condition = this.page.condition;
       if (this.selectNodeIds && this.selectNodeIds.length > 0) {
         condition.nodeIds = this.selectNodeIds;
@@ -259,6 +269,9 @@ export default {
       if (this.projectId) {
         this.getTableData();
       }
+    },
+    pageChange() {
+      this.getTestCases("page")
     },
     saveCaseRelevance(item) {
       this.isSaving = true;
@@ -300,6 +313,12 @@ export default {
     },
     setSelectCounts(data) {
       this.$refs.baseRelevance.selectCounts = data;
+    },
+    pushCustomFieldToCondition(projectId) {
+      getTestTemplate(projectId).then(data => {
+        this.testCaseTemplate = data;
+        this.page.condition.components = initTestCaseConditionComponents(this.page.condition, this.testCaseTemplate.customFields);
+      });
     }
   }
 };

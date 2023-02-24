@@ -44,7 +44,7 @@ import {
   getChildNodeId,
   handleAfterSave,
   handleExpandToLevel,
-  handleMinderIssueDelete,
+  handleMinderIssueDelete, handlePasteAfter, handleSaveError,
   handleTestCaseAdd,
   handTestCaeEdit,
   isCaseNodeData,
@@ -229,6 +229,10 @@ export default {
           this.setIsChange(true);
         }
 
+        if ('paste' === even.commandName) {
+          handlePasteAfter(window.minder.getSelectedNode());
+        }
+
         if ('removenode' === even.commandName) {
           let nodes = window.minder.getSelectedNodes();
           if (nodes) {
@@ -289,6 +293,10 @@ export default {
           data: this.saveExtraNode,
         }
       }
+
+      // 过滤为空的id
+      param.ids = param.ids.filter(id => id);
+
       this.result.loading = true;
       testCaseMinderEdit(param)
         .then(() => {
@@ -590,6 +598,7 @@ export default {
         id: data.id,
         resource: data.resource,
       };
+      data.originId = data.id;
       if (nodeData.id && nodeData.id.length > 20) {
         nodeData.isEdit = true; // 编辑
       } else {
@@ -608,6 +617,7 @@ export default {
     },
     throwError(tip) {
       this.$error(tip)
+      handleSaveError(window.minder.getRoot());
       throw new Error(tip);
     },
     tagEditCheck() {

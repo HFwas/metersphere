@@ -2,23 +2,22 @@ package io.metersphere.service;
 
 import io.metersphere.api.dto.plugin.PluginDTO;
 import io.metersphere.api.dto.plugin.PluginRequest;
-import io.metersphere.api.dto.plugin.PluginResourceDTO;
 import io.metersphere.base.domain.Plugin;
 import io.metersphere.base.domain.PluginExample;
 import io.metersphere.base.domain.PluginWithBLOBs;
 import io.metersphere.base.mapper.PluginMapper;
-import io.metersphere.commons.exception.MSException;
+import io.metersphere.commons.constants.PluginScenario;
+import io.metersphere.commons.constants.StorageConstants;
 import io.metersphere.commons.utils.BeanUtils;
 import io.metersphere.commons.utils.FileUtils;
 import io.metersphere.commons.utils.LogUtil;
-import io.metersphere.commons.utils.SessionUtils;
-import io.metersphere.plugin.core.ui.PluginResource;
-import io.metersphere.commons.utils.CommonUtil;
+import io.metersphere.metadata.service.FileManagerService;
+import io.metersphere.metadata.vo.FileRequest;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
 import java.io.File;
@@ -32,50 +31,8 @@ import java.util.stream.Collectors;
 public class PluginService {
     @Resource
     private PluginMapper pluginMapper;
-
-    public String editPlugin(MultipartFile file) {
-        String id = UUID.randomUUID().toString();
-        String path = FileUtils.create(id, file);
-        if (StringUtils.isNotEmpty(path)) {
-            List<PluginResourceDTO> resources = this.getMethod(path, file.getOriginalFilename());
-            if (CollectionUtils.isNotEmpty(resources)) {
-                for (PluginResourceDTO resource : resources) {
-                    PluginExample example = new PluginExample();
-                    example.createCriteria().andPluginIdEqualTo(resource.getPluginId());
-                    List<Plugin> plugins = pluginMapper.selectByExample(example);
-                    if (CollectionUtils.isNotEmpty(plugins)) {
-                        String delPath = plugins.get(0).getSourcePath();
-                        // this.closeJar(delPath);
-                        FileUtils.deleteFile(delPath);
-                        pluginMapper.deleteByExample(example);
-                    }
-                    this.create(resource, path, file.getOriginalFilename());
-                }
-            }
-        }
-        return null;
-    }
-
-    private void create(PluginResourceDTO resource, String path, String name) {
-        resource.getUiScripts().forEach(item -> {
-            PluginWithBLOBs plugin = new PluginWithBLOBs();
-            plugin.setId(UUID.randomUUID().toString());
-            plugin.setCreateTime(System.currentTimeMillis());
-            plugin.setUpdateTime(System.currentTimeMillis());
-            plugin.setName(item.getName());
-            plugin.setPluginId(resource.getPluginId());
-            plugin.setScriptId(item.getId());
-            plugin.setSourcePath(path);
-            plugin.setFormOption(item.getFormOption());
-            plugin.setFormScript(item.getFormScript());
-            plugin.setClazzName(item.getClazzName());
-            plugin.setSourceName(name);
-            plugin.setJmeterClazz(item.getJmeterClazz());
-            plugin.setExecEntry(resource.getEntry());
-            plugin.setCreateUserId(SessionUtils.getUserId());
-            pluginMapper.insert(plugin);
-        });
-    }
+    @Resource
+    private FileManagerService fileManagerService;
 
     private boolean isXpack(Class<?> aClass, Object instance) {
         try {
@@ -86,33 +43,17 @@ public class PluginService {
         }
     }
 
-    private List<PluginResourceDTO> getMethod(String path, String fileName) {
-        List<PluginResourceDTO> resources = new LinkedList<>();
-        this.loadJar(path);
-        List<Class<?>> classes = CommonUtil.getSubClass(fileName);
-        try {
-            for (Class<?> aClass : classes) {
-                Object instance = aClass.newInstance();
-                Object pluginObj = aClass.getDeclaredMethod("init").invoke(instance);
-                if (pluginObj != null) {
-                    PluginResourceDTO pluginResourceDTO = new PluginResourceDTO();
-                    BeanUtils.copyBean(pluginResourceDTO, (PluginResource) pluginObj);
-                    pluginResourceDTO.setEntry(aClass.getName());
-                    resources.add(pluginResourceDTO);
-                }
-            }
-        } catch (Exception e) {
-            LogUtil.error("初始化脚本异常：" + e.getMessage());
-            MSException.throwException("调用插件初始化脚本失败");
-        }
-        return resources;
-    }
-
-    private boolean loadJar(String jarPath) {
+    private boolean loadJar(String jarPath, String pluginId) {
         try {
             ClassLoader classLoader = ClassLoader.getSystemClassLoader();
             try {
                 File file = new File(jarPath);
+                if (!file.exists()) {
+                    // 从MinIO下载
+                    if (!this.downPluginJar(jarPath, pluginId, jarPath)) {
+                        return false;
+                    }
+                }
                 if (!file.exists()) {
                     return false;
                 }
@@ -132,16 +73,29 @@ public class PluginService {
         return false;
     }
 
+    private boolean downPluginJar(String path, String pluginId, String jarPath) {
+        FileRequest request = new FileRequest();
+        request.setProjectId(StringUtils.join(FileUtils.BODY_FILE_DIR, "/plugin", pluginId));
+        request.setFileName(pluginId);
+        request.setStorage(StorageConstants.MINIO.name());
+        byte[] bytes = fileManagerService.downloadFile(request);
+        if (ArrayUtils.isNotEmpty(bytes)) {
+            FileUtils.createFile(path, bytes);
+        }
+        return new File(jarPath).exists();
+    }
+
     public void loadPlugins() {
         try {
             PluginExample example = new PluginExample();
+            example.createCriteria().andScenarioNotEqualTo(PluginScenario.platform.name());
             List<Plugin> plugins = pluginMapper.selectByExample(example);
             if (CollectionUtils.isNotEmpty(plugins)) {
                 plugins = plugins.stream().collect(Collectors.collectingAndThen(Collectors.toCollection(()
                         -> new TreeSet<>(Comparator.comparing(Plugin::getPluginId))), ArrayList::new));
                 if (CollectionUtils.isNotEmpty(plugins)) {
                     plugins.forEach(item -> {
-                        boolean isLoad = this.loadJar(item.getSourcePath());
+                        boolean isLoad = this.loadJar(item.getSourcePath(), item.getPluginId());
                         if (!isLoad) {
                             PluginExample pluginExample = new PluginExample();
                             pluginExample.createCriteria().andPluginIdEqualTo(item.getPluginId());
@@ -155,14 +109,11 @@ public class PluginService {
         }
     }
 
-    public List<PluginDTO> list(String name) {
+    public List<PluginDTO> getPluginList() {
         List<PluginDTO> lists = new LinkedList<>();
         try {
             PluginExample example = new PluginExample();
-            if (StringUtils.isNotBlank(name)) {
-                name = "%" + name + "%";
-                example.createCriteria().andNameLike(name);
-            }
+            example.createCriteria().andScenarioNotEqualTo(PluginScenario.platform.name());
             List<Plugin> plugins = pluginMapper.selectByExample(example);
             Map<String, Boolean> pluginMap = new HashMap<>();
             if (CollectionUtils.isNotEmpty(plugins)) {
@@ -228,6 +179,7 @@ public class PluginService {
 
     public List<Plugin> list() {
         PluginExample example = new PluginExample();
+        example.createCriteria().andScenarioNotEqualTo(PluginScenario.platform.name());
         List<Plugin> plugins = pluginMapper.selectByExample(example);
         return plugins;
     }

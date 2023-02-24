@@ -1,11 +1,12 @@
 package io.metersphere.base.mapper.ext;
 
-import io.metersphere.dto.PlanReportCaseDTO;
 import io.metersphere.api.dto.QueryAPIReportRequest;
 import io.metersphere.api.dto.datacount.ExecutedCaseInfoResult;
 import io.metersphere.base.domain.ApiDefinitionExecResult;
 import io.metersphere.base.domain.ApiDefinitionExecResultExpand;
 import io.metersphere.base.domain.ApiDefinitionExecResultWithBLOBs;
+import io.metersphere.commons.vo.TaskResultVO;
+import io.metersphere.dto.PlanReportCaseDTO;
 import io.metersphere.task.dto.TaskCenterRequest;
 import org.apache.ibatis.annotations.InsertProvider;
 import org.apache.ibatis.annotations.Param;
@@ -23,12 +24,9 @@ public interface ExtApiDefinitionExecResultMapper {
 
     ApiDefinitionExecResultWithBLOBs selectMaxResultByResourceIdAndType(String resourceId, String type);
 
+    long countByProjectIDAndCreateInThisWeek(@Param("projectId") String projectId, @Param("version") String version, @Param("firstDayTimestamp") long firstDayTimestamp, @Param("lastDayTimestamp") long lastDayTimestamp);
 
-    long countByProjectIDAndCreateInThisWeek(@Param("projectId") String projectId, @Param("firstDayTimestamp") long firstDayTimestamp, @Param("lastDayTimestamp") long lastDayTimestamp);
-
-    long countByTestCaseIDInProject(String projectId);
-
-    List<ExecutedCaseInfoResult> findFailureCaseInTestPlanByProjectIDAndExecuteTimeAndLimitNumber(@Param("projectId") String projectId, @Param("selectFunctionCase") boolean selectFunctionCase, @Param("startTimestamp") long startTimestamp);
+    List<ExecutedCaseInfoResult> findFailureCaseInTestPlanByProjectIDAndExecuteTimeAndLimitNumber(@Param("projectId") String projectId, @Param("versionId") String version, @Param("selectFunctionCase") boolean selectFunctionCase, @Param("startTimestamp") long startTimestamp, @Param("limitNumber") int limitNumber);
 
     String selectExecResult(String resourceId);
 
@@ -36,14 +34,12 @@ public interface ExtApiDefinitionExecResultMapper {
 
     List<ApiDefinitionExecResult> selectStatusByIdList(@Param("ids") Collection<String> values);
 
-    List<ApiDefinitionExecResult> selectApiResultByProjectId(String projectId);
-
     void update(@Param("ids") List<String> ids);
 
     @InsertProvider(type = ExtApiDefinitionExecResultProvider.class, method = "insertListSql")
     void sqlInsert(List<ApiDefinitionExecResult> list);
 
-    List<ApiDefinitionExecResult> findByProjectIds(@Param("request") TaskCenterRequest request);
+    List<TaskResultVO> findByProjectIds(@Param("request") TaskCenterRequest request);
 
     List<String> selectDistinctStatusByReportId(String reportId);
 

@@ -4,44 +4,67 @@
       {{ description }}
     </span>
     <el-row>
-      <el-checkbox v-model="isSelectAll" v-if="isShowEnable === true && items.length > 1"/>
+      <el-checkbox v-model="isSelectAll" v-if="isShowEnable === true && items.length > 1" />
     </el-row>
     <div class="kv-row item" v-for="(item, index) in items" :key="index">
-
       <el-row type="flex" :gutter="20" justify="space-between" align="middle">
         <el-col class="kv-checkbox" v-if="isShowEnable">
-          <el-checkbox v-if="!isDisable(index)" v-model="item.enable"
-                       :disabled="isReadOnly"/>
+          <el-checkbox v-if="!isDisable(index)" v-model="item.enable" :disabled="isReadOnly" />
         </el-col>
         <span style="margin-left: 10px" v-else></span>
 
-        <i class="el-icon-top" style="cursor:pointer" @click="moveTop(index)"/>
-        <i class="el-icon-bottom" style="cursor:pointer;" @click="moveBottom(index)"/>
+        <i class="el-icon-top" style="cursor: pointer" @click="moveTop(index)" />
+        <i class="el-icon-bottom" style="cursor: pointer" @click="moveBottom(index)" />
 
-        <el-col class="item" v-if="unShowSelect===false">
-          <el-input v-if="!suggestions" :disabled="isReadOnly" v-model="item.name" size="small" maxlength="200"
-                    @change="change"
-                    :placeholder="keyText" show-word-limit/>
-          <el-autocomplete :disabled="isReadOnly" :maxlength="400" v-if="suggestions" v-model="item.name" size="small"
-                           :fetch-suggestions="querySearch" @change="change" :placeholder="keyText"
-                           show-word-limit/>
+        <el-col class="item" v-if="unShowSelect === false">
+          <el-input
+            v-if="!suggestions"
+            :disabled="isReadOnly"
+            v-model="item.name"
+            size="small"
+            maxlength="200"
+            @change="change"
+            :placeholder="keyText"
+            show-word-limit />
+          <el-autocomplete
+            :disabled="isReadOnly"
+            :maxlength="400"
+            v-if="suggestions"
+            v-model="item.name"
+            size="small"
+            :fetch-suggestions="querySearch"
+            @change="change"
+            :placeholder="keyText"
+            show-word-limit />
         </el-col>
 
-        <el-col class="item" v-if="unShowSelect===true">
-          <el-input v-if="suggestions" :disabled="isReadOnly" v-model="item.name" size="small" maxlength="200"
-                    :placeholder="keyText" show-word-limit/>
+        <el-col class="item" v-if="unShowSelect === true">
+          <el-input
+            v-if="suggestions"
+            :disabled="isReadOnly"
+            v-model="item.name"
+            size="small"
+            maxlength="200"
+            :placeholder="keyText"
+            show-word-limit />
         </el-col>
 
         <el-col class="item">
-          <el-input v-if="!needMock" :disabled="isReadOnly" v-model="item.value" size="small" @change="change"
-                    :placeholder="unShowSelect?$t('commons.description'):valueText" show-word-limit/>
+          <el-input
+            v-if="!needMock"
+            :disabled="isReadOnly"
+            v-model="item.value"
+            size="small"
+            @change="change"
+            :placeholder="unShowSelect ? $t('commons.description') : valueText"
+            show-word-limit />
           <div v-if="needMock">
             <el-autocomplete
               :disabled="isReadOnly"
               @change="change"
               :placeholder="valueText"
               size="small"
-              style="width: 100%;"
+              style="width: 100%"
               v-model="item.value"
               value-key="name"
               :fetch-suggestions="funcSearch"
@@ -53,33 +76,44 @@
         </el-col>
 
         <el-col class="item" v-if="showDesc">
-          <el-input v-model="item.description" size="small" maxlength="200"
-                    :placeholder="$t('commons.description')" show-word-limit>
+          <el-input
+            v-model="item.description"
+            size="small"
+            maxlength="200"
+            :placeholder="$t('commons.description')"
+            :disabled="isReadOnly"
+            show-word-limit>
           </el-input>
         </el-col>
 
         <el-col class="item kv-delete">
-          <el-button size="mini" class="el-icon-delete-solid" circle @click="remove(index)"
-                     :disabled="isDisable(index) || isReadOnly"/>
+          <el-button
+            size="mini"
+            class="el-icon-delete-solid"
+            circle
+            @click="remove(index)"
+            :disabled="isDisable(index) || isReadOnly" />
         </el-col>
       </el-row>
     </div>
-    <ms-api-variable-advance :scenario-definition="scenarioDefinition" :append-to-body="appendToBody"
-                             :current-item="currentItem" :parameters="keyValues" ref="variableAdvance"/>
-
+    <ms-api-variable-advance
+      :scenario-definition="scenarioDefinition"
+      :append-to-body="appendToBody"
+      :current-item="currentItem"
+      :parameters="keyValues"
+      ref="variableAdvance" />
   </div>
 </template>
 
 <script>
-import {KeyValue} from "../model/ApiTestModel";
+import { KeyValue } from '../model/ApiTestModel';
 import Vue from 'vue';
-import MsApiVariableAdvance from "./ApiVariableAdvance";
-import {JMETER_FUNC, MOCKJS_FUNC} from "metersphere-frontend/src/utils/constants";
-
+import MsApiVariableAdvance from './ApiVariableAdvance';
+import { JMETER_FUNC, MOCKJS_FUNC } from 'metersphere-frontend/src/utils/constants';
 
 export default {
-  name: "MsApiKeyValue",
-  components: {MsApiVariableAdvance},
+  name: 'MsApiKeyValue',
+  components: { MsApiVariableAdvance },
   props: {
     keyPlaceholder: String,
     valuePlaceholder: String,
@@ -88,48 +122,48 @@ export default {
     },
     unShowSelect: {
       type: Boolean,
-      default: false
+      default: false,
     },
     description: String,
     items: {
       type: Array,
       default() {
         return [];
-      }
+      },
     },
     isReadOnly: {
       type: Boolean,
-      default: false
+      default: false,
     },
     suggestions: Array,
     needMock: {
       type: Boolean,
-      default: false
+      default: false,
     },
     showDesc: Boolean,
     appendToBody: {
       type: Boolean,
       default() {
         return false;
-      }
+      },
     },
-    scenarioDefinition: Array
+    scenarioDefinition: Array,
   },
   data() {
     return {
       keyValues: [],
       loading: false,
       currentItem: {},
-      isSelectAll: true
-    }
+      isSelectAll: true,
+    };
   },
   computed: {
     keyText() {
-      return this.keyPlaceholder || this.$t("api_test.key");
+      return this.keyPlaceholder || this.$t('api_test.key');
     },
     valueText() {
-      return this.valuePlaceholder || this.$t("api_test.value");
-    }
+      return this.valuePlaceholder || this.$t('api_test.value');
+    },
   },
   watch: {
     isSelectAll: function (to, from) {
@@ -138,7 +172,7 @@ export default {
       } else if (from == true && to == false) {
         this.invertSelect();
       }
-    }
+    },
   },
   methods: {
     advanced(item) {
@@ -152,7 +186,7 @@ export default {
     },
     funcFilter(queryString) {
       return (func) => {
-        return (func.name.toLowerCase().indexOf(queryString.toLowerCase()) > -1);
+        return func.name.toLowerCase().indexOf(queryString.toLowerCase()) > -1;
       };
     },
     funcSearch(queryString, cb) {
@@ -169,7 +203,7 @@ export default {
       let thisRow = this.items[index];
       let nextRow = this.items[index + 1];
       Vue.set(this.items, index + 1, thisRow);
-      Vue.set(this.items, index, nextRow)
+      Vue.set(this.items, index, nextRow);
     },
     moveTop(index) {
       if (index === 0) {
@@ -179,13 +213,13 @@ export default {
       let thisRow = this.items[index];
       let lastRow = this.items[index - 1];
       Vue.set(this.items, index - 1, thisRow);
-      Vue.set(this.items, index, lastRow)
+      Vue.set(this.items, index, lastRow);
     },
     reload() {
-      this.loading = true
+      this.loading = true;
       this.$nextTick(() => {
-        this.loading = false
-      })
+        this.loading = false;
+      });
     },
     remove: function (index) {
       // 移除整行输入控件及内容
@@ -206,7 +240,19 @@ export default {
         }
       });
       if (isNeedCreate) {
-        this.items.push(new KeyValue({enable: true}));
+        this.items.push(new KeyValue({
+          enable: true,
+          contentType: null,
+          description: null,
+          file: false,
+          files: null,
+          max: null,
+          min: null,
+          required: true,
+          type: null,
+          urlEncode: false,
+          value: null
+        }));
       }
       this.$emit('change', this.items);
       // TODO 检查key重复
@@ -221,16 +267,16 @@ export default {
     },
     createFilter(queryString) {
       return (restaurant) => {
-        return (restaurant.value.toLowerCase().indexOf(queryString.toLowerCase()) === 0);
+        return restaurant.value.toLowerCase().indexOf(queryString.toLowerCase()) === 0;
       };
     },
     selectAll() {
-      this.items.forEach(item => {
+      this.items.forEach((item) => {
         item.enable = true;
       });
     },
     invertSelect() {
-      this.items.forEach(item => {
+      this.items.forEach((item) => {
         item.enable = false;
       });
     },
@@ -243,12 +289,11 @@ export default {
         }
       }
       if (this.items.length === 0 || this.items[this.items.length - 1].name) {
-        this.items.push(new KeyValue({enable: true, name: '', value: ''}));
+        this.items.push(new KeyValue({ enable: true, name: '', value: '' }));
       }
     }
-
-  }
-}
+  },
+};
 </script>
 
 <style scoped>

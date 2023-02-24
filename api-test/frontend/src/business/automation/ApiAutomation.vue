@@ -15,14 +15,12 @@
         page-source="scenario"
         :is-trash-data="trashEnable"
         :type="'edit'"
-        :total='total'
-        ref="nodeTree"/>
+        :total="total"
+        ref="nodeTree" />
     </ms-aside-container>
     <ms-main-container>
       <el-tabs v-model="activeName" @tab-click="addTab" @tab-remove="closeConfirm">
-        <el-tab-pane
-          name="trash" :closable="true"
-          :label="$t('commons.trash')" v-if="trashEnable">
+        <el-tab-pane name="trash" :closable="true" :label="$t('commons.trash')" v-if="trashEnable">
           <ms-api-scenario-list
             @getTrashCase="getTrashCase"
             @refreshTree="refreshTree"
@@ -41,7 +39,7 @@
             @updateInitApiTableOpretion="updateInitApiTableOpretion"
             ref="apiTrashScenarioList">
             <template v-slot:version>
-              <mx-version-select v-xpack :project-id="projectId" @changeVersion="changeVersion"/>
+              <mx-version-select v-xpack :project-id="projectId" @changeVersion="changeVersion" />
             </template>
           </ms-api-scenario-list>
         </el-tab-pane>
@@ -65,39 +63,42 @@
             @updateInitApiTableOpretion="updateInitApiTableOpretion"
             ref="apiScenarioList">
             <template v-slot:version>
-              <mx-version-select v-xpack :project-id="projectId" @changeVersion="changeVersion"/>
+              <mx-version-select v-xpack :project-id="projectId" @changeVersion="changeVersion" />
             </template>
           </ms-api-scenario-list>
         </el-tab-pane>
 
-
-        <el-tab-pane
-          :key="item.name"
-          v-for="(item) in tabs"
-          :label="item.label"
-          :name="item.name"
-          closable>
-          <el-tooltip slot="label" effect="dark" :content="item.label" placement="bottom-start"
-                      class="ms-tab-name-width">
+        <el-tab-pane :key="item.name" v-for="item in tabs" :label="item.label" :name="item.name" closable>
+          <el-tooltip
+            slot="label"
+            effect="dark"
+            :content="item.label"
+            placement="bottom-start"
+            class="ms-tab-name-width">
             <span>{{ item.label }}</span>
           </el-tooltip>
           <div class="ms-api-scenario-div">
-            <ms-edit-api-scenario @refresh="refresh" @openScenario="editScenario" @closePage="closePage"
-                                  :currentScenario="item.currentScenario"
-                                  :custom-num="customNum" :moduleOptions="moduleOptions" ref="autoScenarioConfig"/>
+            <ms-edit-api-scenario
+              @refresh="refresh"
+              @openScenario="editScenario"
+              @closePage="closePage"
+              :currentScenario="item.currentScenario"
+              :custom-num="customNum"
+              :moduleOptions="moduleOptions"
+              ref="autoScenarioConfig" />
           </div>
         </el-tab-pane>
 
         <el-tab-pane name="add" v-if="hasPermission('PROJECT_API_SCENARIO:READ+CREATE')">
           <template v-slot:label>
             <el-dropdown @command="handleCommand">
-              <el-button type="primary" plain icon="el-icon-plus" size="mini"/>
+              <el-button type="primary" plain icon="el-icon-plus" size="mini" />
               <el-dropdown-menu slot="dropdown">
-                <el-dropdown-item command="ADD"
-                                  v-permission="['PROJECT_API_SCENARIO:READ+CREATE']">
+                <el-dropdown-item command="ADD" v-permission="['PROJECT_API_SCENARIO:READ+CREATE']">
                   {{ $t('api_test.automation.add_scenario') }}
                 </el-dropdown-item>
-                <el-dropdown-item command="CLOSE_ALL">{{ $t('api_test.definition.request.close_all_label') }}
+                <el-dropdown-item command="CLOSE_ALL"
+                  >{{ $t('api_test.definition.request.close_all_label') }}
                 </el-dropdown-item>
               </el-dropdown-menu>
             </el-dropdown>
@@ -109,29 +110,28 @@
 </template>
 
 <script>
-
-import {getCurrentProjectID, getCurrentUser, getCurrentWorkspaceId} from "metersphere-frontend/src/utils/token";
-import {getUUID} from "metersphere-frontend/src/utils";
-import {hasPermission} from "metersphere-frontend/src/utils/permission";
-import {PROJECT_ID, WORKSPACE_ID} from "metersphere-frontend/src/utils/constants";
-import {buildTree} from "metersphere-frontend/src/model/NodeTree";
-import {getScenarioById, getScenarioByTrash} from "@/api/scenario";
-import {getOwnerProjectIds, getProject, getProjectConfig} from "@/api/project";
-import {getModuleByProjectId} from "@/api/scenario-module";
-import {useApiStore} from "@/store";
+import { getCurrentProjectID, getCurrentUser, getCurrentWorkspaceId } from 'metersphere-frontend/src/utils/token';
+import { getUUID } from 'metersphere-frontend/src/utils';
+import { hasPermission } from 'metersphere-frontend/src/utils/permission';
+import { PROJECT_ID, WORKSPACE_ID } from 'metersphere-frontend/src/utils/constants';
+import { buildTree } from 'metersphere-frontend/src/model/NodeTree';
+import { getScenarioById, getScenarioByTrash } from '@/api/scenario';
+import { getOwnerProjectIds, getProject, getProjectConfig } from '@/api/project';
+import { getModuleByProjectId } from '@/api/scenario-module';
+import { useApiStore } from '@/store';
 
 const store = useApiStore();
 const jsondiffpatch = require('jsondiffpatch');
 export default {
-  name: "ApiAutomation",
+  name: 'ApiAutomation',
   components: {
-    MxVersionSelect: () => import("metersphere-frontend/src/components/version/MxVersionSelect"),
-    MsApiScenarioModule: () => import("@/business/automation/scenario/ApiScenarioModule"),
-    MsApiScenarioList: () => import("@/business/automation/scenario/ApiScenarioList"),
-    MsMainContainer: () => import("metersphere-frontend/src/components/MsMainContainer"),
-    MsAsideContainer: () => import("metersphere-frontend/src/components/MsAsideContainer"),
-    MsContainer: () => import("metersphere-frontend/src/components/MsContainer"),
-    MsEditApiScenario: () => import("./scenario/EditApiScenario")
+    MxVersionSelect: () => import('metersphere-frontend/src/components/version/MxVersionSelect'),
+    MsApiScenarioModule: () => import('@/business/automation/scenario/ApiScenarioModule'),
+    MsApiScenarioList: () => import('@/business/automation/scenario/ApiScenarioList'),
+    MsMainContainer: () => import('metersphere-frontend/src/components/MsMainContainer'),
+    MsAsideContainer: () => import('metersphere-frontend/src/components/MsAsideContainer'),
+    MsContainer: () => import('metersphere-frontend/src/components/MsContainer'),
+    MsEditApiScenario: () => import('./scenario/EditApiScenario'),
   },
   comments: {},
   computed: {
@@ -167,7 +167,7 @@ export default {
       trashEnable: false,
       selectNodeIds: [],
       nodeTree: [],
-      currentModulePath: "",
+      currentModulePath: '',
       customNum: false,
       //影响API表格刷新的操作。 为了防止高频率刷新模块列表用。如果是模块更新而造成的表格刷新，则不回调模块刷新方法
       initApiTableOpretion: 'init',
@@ -204,10 +204,11 @@ export default {
         this.renderComponent = true;
       });
     },
-    '$route'(to, from) {  //  路由改变时，把接口定义界面中的 ctrl s 保存快捷键监听移除
+    $route(to, from) {
+      //  路由改变时，把接口定义界面中的 ctrl s 保存快捷键监听移除
       if (to.path.indexOf('/api/automation') == -1) {
         if (this.$refs && this.$refs.autoScenarioConfig) {
-          this.$refs.autoScenarioConfig.forEach(item => {
+          this.$refs.autoScenarioConfig.forEach((item) => {
             item.removeListener();
           });
         }
@@ -215,12 +216,12 @@ export default {
     },
     selectNodeIds() {
       if (!this.trashEnable) {
-        this.activeName = "default";
+        this.activeName = 'default';
       }
     },
     activeName() {
-      this.isAsideHidden = (this.activeName === 'default' || this.activeName === 'trash');
-    }
+      this.isAsideHidden = this.activeName === 'default' || this.activeName === 'trash';
+    },
   },
   methods: {
     hasPermission,
@@ -234,20 +235,28 @@ export default {
       if (!params) {
         return;
       }
-      if (typeof params === "string") {
-        let paramArr = params.split("edit:");
+      if (typeof params === 'string') {
+        let paramArr = params.split('edit:');
         if (paramArr.length !== 2) {
           return;
         }
         let scenarioId = paramArr[1];
         //查找单条数据，跳转修改页面
-        getScenarioById(scenarioId).then(response => {
+        getScenarioById(scenarioId).then((response) => {
           let data = response.data;
           if (data) {
             let row = data;
-            let checks = ["array", "object"];
-            if (row && row.tags && (checks.indexOf(Object.prototype.toString.call(row.tags)
-              .match(/\[object (\w+)\]/)[1].toLowerCase()) !== -1)) {
+            let checks = ['array', 'object'];
+            if (
+              row &&
+              row.tags &&
+              checks.indexOf(
+                Object.prototype.toString
+                  .call(row.tags)
+                  .match(/\[object (\w+)\]/)[1]
+                  .toLowerCase()
+              ) !== -1
+            ) {
               row.tags = JSON.parse(row.tags);
             }
             //如果树未加载
@@ -262,11 +271,11 @@ export default {
       }
     },
     initModules(row, projectId) {
-      getModuleByProjectId(projectId).then(response => {
+      getModuleByProjectId(projectId).then((response) => {
         if (response.data) {
-          response.data.forEach(node => {
-            node.name = node.name === '未规划场景' ? this.$t('api_test.automation.unplanned_scenario') : node.name
-            buildTree(node, {path: ''});
+          response.data.forEach((node) => {
+            node.name = node.name === '未规划场景' ? this.$t('api_test.automation.unplanned_scenario') : node.name;
+            buildTree(node, { path: '' });
           });
           this.moduleOptions = response.data;
         }
@@ -276,13 +285,13 @@ export default {
     changeRedirectParam(redirectIDParam) {
       this.redirectID = redirectIDParam;
       if (redirectIDParam != null) {
-        if (this.redirectFlag == "none") {
-          this.activeName = "default";
+        if (this.redirectFlag == 'none') {
+          this.activeName = 'default';
           this.addListener();
-          this.redirectFlag = "redirected";
+          this.redirectFlag = 'redirected';
         }
       } else {
-        this.redirectFlag = "none";
+        this.redirectFlag = 'none';
       }
     },
     getPath(id, arr) {
@@ -290,7 +299,7 @@ export default {
         return null;
       }
       if (arr) {
-        arr.forEach(item => {
+        arr.forEach((item) => {
           if (item.id === id) {
             this.currentModulePath = item.path;
           }
@@ -311,16 +320,19 @@ export default {
         this.$warning(this.$t('commons.check_project_tip'));
         return;
       }
-      this.currentModulePath = "";
+      this.currentModulePath = '';
       if (tab.name === 'add') {
         let label = this.$t('api_test.automation.add_scenario');
         let name = getUUID().substring(0, 8);
         this.activeName = name;
         let currentScenario = {
-          status: "Underway", principal: getCurrentUser().id,
-          apiScenarioModuleId: "default-module", id: getUUID(),
-          modulePath: "/" + this.$t("commons.module_title"),
-          level: "P0", type: "add"
+          status: 'Underway',
+          principal: this._getCurrentUserId(),
+          apiScenarioModuleId: 'default-module',
+          id: getUUID(),
+          modulePath: '/' + this.$t('commons.module_title'),
+          level: 'P0',
+          type: 'add',
         };
         if (this.nodeTree && this.nodeTree.length > 0) {
           currentScenario.apiScenarioModuleId = this.nodeTree[0].id;
@@ -332,7 +344,11 @@ export default {
           this.getPath(this.selectNodeIds[0], this.moduleOptions);
           currentScenario.modulePath = this.currentModulePath;
         }
-        this.tabs.push({label: label, name: name, currentScenario: currentScenario});
+        this.tabs.push({
+          label: label,
+          name: name,
+          currentScenario: currentScenario,
+        });
       }
       if (tab.name === 'edit') {
         let label = this.$t('api_test.automation.add_scenario');
@@ -340,55 +356,79 @@ export default {
         this.activeName = name;
         label = tab.currentScenario.name;
         if (!tab.currentScenario.level) {
-          tab.currentScenario.level = "P0";
+          tab.currentScenario.level = 'P0';
         }
-        this.tabs.push({label: label, name: name, currentScenario: tab.currentScenario});
+        this.tabs.push({
+          label: label,
+          name: name,
+          currentScenario: tab.currentScenario,
+        });
       }
       if (this.$refs && this.$refs.autoScenarioConfig) {
-        this.$refs.autoScenarioConfig.forEach(item => {
+        this.$refs.autoScenarioConfig.forEach((item) => {
           item.removeListener();
-        });  //  删除所有tab的 ctrl + s 监听
+        }); //  删除所有tab的 ctrl + s 监听
         this.addListener();
       }
     },
+    _getCurrentUserId() {
+      const { id, userGroups } = getCurrentUser();
+      if (userGroups) {
+        // 是否是当前项目下的成员
+        let index = userGroups.findIndex((ug) => ug.sourceId === getCurrentProjectID());
+        if (index !== -1) {
+          return id;
+        }
+      }
+      return '';
+    },
     addListener() {
-      let index = this.tabs.findIndex(item => item.name === this.activeName); //  找到当前选中tab的index
-      if (index != -1) {   //  为当前选中的tab添加监听
+      let index = this.tabs.findIndex((item) => item.name === this.activeName); //  找到当前选中tab的index
+      if (index != -1) {
+        //  为当前选中的tab添加监听
         this.$nextTick(() => {
           this.$refs.autoScenarioConfig[index].addListener();
         });
       }
     },
     handleTabClose() {
-      let message = "";
-      this.tabs.forEach(t => {
+      let message = '';
+      this.tabs.forEach((t) => {
         this.diff(t);
         if (t && this.isSave) {
-          message += t.currentScenario.name + "，";
+          message += t.currentScenario.name + '，';
           this.isSave = false;
         }
       });
-      if (message !== "") {
-        this.$alert(this.$t('commons.scenario') + " [ " + message.substr(0, message.length - 1) + " ] " + this.$t('commons.confirm_info'), '', {
-          confirmButtonText: this.$t('commons.confirm'),
-          cancelButtonText: this.$t('commons.cancel'),
-          callback: (action) => {
-            if (action === 'confirm') {
-              this.tabs = [];
-              this.trashEnable = false;
-              this.activeName = "default";
-              this.isSave = false;
-              // 清除vuex中缓存的环境
-              store.scenarioEnvMap = new Map();
-            } else {
-              this.isSave = false;
-            }
+      if (message !== '') {
+        this.$alert(
+          this.$t('commons.scenario') +
+            ' [ ' +
+            message.substr(0, message.length - 1) +
+            ' ] ' +
+            this.$t('commons.confirm_info'),
+          '',
+          {
+            confirmButtonText: this.$t('commons.confirm'),
+            cancelButtonText: this.$t('commons.cancel'),
+            callback: (action) => {
+              if (action === 'confirm') {
+                this.tabs = [];
+                this.trashEnable = false;
+                this.activeName = 'default';
+                this.isSave = false;
+                // 清除vuex中缓存的环境
+                store.scenarioEnvMap = new Map();
+              } else {
+                this.isSave = false;
+              }
+            },
           }
-        });
+        );
       } else {
         this.tabs = [];
         this.trashEnable = false;
-        this.activeName = "default";
+        this.activeName = 'default';
         this.refresh();
         this.isSave = false;
       }
@@ -398,28 +438,28 @@ export default {
     },
     handleCommand(e) {
       switch (e) {
-        case "ADD":
-          this.addTab({name: 'add'});
+        case 'ADD':
+          this.addTab({ name: 'add' });
           break;
-        case "CLOSE_ALL":
+        case 'CLOSE_ALL':
           this.handleTabClose();
           break;
         default:
-          this.addTab({name: 'add'});
+          this.addTab({ name: 'add' });
           break;
       }
     },
     closePage(targetName) {
-      this.tabs = this.tabs.filter(tab => tab.label !== targetName);
+      this.tabs = this.tabs.filter((tab) => tab.label !== targetName);
       if (this.tabs.length > 0) {
         this.activeName = this.tabs[this.tabs.length - 1].name;
         this.addListener(); //  自动切换当前标签时，也添加监听
       } else {
-        this.activeName = "default";
+        this.activeName = 'default';
       }
     },
     diff(t) {
-      if (t.currentScenario.type !== "add") {
+      if (t.currentScenario.type !== 'add') {
         let v1 = t.currentScenario.scenarioDefinitionOrg;
         let v2 = {
           apiScenarioModuleId: t.currentScenario.apiScenarioModuleId,
@@ -429,7 +469,7 @@ export default {
           level: t.currentScenario.level,
           tags: t.currentScenario.tags,
           description: t.currentScenario.description,
-          scenarioDefinition: t.currentScenario.scenarioDefinition
+          scenarioDefinition: t.currentScenario.scenarioDefinition,
         };
         let v3 = JSON.parse(JSON.stringify(v2));
         if (v1.scenarioDefinition) {
@@ -452,7 +492,7 @@ export default {
     },
     deleteResourceIds(array) {
       if (array instanceof Array && array.length > 0) {
-        array.forEach(item => {
+        array.forEach((item) => {
           if (item.currentScenarioId && item.currentScenarioId.length > 0) {
             delete item.currentScenarioId;
           }
@@ -490,7 +530,7 @@ export default {
             delete item.maxThreads;
           }
           if (item.parentIndex) {
-            delete item.parentIndex
+            delete item.parentIndex;
           }
           if (item.connectTimeout) {
             delete item.connectTimeout;
@@ -519,21 +559,33 @@ export default {
           if (item.delay) {
             item.delay = Number(item.delay);
           }
+          if (item.disabled || !item.disabled) {
+            delete item.disabled;
+          }
+          if (!item.environmentEnable || item.environmentEnable) {
+            delete item.environmentEnable;
+          }
+          if (item.refEevMap) {
+            delete item.refEevMap;
+          }
           if (item.body && item.body.kvs) {
-            item.body.kvs.forEach(v => {
+            item.body.kvs.forEach((v) => {
               if (v.files) {
                 delete v.files;
               }
-            })
+            });
           }
-          if (item.body && ((item.body.binary && item.body.binary.length === 0) || (item.body.kvs && item.body.kvs.length === 0))) {
+          if (
+            item.body &&
+            ((item.body.binary && item.body.binary.length === 0) || (item.body.kvs && item.body.kvs.length === 0))
+          ) {
             delete item.body;
           }
           delete item.projectId;
           if (item.hashTree && item.hashTree.length > 0) {
             this.deleteResourceIds(item.hashTree);
           }
-        })
+        });
       }
     },
     closeConfirm(targetName) {
@@ -541,17 +593,19 @@ export default {
         this.selectNodeIds = [];
         this.trashEnable = false;
       } else {
-        let message = "";
-        this.tabs.forEach(tab => {
+        let message = '';
+        this.tabs.forEach((tab) => {
           if (tab.name === targetName) {
             this.diff(tab);
             if (tab && this.isSave) {
-              message += tab.currentScenario.name ? tab.currentScenario.name : this.$t('api_test.automation.add_scenario');
+              message += tab.currentScenario.name
+                ? tab.currentScenario.name
+                : this.$t('api_test.automation.add_scenario');
             }
           }
-        })
-        if (message !== "") {
-          this.$alert(this.$t('commons.scenario') + " [ " + message + " ] " + this.$t('commons.confirm_info'), '', {
+        });
+        if (message !== '') {
+          this.$alert(this.$t('commons.scenario') + ' [ ' + message + ' ] ' + this.$t('commons.confirm_info'), '', {
             confirmButtonText: this.$t('commons.confirm'),
             cancelButtonText: this.$t('commons.cancel'),
             callback: (action) => {
@@ -561,7 +615,7 @@ export default {
               } else {
                 this.isSave = false;
               }
-            }
+            },
           });
         } else {
           this.isSave = false;
@@ -573,7 +627,7 @@ export default {
       }
     },
     removeTab(targetName) {
-      let index = this.tabs.findIndex(item => item.name === targetName);
+      let index = this.tabs.findIndex((item) => item.name === targetName);
       if (index !== -1) {
         // 清除vuex中缓存的环境
         let tab = this.tabs[index];
@@ -582,19 +636,19 @@ export default {
             if (k.indexOf(tab.currentScenario.id) !== -1) {
               store.scenarioEnvMap.delete(k);
             }
-          })
+          });
         }
         this.tabs.splice(index, 1);
         if (tab) {
           tab = undefined;
         }
       }
-      this.tabs = this.tabs.filter(tab => tab.name !== targetName);
+      this.tabs = this.tabs.filter((tab) => tab.name !== targetName);
       if (this.tabs.length > 0) {
         this.activeName = this.tabs[this.tabs.length - 1].name;
         this.addListener(); //  自动切换当前标签时，也添加监听
       } else {
-        this.activeName = "default";
+        this.activeName = 'default';
       }
     },
     setTabLabel(data) {
@@ -655,15 +709,15 @@ export default {
         this.$error(this.$t('api_test.scenario_jump_message'));
         return;
       }
-      const index = this.tabs.find(p => p.currentScenario.id === row.id && p.currentScenario.copy === row.copy);
+      const index = this.tabs.find((p) => p.currentScenario.id === row.id && p.currentScenario.copy === row.copy);
       if (!index) {
-        this.addTab({name: 'edit', currentScenario: row});
+        this.addTab({ name: 'edit', currentScenario: row });
       } else {
         this.activeName = index.name;
       }
     },
     nodeChange(node, nodeIds, pNodes) {
-      this.initApiTableOpretion = "nodeChange";
+      this.initApiTableOpretion = 'nodeChange';
       this.selectNodeIds = nodeIds;
     },
     setModuleOptions(data) {
@@ -676,25 +730,25 @@ export default {
       this.$route.params.dataSelectRange = 'all';
     },
     enableTrash(data) {
-      this.activeName = "default";
-      this.initApiTableOpretion = "enableTrash";
+      this.activeName = 'default';
+      this.initApiTableOpretion = 'enableTrash';
       this.trashEnable = data;
       if (data) {
-        this.activeName = "trash";
+        this.activeName = 'trash';
       } else {
-        this.activeName = "default";
+        this.activeName = 'default';
       }
       this.getTrashCase();
     },
     getTrashCase() {
       let param = {};
       param.projectId = this.projectId;
-      getScenarioByTrash(param).then(response => {
+      getScenarioByTrash(param).then((response) => {
         this.total = response.data;
       });
     },
     getProject() {
-      getProjectConfig(this.projectId, '/SCENARIO_CUSTOM_NUM').then(result => {
+      getProjectConfig(this.projectId, '/SCENARIO_CUSTOM_NUM').then((result) => {
         if (result.data) {
           this.customNum = result.data.scenarioCustomNum;
         }
@@ -714,10 +768,10 @@ export default {
     },
     clickResource(resource) {
       let workspaceId = getCurrentWorkspaceId();
-      let isTurnSpace = true
+      let isTurnSpace = true;
       if (resource.projectId !== getCurrentProjectID()) {
         isTurnSpace = false;
-        getProject(resource.projectId).then(response => {
+        getProject(resource.projectId).then((response) => {
           if (response.data) {
             workspaceId = response.data.workspaceId;
             isTurnSpace = true;
@@ -732,28 +786,29 @@ export default {
       let automationData = this.$router.resolve({
         name: 'ApiAutomationWithQuery',
         params: {
+          versionId: 'default',
           redirectID: getUUID(),
-          dataType: "scenario",
+          dataType: 'scenario',
           dataSelectRange: 'edit:' + resource.id,
           projectId: resource.projectId,
-          workspaceId: workspaceId
-        }
+          workspaceId: workspaceId,
+        },
       });
       if (isTurnSpace) {
         window.open(automationData.href, '_blank');
       }
     },
     checkPermission(resource, workspaceId, isTurnSpace) {
-      getOwnerProjectIds().then(res => {
-        const project = res.data.find(p => p === resource.projectId);
+      getOwnerProjectIds().then((res) => {
+        const project = res.data.find((p) => p === resource.projectId);
         if (!project) {
           this.$warning(this.$t('commons.no_permission'));
         } else {
-          this.gotoTurn(resource, workspaceId, isTurnSpace)
+          this.gotoTurn(resource, workspaceId, isTurnSpace);
         }
-      })
-    }
-  }
+      });
+    },
+  },
 };
 </script>
 

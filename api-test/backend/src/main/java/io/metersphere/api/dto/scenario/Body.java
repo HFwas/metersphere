@@ -1,12 +1,13 @@
 package io.metersphere.api.dto.scenario;
 
 import io.metersphere.api.exec.generator.JSONSchemaRunTest;
+import io.metersphere.commons.constants.ElementConstants;
 import io.metersphere.commons.constants.StorageConstants;
 import io.metersphere.commons.utils.FileUtils;
 import io.metersphere.commons.utils.JSON;
+import io.metersphere.commons.utils.JSONUtil;
 import io.metersphere.jmeter.utils.ScriptEngineUtils;
 import io.metersphere.request.BodyFile;
-import io.metersphere.commons.utils.JSONUtil;
 import io.metersphere.utils.LoggerUtil;
 import lombok.Data;
 import org.apache.commons.collections4.CollectionUtils;
@@ -16,10 +17,11 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.http.entity.ContentType;
 import org.apache.jmeter.protocol.http.sampler.HTTPSamplerProxy;
 import org.apache.jmeter.protocol.http.util.HTTPFileArg;
-import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Data
@@ -38,6 +40,7 @@ public class Body {
     public final static String BINARY = "BINARY";
     public final static String JSON_STR = "JSON";
     public final static String XML = "XML";
+    public final static String JSON_SCHEMA = "JSON-SCHEMA";
 
     public boolean isValid() {
         if (this.isKV()) {
@@ -82,7 +85,7 @@ public class Body {
         } else {
             if (StringUtils.isNotEmpty(this.getRaw()) || this.getJsonSchema() != null) {
                 parseJonBodyMock();
-                KeyValue keyValue = new KeyValue(StringUtils.EMPTY, "JSON-SCHEMA", this.getRaw(), true, true);
+                KeyValue keyValue = new KeyValue(StringUtils.EMPTY, JSON_SCHEMA, this.getRaw(), true, true);
                 sampler.setPostBodyRaw(true);
                 keyValue.setEnable(true);
                 keyValue.setUrlEncode(false);
@@ -93,18 +96,27 @@ public class Body {
     }
 
     private void parseJonBodyMock() {
-        if (StringUtils.isNotBlank(this.type) && StringUtils.equals(this.type, "JSON")) {
+        if (StringUtils.isNotBlank(this.type) && StringUtils.equals(this.type, JSON_STR)) {
             if (StringUtils.isNotEmpty(this.format) && this.getJsonSchema() != null
-                    && "JSON-SCHEMA".equals(this.format)) {
-                this.raw = StringEscapeUtils.unescapeJava(JSONSchemaRunTest.getJson(JSON.toJSONString(this.getJsonSchema())));
+                    && JSON_SCHEMA.equals(this.format)) {
+                this.raw = StringEscapeUtils.unescapeJava(JSONSchemaRunTest.getJson(JSONUtil.toJSONString(this.getJsonSchema())));
             } else {
                 try {
                     if (StringUtils.isNotEmpty(this.getRaw())) {
-                        JSONObject jsonObject = JSONUtil.parseObject(this.getRaw());
-                        if (!this.getRaw().contains("$ref")) {
-                            jsonMockParse(jsonObject);
+                        String value = StringUtils.chomp(this.getRaw().trim());
+                        if (StringUtils.startsWith(value, "[") && StringUtils.endsWith(value, "]")) {
+                            List list = JSON.parseArray(this.getRaw());
+                            if (!this.getRaw().contains("$ref")) {
+                                jsonMockParse(list);
+                            }
+                            this.raw = JSONUtil.parserArray(JSONUtil.toJSONString(list));
+                        } else {
+                            Map<String, Object> map = JSON.parseObject(this.getRaw(), Map.class);
+                            if (!this.getRaw().contains("$ref")) {
+                                jsonMockParse(map);
+                            }
+                            this.raw = JSONUtil.parserObject(JSONUtil.toJSONString(map));
                         }
-                        this.raw = jsonObject.toString();
                     }
                 } catch (Exception e) {
                     LoggerUtil.error("json mock value is abnormal", e);
@@ -113,17 +125,41 @@ public class Body {
         }
     }
 
-    private void jsonMockParse(JSONObject jsonObject) {
-        for (String key : jsonObject.keySet()) {
-            Object value = jsonObject.get(key);
-            if (value instanceof JSONObject) {
-                jsonMockParse((JSONObject) value);
+    private void jsonMockParse(Map map) {
+        for (Object key : map.keySet()) {
+            Object value = map.get(key);
+            if (value instanceof List) {
+                jsonMockParse((List) value);
+            } else if (value instanceof Map) {
+                jsonMockParse((Map) value);
             } else if (value instanceof String) {
                 if (StringUtils.isNotBlank((String) value)) {
                     value = ScriptEngineUtils.buildFunctionCallString((String) value);
                 }
-                jsonObject.put(key, value);
+                map.put(key, value);
             }
+        }
+    }
+
+    private void jsonMockParse(List list) {
+
+        Map<Integer, String> replaceDataMap = new HashMap<>();
+        for (int index = 0; index < list.size(); index++) {
+            Object obj = list.get(index);
+            if (obj instanceof Map) {
+                jsonMockParse((Map) obj);
+            } else if (obj instanceof String) {
+                if (StringUtils.isNotBlank((String) obj)) {
+                    String str = ScriptEngineUtils.buildFunctionCallString((String) obj);
+                    replaceDataMap.put(index, str);
+                }
+            }
+        }
+
+        for (Map.Entry<Integer, String> entry : replaceDataMap.entrySet()) {
+            int replaceIndex = entry.getKey();
+            String replaceStr = entry.getValue();
+            list.set(replaceIndex, replaceStr);
         }
     }
 
@@ -167,8 +203,9 @@ public class Body {
                     mimetype = ContentType.APPLICATION_OCTET_STREAM.getMimeType();
                 }
                 HTTPFileArg fileArg = new HTTPFileArg(path, isBinary ? StringUtils.EMPTY : paramName, mimetype);
-                fileArg.setProperty("isRef", isRef);
-                fileArg.setProperty("fileId", fileId);
+                fileArg.setProperty(ElementConstants.IS_REF, isRef);
+                fileArg.setProperty(ElementConstants.FILE_ID, fileId);
+                fileArg.setProperty(ElementConstants.RESOURCE_ID, requestId);
                 list.add(fileArg);
             });
         }

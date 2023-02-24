@@ -13,7 +13,7 @@ import java.util.Map;
 public class BatchRunDefinitionRequest {
     private String id;
 
-    private List<String> planIds;
+    private List<String> planCaseIds;
 
     private String triggerMode;
 
@@ -21,10 +21,15 @@ public class BatchRunDefinitionRequest {
 
     private String userId;
 
+    private String projectId;
+
     //测试计划报告ID。 测试计划执行时使用
     private String planReportId;
     // 失败重跑
     private boolean rerun;
+
+    private String testPlanId;
+
     private Map<String, ApiDefinitionExecResultWithBLOBs> executeQueue;
 
 }

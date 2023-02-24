@@ -4,7 +4,7 @@ import {getUUID} from "metersphere-frontend/src/utils";
 import {getCurrentProjectID, getCurrentWorkspaceId} from "metersphere-frontend/src/utils/token";
 import {hasLicense} from "metersphere-frontend/src/utils/permission";
 import {getCurrentProject} from "./project";
-import {JIRA, LOCAL} from "metersphere-frontend/src/utils/constants";
+import {LOCAL} from "metersphere-frontend/src/utils/constants";
 import {getIssueTemplate} from "./custom-field-template";
 import {$success, $warning} from "metersphere-frontend/src/plugins/message";
 import i18n from "../i18n";
@@ -22,6 +22,10 @@ export function closeIssue(id) {
 
 export function deleteIssue(id) {
   return get(BASE_URL + `delete/${id}`);
+}
+
+export function batchDeleteIssue(param) {
+  return post(BASE_URL + `batchDelete`, param);
 }
 
 export function issueStatusChange(param) {
@@ -50,14 +54,6 @@ export function saveComment(param) {
 
 export function getIssues(currentPage, pageSize, param) {
   return post(BASE_URL + "list/" + currentPage + '/' + pageSize, param);
-}
-
-export function getZentaoBuilds(param) {
-  return post(BASE_URL + "zentao/builds", param);
-}
-
-export function getZentaoUser(param) {
-  return post(BASE_URL + "zentao/user", param);
 }
 
 export function getTapdUser(param) {
@@ -142,14 +138,16 @@ export function getRelateIssues(page) {
     });
 }
 
-export function syncIssues(param) {
-  let url = 'issues/sync';
-  if (hasLicense()) {
-    url = 'xpack/issue/sync';
-  }
+export function syncAllIssues(param) {
   // 浏览器默认策略，请求同一个url，可能导致 stalled 时间过长，加个uuid防止请求阻塞
-  url = url + "?stamp=" + getUUID();
-  return post(url, param);
+  return post(BASE_URL + 'sync/all?stamp=' + getUUID(), param);
+}
+
+export function syncIssues() {
+  // 浏览器默认策略，请求同一个url，可能导致 stalled 时间过长，加个uuid防止请求阻塞
+  let projectId = getCurrentProjectID();
+  let uuid = getUUID();
+  return get(BASE_URL + `sync/${projectId}?stamp=${uuid}`);
 }
 
 // 轮询同步状态
@@ -178,16 +176,22 @@ export function deleteIssueRelate(param) {
   return post('/issues/delete/relate', param);
 }
 
+function parseOptions(customFields) {
+  if (customFields) {
+    customFields.forEach(item => {
+      if (item.options) {
+        item.options = JSON.parse(item.options);
+      }
+    });
+  }
+}
+
 export function getIssueThirdPartTemplate() {
   return get('/issues/thirdpart/template/' + getCurrentProjectID())
     .then((response) => {
       let template = response.data;
       if (template.customFields) {
-        template.customFields.forEach(item => {
-          if (item.options) {
-            item.options = JSON.parse(item.options);
-          }
-        });
+        parseOptions(template.customFields);
       }
       return template
     });
@@ -204,12 +208,16 @@ export function getJiraIssueType(param) {
   return post('/issues/jira/issuetype', param);
 }
 
+export function getPlatformStatus(param) {
+  return post('/issues/platform/status', param);
+}
+
 export function getPlatformTransitions(param) {
   return post('/issues/platform/transitions', param);
 }
 
-export function enableThirdPartTemplate(currentProject) {
-  return currentProject && currentProject.thirdPartTemplate && currentProject.platform === JIRA;
+export function enableThirdPartTemplate(projectId) {
+  return get(BASE_URL + 'third/part/template/enable/' + projectId);
 }
 
 export function buildIssues(page) {
@@ -223,21 +231,41 @@ export function buildIssues(page) {
   }
 }
 
+export function getPluginCustomFields(projectId) {
+  return get(BASE_URL + `plugin/custom/fields/${projectId}`);
+}
+
 export function getIssuePartTemplateWithProject(callback) {
   getCurrentProject().then((response) => {
     let currentProject = response.data;
-    if (enableThirdPartTemplate(currentProject)) {
-      getIssueThirdPartTemplate()
-        .then((template) => {
-          if (callback)
-            callback(template, currentProject);
-        });
-    } else {
-      getIssueTemplate()
-        .then((template) => {
-          if (callback)
-            callback(template, currentProject);
-        });
-    }
+    enableThirdPartTemplate(currentProject.id)
+      .then((r) => {
+        if (r.data) {
+          getIssueThirdPartTemplate()
+            .then((template) => {
+              if (callback)
+                callback(template, currentProject);
+            });
+        } else {
+          Promise.all([getPluginCustomFields(currentProject.id), getIssueTemplate()])
+            .then(data => {
+              let pluginFields = data[0].data;
+              parseOptions(pluginFields);
+
+              let template = data[1];
+              template.customFields.push(...pluginFields);
+              if (callback)
+                callback(template, currentProject);
+            });
+        }
+      });
   });
+}
+
+export function getPlatformOption() {
+  return get(BASE_URL + 'platform/option');
+}
+
+export function getPlatformFormOption(param) {
+  return post(BASE_URL + 'platform/form/option', param);
 }

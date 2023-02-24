@@ -538,6 +538,7 @@ export default {
         .then(r => {
           this.demandOptions = [];
           if (r.data && r.data.length > 0) {
+            this.demandValue = [];
             this.buildDemandCascaderOptions(r.data, this.demandOptions, []);
           }
           this.addOtherOption();

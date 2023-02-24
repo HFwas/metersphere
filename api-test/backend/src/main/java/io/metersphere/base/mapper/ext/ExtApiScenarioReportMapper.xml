@@ -188,7 +188,9 @@
             <if test="request.projectId != null">
                 AND s_r.project_id = #{request.projectId}
             </if>
-
+            <if test="request.versionId != null">
+                AND s_r.version_id = #{request.versionId}
+            </if>
             <if test="request.isUi">
                 AND s_r.report_type like 'UI%'
             </if>
@@ -358,41 +360,37 @@
         SELECT count(id) AS countNumber
         FROM scenario_execution_info
         WHERE create_time BETWEEN #{firstDayTimestamp} AND #{lastDayTimestamp}
-          AND (
-                    source_id in (
-                    SELECT id
-                    FROM api_scenario
-                    WHERE project_id = #{projectId}
-                ) or
-                    source_id in (
-                        select id
-                        FROM test_plan_api_scenario
-                        WHERE api_scenario_id in (SELECT id
-                                                  FROM api_scenario
-                                                  WHERE project_id = #{projectId})
-                    )
-            )
+          AND project_id = #{projectId}
+        <if test="version != null">
+            AND version = #{version}
+        </if>
+        <if test="executeType != null">
+            AND execute_type = #{executeType}
+        </if>
+
     </select>
 
     <select id="countByProjectIdAndCreateAndByScheduleInThisWeek" resultType="java.lang.Long">
-        SELECT count(ar.id) AS countNumber
-        FROM scenario_execution_info ar
+        SELECT count(id) AS countNumber
+        FROM scenario_execution_info
         WHERE trigger_mode = 'SCHEDULE'
-          AND source_id IN (SELECT id
-                            FROM api_scenario
-                            WHERE project_id = #{projectId}
-                              AND latest = 1)
+          AND project_id = #{projectId}
+        <if test="version != null">
+            AND version = #{version}
+        </if>
+        <if test="executeType != null">
+            AND execute_type = #{executeType}
+        </if>
           AND create_time BETWEEN #{firstDayTimestamp} AND #{lastDayTimestamp}
     </select>
-
     <select id="countByProjectIdGroupByExecuteResult" resultType="io.metersphere.api.dto.datacount.ApiDataCountResult">
         SELECT count(id) AS countNumber, result AS groupField
-        FROM scenario_execution_info ar
+        FROM scenario_execution_info
         WHERE trigger_mode = 'SCHEDULE'
-          AND source_id IN (SELECT id
-                            FROM api_scenario
-                            WHERE project_id = #{projectId}
-                              AND latest = 1)
+          AND project_id = #{projectId}
+        <if test="version != null">
+            AND version = #{version}
+        </if>
         GROUP BY groupField;
     </select>
     <select id="selectLastReportByIds" resultType="io.metersphere.base.domain.ApiScenarioReport">
@@ -471,7 +469,7 @@
         </foreach>
     </update>
 
-    <select id="findByProjectIds" resultType="io.metersphere.base.domain.ApiScenarioReport"
+    <select id="findByProjectIds" resultType="io.metersphere.commons.vo.TaskResultVO"
             parameterType="java.lang.String">
         select actuator ,id from api_scenario_report where status in ("running","starting","PENDING") and project_id in
         <foreach collection="request.projects" item="id" separator="," open="(" close=")">

@@ -1,20 +1,22 @@
 package io.metersphere.service;
 
 import io.metersphere.api.dto.automation.ApiScenarioDTO;
+import io.metersphere.api.dto.definition.ApiDefinitionResult;
 import io.metersphere.api.dto.definition.ApiTestCaseInfo;
 import io.metersphere.api.dto.definition.request.ElementUtil;
-import io.metersphere.base.domain.ApiDefinition;
 import io.metersphere.base.domain.ApiScenarioWithBLOBs;
 import io.metersphere.base.domain.ApiTestCaseWithBLOBs;
 import io.metersphere.base.domain.Project;
-import io.metersphere.base.mapper.ApiDefinitionMapper;
 import io.metersphere.base.mapper.ApiScenarioMapper;
 import io.metersphere.base.mapper.ProjectMapper;
 import io.metersphere.base.mapper.ext.ExtApiScenarioMapper;
+import io.metersphere.commons.constants.CommonConstants;
 import io.metersphere.commons.constants.ElementConstants;
 import io.metersphere.commons.constants.PropertyConstant;
 import io.metersphere.commons.utils.JSON;
 import io.metersphere.commons.utils.JSONUtil;
+import io.metersphere.commons.utils.LogUtil;
+import io.metersphere.dto.ProjectConfig;
 import io.metersphere.service.definition.ApiDefinitionService;
 import io.metersphere.service.definition.ApiTestCaseService;
 import org.apache.commons.collections.CollectionUtils;
@@ -37,14 +39,14 @@ public class MsHashTreeService {
     @Resource
     private ApiDefinitionService apiDefinitionService;
     @Resource
-    private ApiDefinitionMapper apiDefinitionMapper;
-    @Resource
     private ExtApiScenarioMapper extApiScenarioMapper;
+    @Resource
+    private BaseProjectApplicationService baseProjectApplicationService;
 
     @Resource
     private ProjectMapper projectMapper;
 
-    public static final String CASE = "CASE";
+    public static final String CASE = CommonConstants.CASE;
     public static final String REFERENCED = "referenced";
     public static final String REF = "REF";
     public static final String COPY = "Copy";
@@ -60,6 +62,7 @@ public class MsHashTreeService {
     public static final String NUM = "num";
     public static final String ENV_ENABLE = "environmentEnable";
     public static final String VARIABLE_ENABLE = "variableEnable";
+    public static final String MIX_ENABLE = "mixEnable";
     public static final String DISABLED = "disabled";
     public static final String VERSION_NAME = "versionName";
     public static final String VERSION_ENABLE = "versionEnable";
@@ -72,6 +75,14 @@ public class MsHashTreeService {
     public static final String PROJECT_ID = "projectId";
     public static final String ACTIVE = "active";
     public static final String ENV_MAP = "environmentMap";
+    public static final String REF_ENABLE = "refEnable";
+    private static final String PRE = "PRE";
+    private static final String POST = "POST";
+    private static final String ASSERTIONS = ElementConstants.ASSERTIONS;
+    public static final String CUSTOM_NUM = "customNum";
+    public static final String SHOW_CUSTOM_NUM = "showCustomNum";
+    public static final String VERSION_ID = "versionId";
+    public static final String RESOURCE_ID = ElementConstants.RESOURCE_ID;
 
     public void setHashTree(JSONArray hashTree) {
         // 将引用转成复制
@@ -145,9 +156,9 @@ public class MsHashTreeService {
                         Map<String, List<JSONObject>> groupMap = ElementUtil.group(sourceHashTree);
                         Map<String, List<JSONObject>> targetGroupMap = ElementUtil.group(refElement.optJSONArray(HASH_TREE));
 
-                        List<JSONObject> pre = ElementUtil.mergeHashTree(groupMap.get("PRE"), targetGroupMap.get("PRE"));
-                        List<JSONObject> post = ElementUtil.mergeHashTree(groupMap.get("POST"), targetGroupMap.get("POST"));
-                        List<JSONObject> rules = ElementUtil.mergeHashTree(groupMap.get("ASSERTIONS"), targetGroupMap.get("ASSERTIONS"));
+                        List<JSONObject> pre = ElementUtil.mergeHashTree(groupMap.get(PRE), targetGroupMap.get(PRE));
+                        List<JSONObject> post = ElementUtil.mergeHashTree(groupMap.get(POST), targetGroupMap.get(POST));
+                        List<JSONObject> rules = ElementUtil.mergeHashTree(groupMap.get(ASSERTIONS), targetGroupMap.get(ASSERTIONS));
                         List<JSONObject> step = new LinkedList<>();
                         if (CollectionUtils.isNotEmpty(pre)) {
                             step.addAll(pre);
@@ -169,11 +180,12 @@ public class MsHashTreeService {
                 this.setElement(element, apiTestCase.getNum(), enable, apiTestCase.getVersionName(), apiTestCase.getVersionEnable());
             }
         } else if (StringUtils.equalsIgnoreCase(element.optString(REFERENCED), COPY)) {
-            ApiDefinition definition = apiDefinitionMapper.selectByPrimaryKey(element.optString(ID));
+            ApiDefinitionResult definition = apiDefinitionService.getById(element.optString(ID));
             if (definition != null) {
                 Project project = projectMapper.selectByPrimaryKey(definition.getProjectId());
                 element.put(ID, definition.getId());
-                this.setElement(element, definition.getNum(), enable, project.getName(), project.getVersionEnable());
+                element.put(VERSION_ID, definition.getVersionId());
+                this.setElement(element, definition.getNum(), enable, definition.getVersionName(), project.getVersionEnable());
                 isExist = true;
             }
         }
@@ -188,19 +200,22 @@ public class MsHashTreeService {
 
     private JSONObject setRefScenario(JSONObject element) {
         boolean enable = element.has(ENABLE) ? element.optBoolean(ENABLE) : true;
-        if (!element.has(VARIABLE_ENABLE)) {
-            element.put(VARIABLE_ENABLE, true);
+        if (!element.has(MIX_ENABLE)) {
+            element.put(MIX_ENABLE, false);
         }
 
         ApiScenarioDTO scenarioWithBLOBs = extApiScenarioMapper.selectById(element.optString(ID));
         if (scenarioWithBLOBs != null && StringUtils.isNotEmpty(scenarioWithBLOBs.getScenarioDefinition())) {
             boolean environmentEnable = element.has(ENV_ENABLE) ? element.optBoolean(ENV_ENABLE) : false;
-            boolean variableEnable = element.has(VARIABLE_ENABLE) ? element.optBoolean(VARIABLE_ENABLE) : true;
+            boolean variableEnable = element.has(VARIABLE_ENABLE) ? element.optBoolean(VARIABLE_ENABLE) : false;
+            boolean mixEnable = element.has(MIX_ENABLE)
+                    ? element.getBoolean(MIX_ENABLE) : false;
+
             if (environmentEnable && StringUtils.isNotEmpty(scenarioWithBLOBs.getEnvironmentJson())) {
                 element.put(ENV_MAP, JSON.parseObject(scenarioWithBLOBs.getEnvironmentJson(), Map.class));
             }
             if (StringUtils.equalsIgnoreCase(element.optString(REFERENCED), REF)) {
-                element = JSONUtil.parseObject(scenarioWithBLOBs.getScenarioDefinition());
+                element = setRefEnable(element, JSONUtil.parseObject(scenarioWithBLOBs.getScenarioDefinition()));
                 element.put(REFERENCED, REF);
                 element.put(NAME, scenarioWithBLOBs.getName());
             }
@@ -209,6 +224,13 @@ public class MsHashTreeService {
             if (!element.has(VARIABLE_ENABLE)) {
                 element.put(VARIABLE_ENABLE, variableEnable);
             }
+            if (!element.has(MIX_ENABLE) && !variableEnable) {
+                element.put(MIX_ENABLE, mixEnable);
+            }
+            //获取场景的当前项目是否开启了自定义id
+            ProjectConfig projectApplication = baseProjectApplicationService.getSpecificTypeValue(scenarioWithBLOBs.getProjectId(), "SCENARIO_CUSTOM_NUM");
+            element.put(SHOW_CUSTOM_NUM, projectApplication.getScenarioCustomNum());
+            element.put(CUSTOM_NUM, scenarioWithBLOBs.getCustomNum());
             this.setElement(element, scenarioWithBLOBs.getNum(), enable, scenarioWithBLOBs.getVersionName(), scenarioWithBLOBs.getVersionEnable());
         } else {
             if (StringUtils.equalsIgnoreCase(element.optString(REFERENCED), REF)) {
@@ -217,6 +239,42 @@ public class MsHashTreeService {
             element.put(NUM, StringUtils.EMPTY);
         }
         return element;
+    }
+
+    public static JSONObject setRefEnable(JSONObject targetElement, JSONObject orgElement) {
+        if (orgElement == null || targetElement == null) {
+            return orgElement;
+        }
+        if (!orgElement.optBoolean(ENABLE)) {
+            orgElement.put(ENABLE, false);
+            orgElement.put(REF_ENABLE, true);
+        } else {
+            orgElement.put(ENABLE, targetElement.optBoolean(ENABLE));
+        }
+        if (targetElement.optBoolean(REF_ENABLE)) {
+            orgElement.put(REF_ENABLE, targetElement.optBoolean(REF_ENABLE));
+        }
+        try {
+            if (orgElement.has(HASH_TREE)) {
+                JSONArray orgJSONArray = orgElement.optJSONArray(HASH_TREE);
+                JSONArray targetJSONArray = targetElement.optJSONArray(HASH_TREE);
+                if (orgJSONArray != null && targetJSONArray != null) {
+                    orgJSONArray.forEach(obj -> {
+                        JSONObject orgJsonObject = (JSONObject) obj;
+                        targetJSONArray.forEach(targetObj -> {
+                            JSONObject targetJsonObject = (JSONObject) targetObj;
+                            if (StringUtils.equals(orgJsonObject.optString(RESOURCE_ID), targetJsonObject.optString(RESOURCE_ID))) {
+                                setRefEnable(targetJsonObject, orgJsonObject);
+                            }
+                        });
+                    });
+                }
+            }
+        } catch (Exception e) {
+            LogUtil.error(e, e.getMessage());
+            return orgElement;
+        }
+        return orgElement;
     }
 
     public void dataFormatting(JSONArray hashTree) {

@@ -1,19 +1,33 @@
 <template>
   <div v-loading="result.loading">
-    <div v-for="pe in data" :key="pe.id" style="margin-left: 20px;">
-      <el-select v-model="pe['selectEnv']" :placeholder="$t('workspace.env_group.please_select_env')"
-                 style="margin-top: 8px;width: 200px;" size="small">
-        <el-option v-for="(environment, index) in pe.envs" :key="index"
-                   :label="environment.name"
-                   :value="environment.id"/>
-        <el-button class="ms-scenario-button" v-if="isShowConfirmButton(pe.id)" size="mini" type="primary"
-                   @click="openEnvironmentConfig(pe.id, pe['selectEnv'])">
+    <div v-for="pe in data" :key="pe.id" style="margin-left: 20px">
+      <el-select
+        v-model="pe['selectEnv']"
+        filterable
+        :placeholder="$t('workspace.env_group.please_select_env')"
+        style="margin-top: 8px; width: 200px"
+        size="small">
+        <el-option
+          v-for="(environment, index) in pe.envs"
+          :key="index"
+          :label="environment.name"
+          :value="environment.id" />
+        <el-button
+          class="ms-scenario-button"
+          v-if="isShowConfirmButton(pe.id)"
+          size="mini"
+          type="primary"
+          @click="openEnvironmentConfig(pe.id, pe['selectEnv'])">
           {{ $t('api_test.environment.environment_config') }}
         </el-button>
         <template v-slot:empty>
-          <div v-if="isShowConfirmButton(pe.id)" class="empty-environment">
-            <el-button class="ms-scenario-button" size="mini" type="primary"
-                       @click="openEnvironmentConfig(pe.id, pe['selectEnv'])">
+          <!--这里只做没有可搜索内容时使用，否则如果没有符合搜索条件的，也会显示该项，与上面的btn重复显示 -->
+          <div v-if="isShowConfirmButton(pe.id) && pe.envs.length===0" class="empty-environment">
+            <el-button
+              class="ms-scenario-button"
+              size="mini"
+              type="primary"
+              @click="openEnvironmentConfig(pe.id, pe['selectEnv'])">
               {{ $t('api_test.environment.environment_config') }}
             </el-button>
           </div>
@@ -29,19 +43,19 @@
     </el-button>
 
     <!-- 环境配置 -->
-    <api-environment-config ref="environmentConfig" @close="environmentConfigClose"/>
+    <api-environment-config ref="environmentConfig" @close="environmentConfigClose" />
   </div>
 </template>
 
 <script>
-import {parseEnvironment} from "@/business/environment/model/EnvironmentModel";
-import ApiEnvironmentConfig from "metersphere-frontend/src/components/environment/ApiEnvironmentConfig";
-import {getEnvironmentByProjectId} from "metersphere-frontend/src/api/environment";
-import {getOwnerProjectIds} from "@/api/project";
+import { parseEnvironment } from '@/business/environment/model/EnvironmentModel';
+import ApiEnvironmentConfig from 'metersphere-frontend/src/components/environment/ApiEnvironmentConfig';
+import { getEnvironmentByProjectId } from 'metersphere-frontend/src/api/environment';
+import { getOwnerProjectIds } from '@/api/project';
 
 export default {
-  name: "EnvironmentSelect",
-  components: {ApiEnvironmentConfig},
+  name: 'EnvironmentSelect',
+  components: { ApiEnvironmentConfig },
   props: {
     envMap: Map,
     projectIds: Set,
@@ -50,20 +64,20 @@ export default {
       type: Boolean,
       default() {
         return true;
-      }
+      },
     },
     result: {
       type: Object,
       default() {
-        return {loading: false}
-      }
+        return { loading: false };
+      },
     },
     btnStyle: {
       type: Object,
       default() {
-        return {width: "360px"}
-      }
-    }
+        return { width: '360px' };
+      },
+    },
   },
   data() {
     return {
@@ -73,7 +87,7 @@ export default {
       permissionProjectIds: [],
       dialogVisible: false,
       isFullUrl: true,
-    }
+    };
   },
   methods: {
     isShowConfirmButton(projectId) {
@@ -98,38 +112,38 @@ export default {
       }
 
       let arr = [];
-      this.projectIds.forEach(id => {
-        const project = this.projectList.find(p => p.id === id);
+      this.projectIds.forEach((id) => {
+        const project = this.projectList.find((p) => p.id === id);
         if (project) {
-          let item = {id: id, envs: [], selectEnv: ""};
+          let item = { id: id, envs: [], selectEnv: '' };
           this.data.push(item);
-          let p = new Promise(resolve => {
-            getEnvironmentByProjectId(id).then(res => {
+          let p = new Promise((resolve) => {
+            getEnvironmentByProjectId(id).then((res) => {
               let envs = res.data;
-              envs.forEach(environment => {
+              envs.forEach((environment) => {
                 parseEnvironment(environment);
               });
               // 固定环境列表渲染顺序
-              let temp = this.data.find(dt => dt.id === id);
+              let temp = this.data.find((dt) => dt.id === id);
               temp.envs = envs;
               let envId = undefined;
               if (this.envMap) {
                 envId = this.envMap.get(id);
               }
               // 选中环境是否存在
-              temp.selectEnv = envs.filter(e => e.id === envId).length === 0 ? null : envId;
+              temp.selectEnv = envs.filter((e) => e.id === envId).length === 0 ? null : envId;
               resolve();
-            })
-          })
+            });
+          });
           arr.push(p);
         }
-      })
+      });
       return arr;
     },
     getUserPermissionProjectIds() {
-      getOwnerProjectIds().then(res => {
+      getOwnerProjectIds().then((res) => {
         this.permissionProjectIds = res.data;
-      })
+      });
     },
     open() {
       this.data = [];
@@ -142,8 +156,8 @@ export default {
       return Promise.all(this.init());
     },
     getProjectName(id) {
-      const project = this.projectList.find(p => p.id === id);
-      return project ? project.name : "";
+      const project = this.projectList.find((p) => p.id === id);
+      return project ? project.name : '';
     },
     openEnvironmentConfig(projectId, envId) {
       if (!projectId) {
@@ -155,13 +169,13 @@ export default {
     handleConfirm() {
       let map = new Map();
       let sign = true;
-      this.data.forEach(dt => {
+      this.data.forEach((dt) => {
         if (!dt.selectEnv) {
           sign = false;
           return;
         }
         map.set(dt.id, dt.selectEnv);
-      })
+      });
       if (!sign) {
         this.$warning(this.$t('workspace.env_group.please_select_env_for_current_scenario'));
         return;
@@ -176,21 +190,21 @@ export default {
         return true;
       }
       if (this.data.length > 0) {
-        this.data.forEach(dt => {
+        this.data.forEach((dt) => {
           if (!dt.selectEnv) {
             sign = false;
             return false;
           }
-        })
+        });
       } else {
         // 如果有环境，检查环境
         if (this.envMap && this.envMap.size > 0) {
-          this.projectIds.forEach(id => {
+          this.projectIds.forEach((id) => {
             if (!this.envMap.get(id)) {
               sign = false;
               return false;
             }
-          })
+          });
         }
       }
 
@@ -202,9 +216,9 @@ export default {
     },
     environmentConfigClose() {
       // todo 关闭处理
-    }
-  }
-}
+    },
+  },
+};
 </script>
 
 <style scoped>

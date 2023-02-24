@@ -35,6 +35,8 @@ public interface ExtTestPlanApiCaseMapper {
 
     List<TestPlanApiCaseInfoDTO> selectLegalDataByTestPlanId(String planId);
 
+    List<TestPlanApiCaseInfoDTO> selectByPlanCaseIds(List<String> planCaseIds);
+
     List<Map> selectForPlanReport(String planId);
 
     List<TestPlanFailureApiDTO> getFailureList(@Param("planId") String planId, @Param("status") String status);
@@ -54,5 +56,11 @@ public interface ExtTestPlanApiCaseMapper {
     List<TestPlanApiCase> selectPlanByIdsAndStatusIsNotTrash(@Param("ids") List<String> ids);
 
     List<TestPlanApiCase> selectByIdsAndStatusIsNotTrash(@Param("ids") List<String> ids);
+
+    List<String> selectNameByIdIn(@Param("ids") List<String> ids);
+
+    String selectProjectId(String id);
+
+    List<TestPlanApiCase> selectByRefIds(@Param("ids") List<String> ids);
 }
 

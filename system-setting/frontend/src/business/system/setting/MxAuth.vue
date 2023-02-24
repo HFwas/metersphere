@@ -17,6 +17,7 @@
             <template v-slot="scope">
               <span v-if="scope.row.type === 'CAS'">CAS</span>
               <span v-if="scope.row.type === 'OIDC'">OIDC</span>
+              <span v-if="scope.row.type === 'OAuth2'">OAuth2</span>
             </template>
           </el-table-column>
           <el-table-column prop="status" :label="$t('test_resource_pool.enable_disable')">
@@ -74,22 +75,23 @@
                      @change="changeAuthType(form.type)">
             <el-option key="CAS" value="CAS" label="CAS"/>
             <el-option key="OIDC" value="OIDC" label="OIDC"/>
+            <el-option key="OAuth2" value="OAuth2" label="OAuth2"/>
           </el-select>
         </el-form-item>
 
         <div class="node-line" v-if="form.type === 'CAS'">
           <el-row>
             <el-col>
-              <el-form-item label="CAS URL" :rules="requiredRules">
+              <el-form-item label="CAS URL" :rules="requiredRules" prop="configuration.casUrl">
                 <el-input v-model="form.configuration.casUrl" placeholder="eg: http://<casurl>"/>
               </el-form-item>
-              <el-form-item label="Login URL" :rules="requiredRules">
+              <el-form-item label="Login URL" :rules="requiredRules" prop="configuration.loginUrl">
                 <el-input v-model="form.configuration.loginUrl" placeholder="eg: http://<casurl>/login"/>
               </el-form-item>
-              <el-form-item label="Validate URL" :rules="requiredRules">
+              <el-form-item label="Validate URL" :rules="requiredRules" prop="configuration.validateUrl">
                 <el-input v-model="form.configuration.validateUrl" placeholder="eg: http://<casurl>/serviceValidate"/>
               </el-form-item>
-              <el-form-item :rules="requiredRules">
+              <el-form-item :rules="requiredRules" prop="configuration.redirectUrl">
                 <template v-slot:label>
                   Redirect URL
                   <el-tooltip content="Logout redirect URL: http://<metersphere-endpoint>/sso/callback/cas/logout"
@@ -108,7 +110,7 @@
           <el-row>
             <el-col>
               <el-form-item label="Auth Endpoint"
-                            :rules="requiredRules">
+                            :rules="requiredRules" prop="configuration.authUrl">
                 <el-input v-model="form.configuration.authUrl"
                           placeholder="eg: http://<keycloak>/auth/realms/<metersphere>/protocol/openid-connect/auth"/>
               </el-form-item>
@@ -117,7 +119,7 @@
           <el-row>
             <el-col>
               <el-form-item label="Token Endpoint"
-                            :rules="requiredRules">
+                            :rules="requiredRules" prop="configuration.tokenUrl">
                 <el-input v-model="form.configuration.tokenUrl"
                           placeholder="eg: http://<keycloak>/auth/realms/<metersphere>/protocol/openid-connect/token"/>
               </el-form-item>
@@ -126,7 +128,7 @@
           <el-row>
             <el-col>
               <el-form-item label="Userinfo Endpoint"
-                            :rules="requiredRules">
+                            :rules="requiredRules" prop="configuration.userInfoUrl">
                 <el-input v-model="form.configuration.userInfoUrl"
                           placeholder="eg: http://<keycloak>/auth/realms/<metersphere>/protocol/openid-connect/userinfo"/>
               </el-form-item>
@@ -134,8 +136,7 @@
           </el-row>
           <el-row>
             <el-col>
-              <el-form-item
-                            :rules="requiredRules">
+              <el-form-item :rules="requiredRules" prop="configuration.logoutUrl">
                 <template v-slot:label>
                   Logout Endpoint
                   <el-tooltip content="Logout redirect URL: http://<metersphere-endpoint>/sso/callback/logout"
@@ -151,7 +152,7 @@
           </el-row>
           <el-row>
             <el-col>
-              <el-form-item label="Client ID"
+              <el-form-item label="Client ID" prop="configuration.clientId"
                             :rules="requiredRules">
                 <el-input v-model="form.configuration.clientId" placeholder="eg: metersphere"/>
               </el-form-item>
@@ -159,7 +160,7 @@
           </el-row>
           <el-row>
             <el-col>
-              <el-form-item label="Redirect URL"
+              <el-form-item label="Redirect URL" prop="configuration.redirectUrl"
                             :rules="requiredRules">
                 <el-input v-model="form.configuration.redirectUrl"
                           placeholder="eg: http://<metersphere-endpoint>/sso/callback or http://<metersphere-endpoint>/sso/callback/${authId}"/>
@@ -169,9 +170,86 @@
           <el-row>
             <el-col>
               <el-form-item label="Secret"
-                            :rules="requiredRules">
+                            :rules="requiredRules" prop="configuration.secret">
                 <el-input type="password" v-model="form.configuration.secret" show-password autocomplete="new-password"
                           placeholder="OIDC client secret"/>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </div>
+        <div class="node-line" v-if="form.type === 'OAuth2'">
+          <el-row>
+            <el-col>
+              <el-form-item label="Auth Endpoint" prop="configuration.authUrl"
+                            :rules="requiredRules">
+                <el-input v-model="form.configuration.authUrl"
+                          placeholder="eg: http://example.com/login/oauth/authorize"/>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row>
+            <el-col>
+              <el-form-item label="Token Endpoint"
+                            :rules="requiredRules" prop="configuration.tokenUrl">
+                <el-input v-model="form.configuration.tokenUrl"
+                          placeholder="eg: https://example.com/login/oauth/access_token"/>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row>
+            <el-col>
+              <el-form-item label="Userinfo Endpoint"
+                            :rules="requiredRules" prop="configuration.userInfoUrl">
+                <el-input v-model="form.configuration.userInfoUrl"
+                          placeholder="eg: https://example.com/user"/>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row>
+            <el-col>
+              <el-form-item label="Redirect URL"
+                            :rules="requiredRules" prop="configuration.redirectUrl">
+                <el-input v-model="form.configuration.redirectUrl"
+                          placeholder="eg: http://<metersphere-endpoint>/sso/callback/oauth2"/>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row>
+            <el-col>
+              <el-form-item label="Client ID" prop="configuration.clientId"
+                            :rules="requiredRules">
+                <el-input v-model="form.configuration.clientId" placeholder="eg: metersphere"/>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row>
+            <el-col>
+              <el-form-item label="Secret" prop="configuration.secret"
+                            :rules="requiredRules">
+                <el-input type="password" v-model="form.configuration.secret" show-password autocomplete="new-password"
+                          placeholder="oauth2 client secret"/>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row>
+            <el-col>
+              <el-form-item label="Scope" prop="configuration.scope">
+                <el-input v-model="form.configuration.scope"/>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row>
+            <el-col>
+              <el-form-item label="Property Mapping" :rules="requiredRules" prop="configuration.mapping">
+                <el-input v-model="form.configuration.mapping"
+                          :placeholder="mappingTip"/>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row>
+            <el-col>
+              <el-form-item label="Logout Endpoint">
+                <el-input v-model="form.configuration.logoutUrl"/>
               </el-form-item>
             </el-col>
           </el-row>
@@ -211,6 +289,7 @@ export default {
       dialogLoading: false,
       dialogVisible: false,
       infoList: [],
+      mappingTip: '{"userid": "uid", "username": "name", "email": "email"}',
       queryPath: "authsource/list",
       condition: {},
       items: [],
@@ -218,10 +297,10 @@ export default {
       pageSize: 10,
       total: 0,
       form: {configuration: {}},
-      requiredRules: [{required: true, message: this.$t('test_resource_pool.fill_the_data'), trigger: 'blur'}],
+      requiredRules: [  {required: true, message: this.$t('test_resource_pool.fill_the_data'),  trigger: ['blur']}],
       rule: {
         name: [
-          {required: true, message: this.$t('test_resource_pool.input_pool_name'), trigger: 'blur'},
+          {required: true, message: this.$t('commons.input_name'), trigger: 'blur'},
           {min: 2, max: 20, message: this.$t('commons.input_limit', [2, 20]), trigger: 'blur'},
           {
             required: true,
@@ -301,42 +380,26 @@ export default {
         this.$info(this.$t('commons.delete_cancel'));
       });
     },
-    changeAuthType(type) {
-
-    },
-    validateInfo() {
-      let resultValidate = {validate: true, msg: this.$t('test_resource_pool.fill_the_data')};
-      let info = this.form.configuration;
-      for (let key in info) {
-        if (info[key] != '0' && !info[key]) {
-          resultValidate.validate = false;
-          return resultValidate;
-        }
+    changeAuthType() {
+      this.form.configuration = {};
+      if (this.$refs.authSourceForm) {
+        this.$refs.authSourceForm.clearValidate();
       }
-
-      return resultValidate;
     },
     createAuthSource() {
       this.$refs.authSourceForm.validate(valid => {
         if (valid) {
-          let vri = this.validateInfo();
-          if (vri.validate) {
-            let model = JSON.parse(JSON.stringify(this.form));
-            model.configuration = JSON.stringify(model.configuration);
-            this.dialogLoading = addAuth(model)
-              .then(() => {
-                this.$message({
-                    type: 'success',
-                    message: this.$t('commons.save_success')
-                  },
-                  this.dialogVisible = false,
-                  this.initTableData());
-              });
-          } else {
-            this.$warning(vri.msg);
-            return false;
-          }
-
+          let model = JSON.parse(JSON.stringify(this.form));
+          model.configuration = JSON.stringify(model.configuration);
+          this.dialogLoading = addAuth(model)
+            .then(() => {
+              this.$message({
+                  type: 'success',
+                  message: this.$t('commons.save_success')
+                },
+                this.dialogVisible = false,
+                this.initTableData());
+            });
         } else {
           return false;
         }
@@ -347,20 +410,14 @@ export default {
         if (!valid) {
           return false;
         }
-        let vri = this.validateInfo();
-        if (vri.validate) {
-          let model = JSON.parse(JSON.stringify(this.form));
-          model.configuration = JSON.stringify(model.configuration);
-          this.dialogLoading = updateAuth(model)
-            .then(() => {
-              this.$success(this.$t('commons.modify_success'));
-              this.dialogVisible = false;
-              this.initTableData();
-            });
-        } else {
-          this.$warning(vri.msg);
-          return false;
-        }
+        let model = JSON.parse(JSON.stringify(this.form));
+        model.configuration = JSON.stringify(model.configuration);
+        this.dialogLoading = updateAuth(model)
+          .then(() => {
+            this.$success(this.$t('commons.modify_success'));
+            this.dialogVisible = false;
+            this.initTableData();
+          });
       });
     },
   },

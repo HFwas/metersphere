@@ -1,27 +1,24 @@
 package io.metersphere.service;
 
+import io.metersphere.api.dto.BodyFileRequest;
 import io.metersphere.api.dto.EnvironmentType;
+import io.metersphere.api.dto.definition.request.ElementUtil;
 import io.metersphere.api.dto.definition.request.MsTestPlan;
 import io.metersphere.api.exec.api.ApiCaseSerialService;
 import io.metersphere.base.domain.*;
-import io.metersphere.base.mapper.ApiScenarioMapper;
 import io.metersphere.base.mapper.ApiExecutionQueueDetailMapper;
+import io.metersphere.base.mapper.ApiScenarioMapper;
 import io.metersphere.base.mapper.plan.TestPlanApiScenarioMapper;
 import io.metersphere.commons.constants.ApiRunMode;
-import io.metersphere.commons.constants.StorageConstants;
-import io.metersphere.commons.utils.CommonBeanFactory;
-import io.metersphere.commons.utils.FileUtils;
-import io.metersphere.commons.utils.JSON;
-import io.metersphere.commons.utils.LogUtil;
-import io.metersphere.dto.FileInfoDTO;
+import io.metersphere.commons.utils.*;
 import io.metersphere.dto.JmeterRunRequestDTO;
 import io.metersphere.environment.service.BaseEnvGroupProjectService;
 import io.metersphere.metadata.service.FileMetadataService;
 import io.metersphere.request.BodyFile;
-import io.metersphere.commons.utils.GenerateHashTreeUtil;
 import io.metersphere.utils.LoggerUtil;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jorphan.collections.HashTree;
 import org.springframework.stereotype.Service;
@@ -64,7 +61,7 @@ public class ApiJMeterFileService {
 
     public byte[] downloadJmeterFiles(String runMode, String remoteTestId, String reportId, String reportType, String queueId) {
         Map<String, String> planEnvMap = new HashMap<>();
-        JmeterRunRequestDTO runRequest = new JmeterRunRequestDTO(remoteTestId, reportId, runMode, null);
+        JmeterRunRequestDTO runRequest = new JmeterRunRequestDTO(remoteTestId, reportId, runMode);
         runRequest.setReportType(reportType);
         runRequest.setQueueId(queueId);
 
@@ -130,6 +127,9 @@ public class ApiJMeterFileService {
             }
             hashTree = GenerateHashTreeUtil.generateHashTree(scenario, planEnvMap, runRequest);
         }
+        if (hashTree != null) {
+            ElementUtil.coverArguments(hashTree);
+        }
         return zipFilesToByteArray((reportId + "_" + remoteTestId), hashTree);
     }
 
@@ -193,29 +193,24 @@ public class ApiJMeterFileService {
         } else {
             return new HashMap<>();
         }
-
     }
 
     private Map<String, byte[]> getPlugJar() {
         Map<String, byte[]> jarFiles = new LinkedHashMap<>();
-        // jar 包
         List<Plugin> plugins = pluginService.list();
         if (CollectionUtils.isNotEmpty(plugins)) {
-            plugins = plugins.stream().collect(Collectors.collectingAndThen(Collectors.toCollection(()
-                    -> new TreeSet<>(Comparator.comparing(Plugin::getPluginId))), ArrayList::new));
-            if (CollectionUtils.isNotEmpty(plugins)) {
-                plugins.forEach(item -> {
-                    String path = item.getSourcePath();
-                    File file = new File(path);
-                    if (file.isDirectory() && !path.endsWith("/")) {
-                        file = new File(path + "/");
-                    }
+            plugins = plugins.stream().collect(Collectors.collectingAndThen(Collectors.toCollection(() ->
+                    new TreeSet<>(Comparator.comparing(Plugin::getPluginId))), ArrayList::new));
+            plugins.forEach(item -> {
+                File file = new File(item.getSourcePath());
+                if (file.exists() && !file.isDirectory()) {
                     byte[] fileByte = FileUtils.fileToByte(file);
-                    if (fileByte != null) {
+                    if (ArrayUtils.isNotEmpty(fileByte)) {
                         jarFiles.put(file.getName(), fileByte);
                     }
-                });
-            }
+                }
+            });
+
         }
         return jarFiles;
     }
@@ -224,31 +219,8 @@ public class ApiJMeterFileService {
         Map<String, byte[]> multipartFiles = new LinkedHashMap<>();
         // 获取附件
         List<BodyFile> files = new LinkedList<>();
-        FileUtils.getExecuteFiles(hashTree, reportId, files);
-        if (CollectionUtils.isNotEmpty(files)) {
-            Map<String, String> repositoryFileMap = new HashMap<>();
-            for (BodyFile bodyFile : files) {
-                if (StringUtils.equals(bodyFile.getStorage(), StorageConstants.GIT.name())
-                        && StringUtils.isNotBlank(bodyFile.getFileId())) {
-                    repositoryFileMap.put(bodyFile.getFileId(), bodyFile.getName());
-                } else {
-                    File file = new File(bodyFile.getName());
-                    if (file != null && file.exists()) {
-                        byte[] fileByte = FileUtils.fileToByte(file);
-                        if (fileByte != null) {
-                            multipartFiles.put(file.getAbsolutePath(), fileByte);
-                        }
-                    }
-                }
-            }
-            List<FileInfoDTO> fileInfoDTOList = fileMetadataService.downloadFileByIds(repositoryFileMap.keySet());
-            fileInfoDTOList.forEach(repositoryFile -> {
-                if (repositoryFile.getFileByte() != null) {
-                    multipartFiles.put(FileUtils.BODY_FILE_DIR + File.separator + repositoryFileMap.get(repositoryFile.getId()), repositoryFile.getFileByte());
-                }
-            });
-
-        }
+        ApiFileUtil.getExecuteFiles(hashTree, reportId, files);
+        HashTreeUtil.downFile(files, multipartFiles, fileMetadataService);
         return multipartFiles;
     }
 
@@ -291,21 +263,46 @@ public class ApiJMeterFileService {
         return listBytesToZip(files);
     }
 
-    private byte[] listBytesToZip(Map<String, byte[]> mapReport) {
-        try {
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ZipOutputStream zos = new ZipOutputStream(baos);
-            for (Map.Entry<String, byte[]> report : mapReport.entrySet()) {
-                ZipEntry entry = new ZipEntry(report.getKey());
-                entry.setSize(report.getValue().length);
+    private byte[] listBytesToZip(Map<String, byte[]> content) {
+        try (ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+             ZipOutputStream zos = new ZipOutputStream(byteArrayOutputStream)) {
+            for (String key : content.keySet()) {
+                ZipEntry entry = new ZipEntry(key);
+                entry.setSize(content.get(key).length);
                 zos.putNextEntry(entry);
-                zos.write(report.getValue());
+                zos.write(content.get(key));
             }
             zos.closeEntry();
             zos.close();
-            return baos.toByteArray();
+            return byteArrayOutputStream.toByteArray();
         } catch (Exception e) {
-            return null;
+            LogUtil.error(e);
+            return new byte[0];
         }
     }
+
+    public byte[] zipFilesToByteArray(BodyFileRequest request) {
+        Map<String, byte[]> files = new LinkedHashMap<>();
+        if (CollectionUtils.isNotEmpty(request.getBodyFiles())) {
+            LoggerUtil.info("开始从三方仓库下载文件");
+            HashTreeUtil.downFile(request.getBodyFiles(), files, fileMetadataService);
+            LoggerUtil.info("从三方仓库下载文件");
+            for (BodyFile bodyFile : request.getBodyFiles()) {
+                File file = new File(bodyFile.getName());
+                if (!file.exists()) {
+                    // 从MinIO下载
+                    ApiFileUtil.downloadFile(bodyFile.getId(), bodyFile.getName());
+                    file = new File(bodyFile.getName());
+                }
+                if (file != null && file.exists()) {
+                    byte[] fileByte = FileUtils.fileToByte(file);
+                    if (fileByte != null) {
+                        files.put(file.getAbsolutePath(), fileByte);
+                    }
+                }
+            }
+        }
+        return listBytesToZip(files);
+    }
+
 }

@@ -79,17 +79,19 @@ public interface ExtTestCaseMapper {
 
     List<TrackCountResult> countStatus(@Param("projectId") String projectId);
 
-    List<TrackCountResult> countRelevance(@Param("projectId") String projectId);
+    List<TrackCountResult> countRelevance(@Param("projectId") String projectId, @Param("queryUI") boolean queryUI);
 
     long countRelevanceCreatedThisWeek(@Param("projectId") String projectId, @Param("firstDayTimestamp") long firstDayTimestamp, @Param("lastDayTimestamp") long lastDayTimestamp);
 
-    int countCoverage(@Param("projectId") String projectId);
+    int countCoverage(@Param("projectId") String projectId, @Param("queryUi") boolean queryUi);
 
     List<TrackCountResult> countFuncMaintainer(@Param("projectId") String projectId);
 
     List<TrackCountResult> countRelevanceMaintainer(@Param("projectId") String projectId);
 
     List<String> getTestPlanBug(@Param("planId") String planId);
+
+    Long getTestPlanThisWeekBugCount(@Param("projectId") String projectId, @Param("ids") List<String> ids);
 
     int getTestPlanCase(@Param("planId") String planId);
 
@@ -148,7 +150,12 @@ public interface ExtTestCaseMapper {
 
     int addLatestVersion(@Param("refId") String refId);
 
+    void updateVersionModule(@Param("refId") String refId, @Param("versionId") String versionId, @Param("moduleId") String moduleId, @Param("modulePath") String modulePath);
+
+
     List<TestCase> getMaintainerMap(@Param("request") QueryTestCaseRequest request);
+
+    List<TestCase> getMaintainerMapForPlanRepeat(@Param("request") QueryTestCaseRequest request);
 
     List<TestCaseDTO> getForNodeEdit(@Param("ids") List<String> ids);
 

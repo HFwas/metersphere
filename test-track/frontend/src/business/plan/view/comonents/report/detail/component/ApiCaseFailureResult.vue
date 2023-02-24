@@ -13,7 +13,7 @@
                     :data="apiCases">
 
             <ms-table-column
-              :width="80"
+              :width="100"
               :label="$t('commons.id')"
               prop="num">
             </ms-table-column>
@@ -239,7 +239,7 @@ export default {
                 this.responseLoading = false;
                 if (response.data) {
                   let data = response.data;
-                  if (data && data.content) {
+                  if (data) {
                     this.showResponse = true;
                     try {
                       this.response = JSON.parse(data.content);

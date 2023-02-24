@@ -46,6 +46,8 @@
                                     :is-read="currentTestCaseInfo.trashEnable || readOnly"
                                     @confirmOtherInfo="confirmOtherInfo"
                                     :current-project-id="currentProjectId"
+                                    :has-latest="hasLatest"
+                                    @setLatest="setLatest"
                                     @compare="compare" @checkout="checkout" @create="create" @del="del"/>
                 <el-dropdown split-button type="primary" class="ms-api-buttion" @click="handleCommand"
                              @command="handleCommand" size="small" style="float: right;margin-right: 20px"
@@ -192,6 +194,7 @@ import {
 
 import {getProjectListAll, getProjectMemberOption} from "@/business/utils/sdk-utils";
 import {testCaseCommentList} from "@/api/test-case-comment";
+import {getDefaultVersion, setLatestVersionById} from 'metersphere-frontend/src/api/version';
 
 export default {
   name: "TestCaseEdit",
@@ -306,7 +309,9 @@ export default {
       selectedOtherInfo: null,
       currentProjectId: "",
       casePublic: false,
-      isClickAttachmentTab: false
+      isClickAttachmentTab: false,
+      latestVersionId: '',
+      hasLatest: false
     };
   },
   props: {
@@ -414,6 +419,7 @@ export default {
     }
     this.projectId = this.projectIds;
     let initAddFuc = this.initAddFuc;
+    this.loading = true;
     getTestTemplate()
       .then((template) => {
         this.testCaseTemplate = template;
@@ -444,10 +450,8 @@ export default {
           }
         }
       });
-    this.loading = true;
     getProjectApplicationConfig('CASE_PUBLIC')
       .then(res => {
-        this.loading = false;
         let data = res.data;
         if (data && data.typeValue === 'true') {
           this.isPublic = true;
@@ -461,7 +465,7 @@ export default {
       this.isXpack = false;
     }
     if (hasLicense()) {
-      this.getVersionHistory();
+      this.getDefaultVersion();
     }
 
     //浏览器拉伸时窗口编辑窗口自适应
@@ -513,6 +517,9 @@ export default {
         if (this.testCaseTemplate.steps) {
           this.form.steps = JSON.parse(this.testCaseTemplate.steps);
         }
+      }
+      if (this.type === 'add' || this.type === 'copy') {
+        this.loading = false;
       }
     },
     setDefaultValue() {
@@ -594,6 +601,7 @@ export default {
       */
       this.projectId = this.projectIds;
       let initFuc = this.initEdit;
+      this.loading = true;
       getTestTemplate()
         .then(template => {
           this.testCaseTemplate = template;
@@ -629,6 +637,7 @@ export default {
             this.showInputTag = true;
           });
           this.form.id = null;
+          this.loading = false;
         } else {
           this.getTestCase(testCase.id);
         }
@@ -651,6 +660,7 @@ export default {
         this.getSelectOptions();
         this.customFieldForm = parseCustomField(this.form, this.testCaseTemplate, this.customFieldRules);
         this.reload();
+        this.loading = false;
       }
       if (callback) {
         callback();
@@ -795,7 +805,7 @@ export default {
 
             //更新版本
             if (hasLicense()) {
-              this.getVersionHistory();
+              this.getDefaultVersion();
             }
           }).catch(() => {
             this.loading = false;
@@ -985,6 +995,13 @@ export default {
           });
       }
     },
+    getDefaultVersion() {
+      getDefaultVersion(this.projectId)
+        .then(response => {
+          this.latestVersionId = response.data;
+          this.getVersionHistory();
+        });
+    },
     getVersionHistory() {
       getTestCaseVersions(this.currentTestCaseInfo.id)
         .then(response => {
@@ -996,6 +1013,12 @@ export default {
             this.currentProjectId = getCurrentProjectID();
           }
           this.versionData = response.data;
+          let latestVersionData = response.data.filter((v) => v.versionId === this.latestVersionId);
+          if (latestVersionData.length > 0) {
+            this.hasLatest = false
+          } else {
+            this.hasLatest = true;
+          }
           if (this.$refs.versionHistory) {
             this.$refs.versionHistory.loading = false;
           }
@@ -1117,16 +1140,28 @@ export default {
         }
       });
     },
+    setLatest(row) {
+      let param = {
+        projectId: getCurrentProjectID(),
+        type: 'TEST_CASE',
+        versionId: row.id,
+        resourceId: this.currentTestCaseInfo.id
+      }
+      setLatestVersionById(param).then(() => {
+        this.$success(this.$t('commons.modify_success'));
+        this.checkout(row);
+      });
+    },
     hasOtherInfo() {
       return new Promise((resolve) => {
-          if (this.form.id) {
-            hasTestCaseOtherInfo(this.form.id)
-              .then((res) => {
-                resolve(res.data);
-              });
-          } else {
-            resolve();
-          }
+        if (this.form.id) {
+          hasTestCaseOtherInfo(this.form.id)
+            .then((res) => {
+              resolve(res.data);
+            });
+        } else {
+          resolve();
+        }
         }
       );
     },

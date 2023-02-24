@@ -68,11 +68,19 @@ public class GroupService {
     private UserMapper userMapper;
 
     private static final String GLOBAL = "global";
+    private static final String PERSONAL_PREFIX = "PERSONAL";
+
 
     // 服务权限拼装顺序
-    private static final String[] servicePermissionLoadOrder = {MicroServiceName.PROJECT_MANAGEMENT,
-            MicroServiceName.TEST_TRACK, MicroServiceName.API_TEST, MicroServiceName.UI_TEST,
-            MicroServiceName.PERFORMANCE_TEST, MicroServiceName.REPORT_STAT, MicroServiceName.SYSTEM_SETTING};
+    private static final String[] servicePermissionLoadOrder = {
+            MicroServiceName.SYSTEM_SETTING,
+            MicroServiceName.PROJECT_MANAGEMENT,
+            MicroServiceName.TEST_TRACK,
+            MicroServiceName.API_TEST,
+            MicroServiceName.UI_TEST,
+            MicroServiceName.PERFORMANCE_TEST,
+            MicroServiceName.REPORT_STAT
+    };
 
     private static final Map<String, List<String>> map = new HashMap<>(4) {{
         put(UserGroupType.SYSTEM, Arrays.asList(UserGroupType.SYSTEM, UserGroupType.WORKSPACE, UserGroupType.PROJECT));
@@ -93,14 +101,11 @@ public class GroupService {
         return getGroups(groupTypeList, request);
     }
 
-    public void buildUserInfo(List<GroupDTO> testCases) {
-        List<String> userIds = new ArrayList();
-        userIds.addAll(testCases.stream().map(GroupDTO::getCreator).collect(Collectors.toList()));
+    public void buildUserInfo(List<GroupDTO> groups) {
+        List<String> userIds = groups.stream().map(GroupDTO::getCreator).collect(Collectors.toList());
         if (!userIds.isEmpty()) {
             Map<String, String> userMap = ServiceUtils.getUserNameMap(userIds);
-            testCases.forEach(caseResult -> {
-                caseResult.setCreator(userMap.get(caseResult.getCreator()));
-            });
+            groups.forEach(caseResult -> caseResult.setCreator(userMap.getOrDefault(caseResult.getCreator(), caseResult.getCreator())));
         }
     }
 
@@ -140,6 +145,9 @@ public class GroupService {
     }
 
     public void editGroup(EditGroupRequest request) {
+        if (StringUtils.equals(request.getId(), UserGroupConstants.SUPER_GROUP)) {
+            MSException.throwException("超级管理员无法编辑！");
+        }
         if (StringUtils.equals(request.getId(), UserGroupConstants.ADMIN)) {
             MSException.throwException("系统管理员无法编辑！");
         }
@@ -147,16 +155,18 @@ public class GroupService {
         Group group = new Group();
         request.setScopeId(null);
         BeanUtils.copyBean(group, request);
+        group.setCreator(SessionUtils.getUserId());
         group.setUpdateTime(System.currentTimeMillis());
         groupMapper.updateByPrimaryKeySelective(group);
     }
 
     public void deleteGroup(String id) {
         Group group = groupMapper.selectByPrimaryKey(id);
-        if (group != null) {
-            if (BooleanUtils.isTrue(group.getSystem())) {
-                MSException.throwException("系统用户组不支持删除！");
-            }
+        if (group == null) {
+            MSException.throwException("group does not exist!");
+        }
+        if (BooleanUtils.isTrue(group.getSystem())) {
+            MSException.throwException("系统用户组不支持删除！");
         }
         groupMapper.deleteByPrimaryKey(id);
 
@@ -175,19 +185,22 @@ public class GroupService {
         example.createCriteria().andGroupIdEqualTo(group.getId());
         List<UserGroupPermission> groupPermissions = userGroupPermissionMapper.selectByExample(example);
         List<String> groupPermissionIds = groupPermissions.stream().map(UserGroupPermission::getPermissionId).collect(Collectors.toList());
+
         GroupJson groupJson = this.loadPermissionJsonFromService();
         if (groupJson == null) {
             MSException.throwException(Translator.get("read_permission_file_fail"));
         }
+
         List<GroupResource> resource = groupJson.getResource();
         List<GroupPermission> permissions = groupJson.getPermissions();
         List<GroupResourceDTO> dtoPermissions = dto.getPermissions();
-        dtoPermissions.addAll(getResourcePermission(resource, permissions, group.getType(), groupPermissionIds));
+        dtoPermissions.addAll(getResourcePermission(resource, permissions, group, groupPermissionIds));
         return dto;
     }
 
     private GroupJson loadPermissionJsonFromService() {
         GroupJson groupJson = null;
+        List<GroupResource> globalResources = new ArrayList<>();
         try {
             for (String service : servicePermissionLoadOrder) {
                 Object obj = stringRedisTemplate.opsForHash().get(RedisKey.MS_PERMISSION_KEY, service);
@@ -195,13 +208,26 @@ public class GroupService {
                     LogUtil.warn("permission json file is null. service name: " + service);
                     continue;
                 }
-                GroupJson temp = JSON.parseObject((String) obj, GroupJson.class);
-                if (groupJson == null) {
-                    groupJson = temp;
-                } else {
-                    groupJson.getResource().addAll(temp.getResource());
-                    groupJson.getPermissions().addAll(temp.getPermissions());
+                GroupJson microServiceGroupJson = JSON.parseObject((String) obj, GroupJson.class);
+                List<GroupResource> globalResource = microServiceGroupJson.getResource()
+                        .stream()
+                        .filter(gp -> BooleanUtils.isTrue(gp.isGlobal()))
+                        .collect(Collectors.toList());
+                if (CollectionUtils.isNotEmpty(globalResource)) {
+                    globalResources.addAll(globalResource);
+                    microServiceGroupJson.getResource().removeIf(gp -> BooleanUtils.isTrue(gp.isGlobal()));
                 }
+
+                if (groupJson == null) {
+                    groupJson = microServiceGroupJson;
+                } else {
+                    groupJson.getResource().addAll(microServiceGroupJson.getResource());
+                    groupJson.getPermissions().addAll(microServiceGroupJson.getPermissions());
+                }
+            }
+            // 拼装时通用权限Resource放在最后
+            if (groupJson != null && !globalResources.isEmpty()) {
+                groupJson.getResource().addAll(globalResources);
             }
         } catch (Exception e) {
             LogUtil.error(e);
@@ -210,6 +236,10 @@ public class GroupService {
     }
 
     public void editGroupPermission(EditGroupRequest request) {
+        // 超级用户组禁止修改权限
+        if (StringUtils.equals(request.getUserGroupId(), UserGroupConstants.SUPER_GROUP)) {
+            return;
+        }
         List<GroupPermission> permissions = request.getPermissions();
         if (CollectionUtils.isEmpty(permissions)) {
             return;
@@ -291,8 +321,7 @@ public class GroupService {
             scopeList = Arrays.asList(GLOBAL, resourceId, request.getProjectId());
         }
         GroupExample groupExample = new GroupExample();
-        groupExample.createCriteria().andScopeIdIn(scopeList)
-                .andTypeEqualTo(type);
+        groupExample.createCriteria().andScopeIdIn(scopeList).andTypeEqualTo(type);
         return groupMapper.selectByExample(groupExample);
     }
 
@@ -300,15 +329,25 @@ public class GroupService {
         return baseUserGroupMapper.getWorkspaceMemberGroups(workspaceId, userId);
     }
 
-    private List<GroupResourceDTO> getResourcePermission(List<GroupResource> resource, List<GroupPermission> permissions, String type, List<String> permissionList) {
+    private List<GroupResourceDTO> getResourcePermission(List<GroupResource> resources, List<GroupPermission> permissions, Group group, List<String> permissionList) {
         List<GroupResourceDTO> dto = new ArrayList<>();
-        List<GroupResource> resources = resource.stream().filter(g -> g.getId().startsWith(type) || g.getId().startsWith("PERSONAL")).collect(Collectors.toList());
-        permissions.forEach(p -> {
-            if (permissionList.contains(p.getId())) {
-                p.setChecked(true);
-            }
-        });
-        for (GroupResource r : resources) {
+        List<GroupResource> grs;
+        if (StringUtils.equals(group.getId(), UserGroupConstants.SUPER_GROUP)) {
+            grs = resources;
+            permissions.forEach(p -> p.setChecked(true));
+        } else {
+            grs = resources
+                    .stream()
+                    .filter(g -> g.getId().startsWith(group.getType()) || BooleanUtils.isTrue(g.isGlobal()))
+                    .collect(Collectors.toList());
+            permissions.forEach(p -> {
+                if (permissionList.contains(p.getId())) {
+                    p.setChecked(true);
+                }
+            });
+        }
+
+        for (GroupResource r : grs) {
             GroupResourceDTO resourceDTO = new GroupResourceDTO();
             resourceDTO.setResource(r);
             List<GroupPermission> collect = permissions
@@ -435,7 +474,13 @@ public class GroupService {
         }
 
         if (StringUtils.equals(group.getType(), UserGroupType.SYSTEM)) {
-            this.addSystemGroupUser(group, request.getUserIds());
+            SessionUser user = Objects.requireNonNull(SessionUtils.getUser());
+            long count = user.getGroups().stream().filter(g -> StringUtils.equals(g.getType(), UserGroupType.SYSTEM)).count();
+            if (count > 0) {
+                this.addSystemGroupUser(group, request.getUserIds());
+            } else {
+                LogUtil.warn("no permission to add system group!");
+            }
         } else {
             if (CollectionUtils.isNotEmpty(request.getSourceIds())) {
                 this.addNotSystemGroupUser(group, request.getUserIds(), request.getSourceIds());
@@ -452,9 +497,14 @@ public class GroupService {
             UserGroupExample userGroupExample = new UserGroupExample();
             userGroupExample.createCriteria().andUserIdEqualTo(userId).andGroupIdEqualTo(group.getId());
             List<UserGroup> userGroups = userGroupMapper.selectByExample(userGroupExample);
-            if (userGroups.size() <= 0) {
-                UserGroup userGroup = new UserGroup(UUID.randomUUID().toString(), userId, group.getId(),
-                        "system", System.currentTimeMillis(), System.currentTimeMillis());
+            if (userGroups.size() == 0) {
+                UserGroup userGroup = new UserGroup(
+                        UUID.randomUUID().toString(),
+                        userId,
+                        group.getId(),
+                        "system",
+                        System.currentTimeMillis(),
+                        System.currentTimeMillis());
                 userGroupMapper.insertSelective(userGroup);
             }
         }
@@ -491,7 +541,7 @@ public class GroupService {
 
     private void checkQuota(QuotaService quotaService, String type, List<String> sourceIds, List<String> userIds) {
         if (quotaService != null) {
-            Map<String, List<String>> addMemberMap = sourceIds.stream().collect(Collectors.toMap( id -> id, id -> userIds));
+            Map<String, List<String>> addMemberMap = sourceIds.stream().collect(Collectors.toMap(id -> id, id -> userIds));
             quotaService.checkMemberCount(addMemberMap, type);
         }
     }

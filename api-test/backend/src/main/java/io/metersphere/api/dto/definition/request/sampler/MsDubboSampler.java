@@ -2,9 +2,6 @@ package io.metersphere.api.dto.definition.request.sampler;
 
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.ningyu.jmeter.plugin.dubbo.sample.DubboSample;
 import io.github.ningyu.jmeter.plugin.dubbo.sample.MethodArgument;
 import io.github.ningyu.jmeter.plugin.util.Constants;
@@ -17,17 +14,18 @@ import io.metersphere.api.dto.scenario.KeyValue;
 import io.metersphere.api.dto.scenario.environment.EnvironmentConfig;
 import io.metersphere.api.dto.scenario.environment.GlobalScriptFilterRequest;
 import io.metersphere.api.parse.api.JMeterScriptUtil;
-import io.metersphere.service.definition.ApiDefinitionService;
-import io.metersphere.service.definition.ApiTestCaseService;
 import io.metersphere.base.domain.ApiDefinitionWithBLOBs;
 import io.metersphere.base.domain.ApiTestCaseWithBLOBs;
+import io.metersphere.commons.constants.CommonConstants;
 import io.metersphere.commons.constants.ElementConstants;
 import io.metersphere.commons.constants.MsTestElementConstants;
 import io.metersphere.commons.utils.CommonBeanFactory;
+import io.metersphere.commons.utils.JSONUtil;
 import io.metersphere.commons.utils.LogUtil;
 import io.metersphere.plugin.core.MsParameter;
 import io.metersphere.plugin.core.MsTestElement;
-import io.metersphere.commons.utils.JSONUtil;
+import io.metersphere.service.definition.ApiDefinitionService;
+import io.metersphere.service.definition.ApiTestCaseService;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.apache.commons.collections.CollectionUtils;
@@ -43,41 +41,23 @@ import java.util.stream.Collectors;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-
 public class MsDubboSampler extends MsTestElement {
     private String clazzName = MsDubboSampler.class.getCanonicalName();
-
     /**
      * type 必须放最前面，以便能够转换正确的类
      */
     private String type = ElementConstants.DUBBO_SAMPLER;
-
-
     private final String protocol = "dubbo://";
     @JsonProperty(value = "interface")
-
     private String _interface;
-
     private String method;
-
-
     private MsConfigCenter configCenter;
-
     private MsRegistryCenter registryCenter;
-
     private MsConsumerAndService consumerAndService;
-
-
     private List<KeyValue> args;
-
     private List<KeyValue> attachmentArgs;
-
-
     private String useEnvironment;
-
-
     private boolean customizeReq;
-
 
     @Override
     public void toHashTree(HashTree tree, List<MsTestElement> hashTree, MsParameter msParameter) {
@@ -130,32 +110,28 @@ public class MsDubboSampler extends MsTestElement {
 
     private boolean setRefElement() {
         try {
-            ApiDefinitionService apiDefinitionService = CommonBeanFactory.getBean(ApiDefinitionService.class);
-            ObjectMapper mapper = new ObjectMapper();
-            mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
             MsDubboSampler proxy = null;
-            if (StringUtils.equals(this.getRefType(), "CASE")) {
+            if (StringUtils.equals(this.getRefType(), CommonConstants.CASE)) {
                 ApiTestCaseService apiTestCaseService = CommonBeanFactory.getBean(ApiTestCaseService.class);
                 ApiTestCaseWithBLOBs bloBs = apiTestCaseService.get(this.getId());
                 if (bloBs != null) {
                     this.setProjectId(bloBs.getProjectId());
                     JSONObject element = JSONUtil.parseObject(bloBs.getRequest());
                     ElementUtil.dataFormatting(element);
-                    proxy = mapper.readValue(element.toString(), new TypeReference<MsDubboSampler>() {
-                    });
+                    proxy = JSONUtil.parseObject(element.toString(), MsDubboSampler.class);
                     this.setName(bloBs.getName());
                 }
             } else {
+                ApiDefinitionService apiDefinitionService = CommonBeanFactory.getBean(ApiDefinitionService.class);
                 ApiDefinitionWithBLOBs apiDefinition = apiDefinitionService.getBLOBs(this.getId());
                 if (apiDefinition != null) {
                     this.setProjectId(apiDefinition.getProjectId());
-                    proxy = mapper.readValue(apiDefinition.getRequest(), new TypeReference<MsDubboSampler>() {
-                    });
+                    proxy = JSONUtil.parseObject(apiDefinition.getRequest(), MsDubboSampler.class);
                     this.setName(apiDefinition.getName());
                 }
             }
             if (proxy != null) {
-                if (StringUtils.equals(this.getRefType(), "CASE")) {
+                if (StringUtils.equals(this.getRefType(), CommonConstants.CASE)) {
                     ElementUtil.mergeHashTree(this, proxy.getHashTree());
                 } else {
                     this.setHashTree(proxy.getHashTree());

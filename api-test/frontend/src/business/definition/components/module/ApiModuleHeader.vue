@@ -4,73 +4,72 @@
       <el-col :span="8">
         <el-select class="protocol-select" size="small" v-model="condition.protocol">
           <el-option
-              v-for="item in options"
-              :key="item.value"
-              :name="item.name"
-              :value="item.value"
-              :disabled="item.disabled">
+            v-for="item in options"
+            :key="item.value"
+            :name="item.name"
+            :value="item.value"
+            :disabled="item.disabled">
           </el-option>
         </el-select>
       </el-col>
       <el-col :span="15">
-        <ms-search-bar
-            :show-operator="showOperator && !isTrashData"
-            :condition="condition"
-            :commands="operators"/>
+        <ms-search-bar :show-operator="showOperator && !isTrashData" :condition="condition" :commands="operators" />
       </el-col>
     </el-row>
 
-    <module-trash-button v-if="showTrashNode" :condition="condition" :total="total"
-                         :exe="enableTrash"/>
+    <module-trash-button v-if="showTrashNode" :condition="condition" :total="total" :exe="enableTrash" />
 
     <ms-add-basis-api
-        :current-protocol="condition.protocol"
-        :module-options="moduleOptions"
-        @saveAsEdit="saveAsEdit"
-        @refresh="refresh"
-        ref="basisApi"/>
-    <api-import :protocol="condition.protocol" ref="apiImport" :moduleOptions="moduleOptions"
-                @refresh="$emit('refresh')"/>
+      :current-protocol="condition.protocol"
+      :module-options="moduleOptions"
+      @saveAsEdit="saveAsEdit"
+      @refresh="refresh"
+      ref="basisApi" />
+    <api-import
+      :protocol="condition.protocol"
+      ref="apiImport"
+      :moduleOptions="moduleOptions"
+      @refresh="$emit('refresh')" />
   </div>
 </template>
 
 <script>
-import {OPTIONS} from "../../model/JsonData";
-import MsAddBasisApi from "../basis/AddBasisApi";
-import ApiImport from "../import/ApiImport";
-import ModuleTrashButton from "./ModuleTrashButton";
-import MsSearchBar from "metersphere-frontend/src/components/search/MsSearchBar";
-import {getCurrentProjectID} from "metersphere-frontend/src/utils/token";
+import { OPTIONS } from '../../model/JsonData';
+import MsAddBasisApi from '../basis/AddBasisApi';
+import ApiImport from '../import/ApiImport';
+import ModuleTrashButton from './ModuleTrashButton';
+import MsSearchBar from 'metersphere-frontend/src/components/search/MsSearchBar';
+import { getCurrentProjectID } from 'metersphere-frontend/src/utils/token';
 
 export default {
-  name: "ApiModuleHeader",
-  components: {MsSearchBar, ModuleTrashButton, ApiImport, MsAddBasisApi},
+  name: 'ApiModuleHeader',
+  components: { MsSearchBar, ModuleTrashButton, ApiImport, MsAddBasisApi },
   data() {
     return {
       httpOperators: [
         {
           label: this.$t('api_test.definition.request.title'),
           callback: this.addApi,
-          permissions: ['PROJECT_API_DEFINITION:READ+CREATE_API']
+          permissions: ['PROJECT_API_DEFINITION:READ+CREATE_API'],
         },
         {
           label: this.$t('api_test.definition.request.fast_debug'),
           callback: () => {
             this.$emit('debug');
           },
-          permissions: ['PROJECT_API_DEFINITION:READ+DEBUG']
+          permissions: ['PROJECT_API_DEFINITION:READ+DEBUG'],
         },
         {
           label: this.$t('api_test.api_import.timing_synchronization'),
           callback: () => {
             this.$emit('schedule');
           },
-          permissions: ['PROJECT_API_DEFINITION:READ+TIMING_SYNC']
+          permissions: ['PROJECT_API_DEFINITION:READ+TIMING_SYNC'],
         },
         {
           label: this.$t('api_test.api_import.label'),
           callback: this.handleImport,
-          permissions: ['PROJECT_API_DEFINITION:READ+IMPORT_API']
+          permissions: ['PROJECT_API_DEFINITION:READ+IMPORT_API'],
         },
         {
           label: this.$t('report.export'),
@@ -84,7 +83,7 @@ export default {
                   return;
                 }
                 this.$emit('exportAPI', 'MS');
-              }
+              },
             },
             {
               label: this.$t('report.export_to_swagger3_format'),
@@ -95,9 +94,9 @@ export default {
                   return;
                 }
                 this.$emit('exportAPI', 'Swagger');
-              }
-            }
-          ]
+              },
+            },
+          ],
         },
       ],
       operators: [],
@@ -105,26 +104,26 @@ export default {
         {
           label: this.$t('api_test.definition.request.title'),
           callback: this.addApi,
-          permissions: ['PROJECT_API_DEFINITION:READ+CREATE_API']
+          permissions: ['PROJECT_API_DEFINITION:READ+CREATE_API'],
         },
         {
           label: this.$t('api_test.definition.request.fast_debug'),
           callback: () => {
             this.$emit('debug');
           },
-          permissions: ['PROJECT_API_DEFINITION:READ+DEBUG']
+          permissions: ['PROJECT_API_DEFINITION:READ+DEBUG'],
         },
         {
           label: this.$t('api_test.api_import.timing_synchronization'),
           callback: () => {
             this.$emit('schedule');
           },
-          permissions: ['PROJECT_API_DEFINITION:READ+TIMING_SYNC']
+          permissions: ['PROJECT_API_DEFINITION:READ+TIMING_SYNC'],
         },
         {
           label: this.$t('api_test.api_import.label'),
           callback: this.handleImport,
-          permissions: ['PROJECT_API_DEFINITION:READ+IMPORT_API']
+          permissions: ['PROJECT_API_DEFINITION:READ+IMPORT_API'],
         },
         {
           label: this.$t('report.export'),
@@ -138,9 +137,9 @@ export default {
                   return;
                 }
                 this.$emit('exportAPI', 'MS');
-              }
-            }
-          ]
+              },
+            },
+          ],
         },
       ],
     };
@@ -150,7 +149,7 @@ export default {
       type: Object,
       default() {
         return {};
-      }
+      },
     },
     showOperator: Boolean,
     moduleOptions: Array,
@@ -159,32 +158,32 @@ export default {
       type: Object,
       default() {
         return {};
-      }
+      },
     },
     isReadOnly: {
       type: Boolean,
       default() {
         return false;
-      }
+      },
     },
     isTrashData: {
       type: Boolean,
       default() {
         return false;
-      }
+      },
     },
     options: {
       type: Array,
       default() {
         return OPTIONS;
-      }
+      },
     },
     selectProjectId: {
       type: String,
       default() {
         return getCurrentProjectID();
-      }
-    }
+      },
+    },
   },
   computed: {
     projectId() {
@@ -195,8 +194,8 @@ export default {
       }
     },
     showTrashNode() {
-      return (!this.isReadOnly && !this.isTrashData);
-    }
+      return !this.isReadOnly && !this.isTrashData;
+    },
   },
   watch: {
     'condition.protocol'() {
@@ -216,7 +215,7 @@ export default {
         this.$warning(this.$t('commons.check_project_tip'));
         return;
       }
-      this.protocol = "HTTP";
+      this.protocol = 'HTTP';
       this.$refs.apiImport.open(this.moduleOptions);
     },
     addApi() {
@@ -234,8 +233,8 @@ export default {
     },
     enableTrash() {
       this.condition.trashEnable = true;
-    }
-  }
+    },
+  },
 };
 </script>
 

@@ -12,6 +12,9 @@
           <font-awesome-icon v-if="scope.row.isCurrent"
                              class="icon global focusing" :icon="['fas', 'tag']"/>
           {{ scope.row.name }}
+          <el-tag v-if="scope.row.id === dataLatestId" size="mini" type="primary">
+            {{ $t('api_test.api_import.latest_version') }}&nbsp;
+          </el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="status" column-key="status"
@@ -48,9 +51,24 @@
             {{ $t('commons.create') }}&nbsp;
           </el-link>
 
-          <el-link @click="del(scope.row)" v-if="scope.row.isCheckout" :disabled="scope.row.isCurrent || isRead">
-            {{ $t('commons.delete') }}&nbsp;
-          </el-link>
+          <el-popover
+            placement="bottom"
+            width="100"
+            trigger="hover"
+            v-if="scope.row.isCheckout || scope.row.status !== 'open'"
+          >
+            <div style="text-align: left;">
+              <el-link @click="setLatest(scope.row)" v-if="hasLatest && scope.row.isCheckout"
+                       :disabled="isRead || scope.row.id === dataLatestId">
+                {{ $t('project.version.set_new') }}&nbsp;
+              </el-link>
+              <br/>
+              <el-link @click="del(scope.row)" v-if="scope.row.isCheckout" :disabled="scope.row.isCurrent || isRead">
+                {{ $t('commons.delete') }}&nbsp;
+              </el-link>
+            </div>
+            <span slot="reference">...</span>
+          </el-popover>
         </template>
       </el-table-column>
     </el-table>
@@ -66,7 +84,7 @@
 
 import {getCurrentProjectID} from "../../utils/token";
 import {hasLicense} from "../../utils/permission";
-import {getProjectMembers, getProjectVersions, isProjectVersionEnable} from "../../api/version";
+import {getDefaultVersion, getProjectMembers, getProjectVersions, isProjectVersionEnable} from "../../api/version";
 
 export default {
   name: "MxVersionHistory",
@@ -88,6 +106,10 @@ export default {
       default() {
         return getCurrentProjectID();
       }
+    },
+    hasLatest: {
+      type: Boolean,
+      default: false
     }
   },
   data() {
@@ -97,6 +119,7 @@ export default {
       versionOptions: [],
       userData: {},
       currentVersion: {},
+      dataLatestId: ''
     };
   },
   methods: {
@@ -144,12 +167,20 @@ export default {
       this.loading = true;
       this.$emit('del', row);
     },
+    setLatest(row) {
+      this.loading = true;
+      this.$emit('setLatest', row);
+    },
     handleVersionOptions() {
       let versionData = this.versionData;
       if (versionData.length === 0) {
         this.currentVersion = this.versionOptions.filter(v => v.status === 'open' && v.latest)[0] || {};
         this.loading = false;
         return;
+      }
+      let latestData = versionData.filter((v) => v.latest === true);
+      if (latestData) {
+        this.dataLatestId = latestData[0].versionId;
       }
       this.versionOptions.forEach(version => {
         let vs = versionData.filter(v => v.versionId === version.id);
@@ -185,7 +216,7 @@ export default {
     testUsers() {
       this.updateUserDataByExternal();
     }
-  }
+  },
 };
 </script>
 

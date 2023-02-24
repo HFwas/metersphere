@@ -10,22 +10,26 @@
     color="#67C23A"
     background-color="#F2F9EE"
     :title="$t('api_test.automation.wait_controller')">
-
     <template v-slot:headerLeft>
-      <el-input-number class="time-input" size="mini" v-model="timer.delay" :min="0" :step="1000" ref="nameInput"
-                       :disabled="timer.disabled"/>
+      <el-input-number
+        class="time-input"
+        size="mini"
+        v-model="timer.delay"
+        :min="0"
+        :step="1000"
+        ref="nameInput"
+        :disabled="timer.disabled" />
       ms
     </template>
-
   </api-base-component>
 </template>
 
 <script>
-import ApiBaseComponent from "../common/ApiBaseComponent";
+import ApiBaseComponent from '../common/ApiBaseComponent';
 
 export default {
-  name: "MsConstantTimer",
-  components: {ApiBaseComponent},
+  name: 'MsConstantTimer',
+  components: { ApiBaseComponent },
   props: {
     timer: {},
     innerStep: {
@@ -47,7 +51,7 @@ export default {
     },
   },
   data() {
-    return {}
+    return {};
   },
   created() {
     this.$nextTick(() => {
@@ -61,8 +65,8 @@ export default {
     copyRow() {
       this.$emit('copyRow', this.timer, this.node);
     },
-  }
-}
+  },
+};
 </script>
 
 <style scoped>

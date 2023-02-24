@@ -19,10 +19,11 @@ import io.metersphere.commons.utils.CommonBeanFactory;
 import io.metersphere.commons.utils.JSONUtil;
 import io.metersphere.commons.utils.SessionUtils;
 import io.metersphere.service.BaseCheckPermissionService;
+import io.metersphere.service.definition.ApiDefinitionImportUtilService;
 import io.metersphere.service.definition.ApiDefinitionService;
 import io.metersphere.service.definition.ApiTestCaseService;
 import io.metersphere.service.scenario.ApiScenarioModuleService;
-import io.metersphere.service.scenario.dto.ApiScenarioParamDto;
+import io.metersphere.api.dto.scenario.ApiScenarioParamDTO;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -161,7 +162,7 @@ public class ApiScenarioImportUtil {
         }
     }
 
-    public static void checkCase(JSONObject object, String versionId, String projectId, ApiScenarioParamDto apiScenarioParamDto) {
+    public static void checkCase(JSONObject object, String versionId, String projectId, ApiScenarioParamDTO apiScenarioParamDto) {
         Map<String, ApiDefinition> definitionMap = apiScenarioParamDto.getDefinitionMap();
         ApiTestCaseMapper apiTestCaseMapper = apiScenarioParamDto.getApiTestCaseMapper();
         Map<String, Set<String>> apiIdCaseNameMap = apiScenarioParamDto.getApiIdCaseNameMap();
@@ -179,18 +180,18 @@ public class ApiScenarioImportUtil {
                     request.setName(object.optString("name"));
                     ApiTestCase sameCase = testCaseService.getSameCase(request);
                     if (sameCase == null) {
-                        structureCaseByJson(object, testCaseService, apiDefinition, apiTestCaseMapper,apiIdCaseNameMap);
+                        structureCaseByJson(object, testCaseService, apiDefinition, apiTestCaseMapper, apiIdCaseNameMap);
                     } else {
                         object.put("id", sameCase.getId());
-                        object.put("resourceId", sameCase.getId());
+                        object.put(ElementConstants.RESOURCE_ID, sameCase.getId());
                         object.put("projectId", projectId);
-                        object.put("useEnvironment", StringUtils.EMPTY);
-                        object.put("environmentId", StringUtils.EMPTY);
+                        object.put(PropertyConstant.ENVIRONMENT, StringUtils.EMPTY);
+                        object.put(PropertyConstant.ENVIRONMENT_ID, StringUtils.EMPTY);
                     }
                 }
             } else {
                 ApiDefinitionResult apiDefinitionResult = structureApiDefinitionByJson(apiDefinitionService, object, versionId, projectId, apiScenarioParamDto.getApiDefinitionMapper(), definitionMap);
-                structureCaseByJson(object, testCaseService, apiDefinitionResult, apiTestCaseMapper,apiIdCaseNameMap);
+                structureCaseByJson(object, testCaseService, apiDefinitionResult, apiTestCaseMapper, apiIdCaseNameMap);
             }
         }
     }
@@ -213,13 +214,13 @@ public class ApiScenarioImportUtil {
         }
         String id = UUID.randomUUID().toString();
         test.setId(id);
-        if (MapUtils.isEmpty(definitionMap)){
+        if (MapUtils.isEmpty(definitionMap)) {
             test.setNum(apiDefinitionService.getNextNum(projectId));
-        }else {
+        } else {
             ArrayList<ApiDefinition> apiDefinitions = new ArrayList<>(definitionMap.values());
             List<Integer> collect = apiDefinitions.stream().map(ApiDefinition::getNum).collect(Collectors.toList());
             Collections.sort(collect);
-            test.setNum(collect.get(collect.size()-1)+1);
+            test.setNum(collect.get(collect.size() - 1) + 1);
         }
         test.setName(object.optString("name"));
         if (StringUtils.isBlank(object.optString("path"))) {
@@ -231,6 +232,7 @@ public class ApiScenarioImportUtil {
         } else {
             test.setPath(object.optString("path"));
         }
+        ApiDefinitionImportUtilService apiDefinitionImportUtilService = CommonBeanFactory.getBean(ApiDefinitionImportUtilService.class);
         test.setCreateUser(SessionUtils.getUserId());
         test.setProjectId(projectId);
         test.setCreateTime(System.currentTimeMillis());
@@ -240,10 +242,10 @@ public class ApiScenarioImportUtil {
         test.setLatest(true);
         test.setVersionId(versionId);
         object.put("id", test.getId());
-        object.put("resourceId", test.getId());
+        object.put(ElementConstants.RESOURCE_ID, test.getId());
         object.put("projectId", projectId);
-        object.put("useEnvironment", StringUtils.EMPTY);
-        object.put("environmentId", StringUtils.EMPTY);
+        object.put(PropertyConstant.ENVIRONMENT, StringUtils.EMPTY);
+        object.put(PropertyConstant.ENVIRONMENT_ID, StringUtils.EMPTY);
         object.put("url", StringUtils.EMPTY);
         JSONObject objectNew = JSONUtil.parseObject(object.toString());
         objectNew.remove("refType");
@@ -259,7 +261,7 @@ public class ApiScenarioImportUtil {
         test.setResponse(httpResponse.toString());
         test.setUserId(SessionUtils.getUserId());
         test.setLatest(true);
-        test.setOrder(apiDefinitionService.getImportNextOrder(projectId));
+        test.setOrder(apiDefinitionImportUtilService.getImportNextOrder(projectId));
         if (test.getName().length() > 255) {
             test.setName(test.getName().substring(0, 255));
         }
@@ -268,10 +270,10 @@ public class ApiScenarioImportUtil {
         return test;
     }
 
-    public static void structureCaseByJson(JSONObject object, ApiTestCaseService testCaseService, ApiDefinition apiDefinition, ApiTestCaseMapper apiTestCaseMapper,Map<String, Set<String>> apiIdCaseNameMap) {
+    public static void structureCaseByJson(JSONObject object, ApiTestCaseService testCaseService, ApiDefinition apiDefinition, ApiTestCaseMapper apiTestCaseMapper, Map<String, Set<String>> apiIdCaseNameMap) {
         String caseMapKey = apiDefinition.getId();
         Set<String> caseNameSet = apiIdCaseNameMap.get(caseMapKey);
-        if (CollectionUtils.isNotEmpty(caseNameSet) && caseNameSet.contains(object.optString("name"))){
+        if (CollectionUtils.isNotEmpty(caseNameSet) && caseNameSet.contains(object.optString("name"))) {
             return;
         }
         String projectId = apiDefinition.getProjectId();
@@ -289,30 +291,31 @@ public class ApiScenarioImportUtil {
         apiTestCase.setUpdateTime(System.currentTimeMillis());
         apiTestCase.setVersionId(apiDefinition.getVersionId());
         apiTestCase.setPriority("P0");
-        if (CollectionUtils.isEmpty(caseNameSet)){
+        if (CollectionUtils.isEmpty(caseNameSet)) {
             apiTestCase.setNum(testCaseService.getNextNum(apiTestCase.getApiDefinitionId(), apiDefinition.getNum(), projectId));
-        }else {
-            apiTestCase.setNum(apiDefinition.getNum()*1000+caseNameSet.size()+1);
+        } else {
+            apiTestCase.setNum(apiDefinition.getNum() * 1000 + caseNameSet.size() + 1);
         }
+        ApiDefinitionImportUtilService apiDefinitionImportUtilService = CommonBeanFactory.getBean(ApiDefinitionImportUtilService.class);
         object.put("id", apiTestCase.getId());
-        object.put("resourceId", apiTestCase.getId());
+        object.put(ElementConstants.RESOURCE_ID, apiTestCase.getId());
         object.put("projectId", projectId);
-        object.put("useEnvironment", StringUtils.EMPTY);
-        object.put("environmentId", StringUtils.EMPTY);
+        object.put(PropertyConstant.ENVIRONMENT, StringUtils.EMPTY);
+        object.put(PropertyConstant.ENVIRONMENT_ID, StringUtils.EMPTY);
         JSONObject objectNew = JSONUtil.parseObject(object.toString());
         objectNew.remove("refType");
         objectNew.remove("referenced");
         apiTestCase.setRequest(objectNew.toString());
-        apiTestCase.setOrder(apiDefinitionService.getImportNextCaseOrder(projectId));
+        apiTestCase.setOrder(apiDefinitionImportUtilService.getImportNextCaseOrder(projectId));
         if (apiTestCase.getName().length() > 255) {
             apiTestCase.setName(apiTestCase.getName().substring(0, 255));
         }
         Set<String> strings = apiIdCaseNameMap.get(caseMapKey);
-        if (CollectionUtils.isEmpty(strings)){
-            Set<String>addCaseNameSet  = new HashSet<>();
+        if (CollectionUtils.isEmpty(strings)) {
+            Set<String> addCaseNameSet = new HashSet<>();
             addCaseNameSet.add(apiTestCase.getName());
-            apiIdCaseNameMap.put(caseMapKey,addCaseNameSet);
-        }else {
+            apiIdCaseNameMap.put(caseMapKey, addCaseNameSet);
+        } else {
             strings.add(apiTestCase.getName());
         }
         apiTestCaseMapper.insert(apiTestCase);
@@ -323,7 +326,7 @@ public class ApiScenarioImportUtil {
             for (int i = 0; i < hashTree.length(); i++) {
                 JSONObject object = (JSONObject) hashTree.get(i);
                 object.put("index", i + 1);
-                object.put("resourceId", UUID.randomUUID().toString());
+                object.put(ElementConstants.RESOURCE_ID, UUID.randomUUID().toString());
                 hashTree.put(i, object);
                 if (object.has(ElementConstants.HASH_TREE) && object.optJSONArray(ElementConstants.HASH_TREE) != null) {
                     formatHashTree(object.optJSONArray(ElementConstants.HASH_TREE));
@@ -331,5 +334,4 @@ public class ApiScenarioImportUtil {
             }
         }
     }
-
 }

@@ -1,5 +1,5 @@
-import {fileDownload, fileUpload} from "@/api/base-network";
-import {get, post} from "metersphere-frontend/src/plugins/request"
+import { fileUpload } from '@/api/base-network';
+import { get, post } from 'metersphere-frontend/src/plugins/request';
 
 export function getRelationshipCountApi(id) {
   return get('/api/definition/relationship/count/' + id);
@@ -61,8 +61,8 @@ export function apiListBatch(params) {
   return post('/api/definition/list/batch', params);
 }
 
-export function definitionWeekList(currentPage, pageSize, params) {
-  return post('/api/definition/list/week/' + currentPage + '/' + pageSize, params);
+export function definitionWeekList(projectId, versionId, page, pageSize) {
+  return post('/api/definition/list/week/' + projectId + '/' + versionId + '/' + page + '/' + pageSize);
 }
 
 export function getRelevanceDefinitionPage(page, pageSize, params) {
@@ -121,8 +121,12 @@ export function jsonGenerator(params) {
   return post('/api/definition/generator', params);
 }
 
-export function getDefinitionReference(params) {
-  return post('/api/definition/get-reference', params);
+export function getDefinitionReference(currentPage, pageSize, params) {
+  return post('/api/definition/get-reference/' + currentPage + '/' + pageSize, params);
+}
+
+export function getPlanReference(currentPage, pageSize, params) {
+  return post('/test/plan/api/case/get-reference/' + currentPage + '/' + pageSize, params);
 }
 
 export function deleteBatchByParams(params) {
@@ -131,6 +135,10 @@ export function deleteBatchByParams(params) {
 
 export function removeToGcByParams(params) {
   return post('/api/definition/move-gc-batch', params);
+}
+
+export function copyDataByVersion(params) {
+  return post('/api/definition/copy/by/version', params);
 }
 
 export function removeToGcByIds(params) {
@@ -166,9 +174,4 @@ export function updateDefinition(url, file, files, params) {
 export function createDefinition(file, files, params) {
   let url = '/api/definition/create';
   return fileUpload(url, file, files, params);
-}
-
-export function exportEsbTemp(name) {
-  let url = '/api/definition/export-esb-template';
-  return fileDownload(url, name);
 }

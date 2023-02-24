@@ -443,6 +443,216 @@ public class ScenarioExecutionInfoExample {
             addCriterion("create_time not between", value1, value2, "createTime");
             return (Criteria) this;
         }
+
+        public Criteria andProjectIdIsNull() {
+            addCriterion("project_id is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andProjectIdIsNotNull() {
+            addCriterion("project_id is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andProjectIdEqualTo(String value) {
+            addCriterion("project_id =", value, "projectId");
+            return (Criteria) this;
+        }
+
+        public Criteria andProjectIdNotEqualTo(String value) {
+            addCriterion("project_id <>", value, "projectId");
+            return (Criteria) this;
+        }
+
+        public Criteria andProjectIdGreaterThan(String value) {
+            addCriterion("project_id >", value, "projectId");
+            return (Criteria) this;
+        }
+
+        public Criteria andProjectIdGreaterThanOrEqualTo(String value) {
+            addCriterion("project_id >=", value, "projectId");
+            return (Criteria) this;
+        }
+
+        public Criteria andProjectIdLessThan(String value) {
+            addCriterion("project_id <", value, "projectId");
+            return (Criteria) this;
+        }
+
+        public Criteria andProjectIdLessThanOrEqualTo(String value) {
+            addCriterion("project_id <=", value, "projectId");
+            return (Criteria) this;
+        }
+
+        public Criteria andProjectIdLike(String value) {
+            addCriterion("project_id like", value, "projectId");
+            return (Criteria) this;
+        }
+
+        public Criteria andProjectIdNotLike(String value) {
+            addCriterion("project_id not like", value, "projectId");
+            return (Criteria) this;
+        }
+
+        public Criteria andProjectIdIn(List<String> values) {
+            addCriterion("project_id in", values, "projectId");
+            return (Criteria) this;
+        }
+
+        public Criteria andProjectIdNotIn(List<String> values) {
+            addCriterion("project_id not in", values, "projectId");
+            return (Criteria) this;
+        }
+
+        public Criteria andProjectIdBetween(String value1, String value2) {
+            addCriterion("project_id between", value1, value2, "projectId");
+            return (Criteria) this;
+        }
+
+        public Criteria andProjectIdNotBetween(String value1, String value2) {
+            addCriterion("project_id not between", value1, value2, "projectId");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecuteTypeIsNull() {
+            addCriterion("execute_type is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecuteTypeIsNotNull() {
+            addCriterion("execute_type is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecuteTypeEqualTo(String value) {
+            addCriterion("execute_type =", value, "executeType");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecuteTypeNotEqualTo(String value) {
+            addCriterion("execute_type <>", value, "executeType");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecuteTypeGreaterThan(String value) {
+            addCriterion("execute_type >", value, "executeType");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecuteTypeGreaterThanOrEqualTo(String value) {
+            addCriterion("execute_type >=", value, "executeType");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecuteTypeLessThan(String value) {
+            addCriterion("execute_type <", value, "executeType");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecuteTypeLessThanOrEqualTo(String value) {
+            addCriterion("execute_type <=", value, "executeType");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecuteTypeLike(String value) {
+            addCriterion("execute_type like", value, "executeType");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecuteTypeNotLike(String value) {
+            addCriterion("execute_type not like", value, "executeType");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecuteTypeIn(List<String> values) {
+            addCriterion("execute_type in", values, "executeType");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecuteTypeNotIn(List<String> values) {
+            addCriterion("execute_type not in", values, "executeType");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecuteTypeBetween(String value1, String value2) {
+            addCriterion("execute_type between", value1, value2, "executeType");
+            return (Criteria) this;
+        }
+
+        public Criteria andExecuteTypeNotBetween(String value1, String value2) {
+            addCriterion("execute_type not between", value1, value2, "executeType");
+            return (Criteria) this;
+        }
+
+        public Criteria andVersionIsNull() {
+            addCriterion("version is null");
+            return (Criteria) this;
+        }
+
+        public Criteria andVersionIsNotNull() {
+            addCriterion("version is not null");
+            return (Criteria) this;
+        }
+
+        public Criteria andVersionEqualTo(String value) {
+            addCriterion("version =", value, "version");
+            return (Criteria) this;
+        }
+
+        public Criteria andVersionNotEqualTo(String value) {
+            addCriterion("version <>", value, "version");
+            return (Criteria) this;
+        }
+
+        public Criteria andVersionGreaterThan(String value) {
+            addCriterion("version >", value, "version");
+            return (Criteria) this;
+        }
+
+        public Criteria andVersionGreaterThanOrEqualTo(String value) {
+            addCriterion("version >=", value, "version");
+            return (Criteria) this;
+        }
+
+        public Criteria andVersionLessThan(String value) {
+            addCriterion("version <", value, "version");
+            return (Criteria) this;
+        }
+
+        public Criteria andVersionLessThanOrEqualTo(String value) {
+            addCriterion("version <=", value, "version");
+            return (Criteria) this;
+        }
+
+        public Criteria andVersionLike(String value) {
+            addCriterion("version like", value, "version");
+            return (Criteria) this;
+        }
+
+        public Criteria andVersionNotLike(String value) {
+            addCriterion("version not like", value, "version");
+            return (Criteria) this;
+        }
+
+        public Criteria andVersionIn(List<String> values) {
+            addCriterion("version in", values, "version");
+            return (Criteria) this;
+        }
+
+        public Criteria andVersionNotIn(List<String> values) {
+            addCriterion("version not in", values, "version");
+            return (Criteria) this;
+        }
+
+        public Criteria andVersionBetween(String value1, String value2) {
+            addCriterion("version between", value1, value2, "version");
+            return (Criteria) this;
+        }
+
+        public Criteria andVersionNotBetween(String value1, String value2) {
+            addCriterion("version not between", value1, value2, "version");
+            return (Criteria) this;
+        }
     }
 
     public static class Criteria extends GeneratedCriteria {

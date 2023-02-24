@@ -7,12 +7,7 @@ import io.github.ningyu.jmeter.plugin.util.Constants;
 import io.metersphere.api.dto.ApiTestImportRequest;
 import io.metersphere.api.dto.automation.ImportPoolsDTO;
 import io.metersphere.api.dto.definition.request.MsScenario;
-import io.metersphere.api.dto.definition.request.assertions.MsAssertionDuration;
-import io.metersphere.api.dto.definition.request.assertions.MsAssertionJSR223;
-import io.metersphere.api.dto.definition.request.assertions.MsAssertionJsonPath;
-import io.metersphere.api.dto.definition.request.assertions.MsAssertionRegex;
-import io.metersphere.api.dto.definition.request.assertions.MsAssertionXPath2;
-import io.metersphere.api.dto.definition.request.assertions.MsAssertions;
+import io.metersphere.api.dto.definition.request.assertions.*;
 import io.metersphere.api.dto.definition.request.extract.MsExtract;
 import io.metersphere.api.dto.definition.request.extract.MsExtractJSONPath;
 import io.metersphere.api.dto.definition.request.extract.MsExtractRegex;
@@ -34,36 +29,30 @@ import io.metersphere.api.dto.scenario.DatabaseConfig;
 import io.metersphere.api.dto.scenario.KeyValue;
 import io.metersphere.api.dto.scenario.environment.EnvironmentConfig;
 import io.metersphere.api.parse.ApiImportAbstractParser;
-import io.metersphere.api.parse.scenario.MsJmeterParser;
+import io.metersphere.api.parse.scenario.JMeterParser;
 import io.metersphere.base.domain.ApiDefinitionWithBLOBs;
 import io.metersphere.base.domain.ApiTestCaseWithBLOBs;
 import io.metersphere.base.domain.ApiTestEnvironmentExample;
 import io.metersphere.base.domain.ApiTestEnvironmentWithBLOBs;
+import io.metersphere.commons.constants.ElementConstants;
 import io.metersphere.commons.constants.PropertyConstant;
 import io.metersphere.commons.constants.RequestTypeConstants;
 import io.metersphere.commons.enums.ApiTestDataStatus;
 import io.metersphere.commons.exception.MSException;
-import io.metersphere.commons.utils.BeanUtils;
-import io.metersphere.commons.utils.CommonBeanFactory;
-import io.metersphere.commons.utils.JSON;
-import io.metersphere.commons.utils.LogUtil;
-import io.metersphere.commons.utils.SessionUtils;
+import io.metersphere.commons.utils.*;
 import io.metersphere.environment.service.BaseEnvironmentService;
 import io.metersphere.plugin.core.MsTestElement;
 import io.metersphere.request.BodyFile;
-import io.metersphere.commons.utils.JSONUtil;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.jmeter.assertions.DurationAssertion;
-import org.apache.jmeter.assertions.JSONPathAssertion;
-import org.apache.jmeter.assertions.JSR223Assertion;
-import org.apache.jmeter.assertions.ResponseAssertion;
-import org.apache.jmeter.assertions.XPath2Assertion;
+import org.apache.jmeter.assertions.*;
 import org.apache.jmeter.config.ConfigTestElement;
+import org.apache.jmeter.extractor.BeanShellPostProcessor;
 import org.apache.jmeter.extractor.JSR223PostProcessor;
 import org.apache.jmeter.extractor.RegexExtractor;
 import org.apache.jmeter.extractor.XPath2Extractor;
 import org.apache.jmeter.extractor.json.jsonpath.JSONPostProcessor;
+import org.apache.jmeter.modifiers.BeanShellPreProcessor;
 import org.apache.jmeter.modifiers.JSR223PreProcessor;
 import org.apache.jmeter.protocol.http.control.HeaderManager;
 import org.apache.jmeter.protocol.http.sampler.HTTPSamplerProxy;
@@ -82,18 +71,14 @@ import org.apache.jorphan.collections.HashTree;
 
 import java.io.InputStream;
 import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 public class JmeterDefinitionParser extends ApiImportAbstractParser<ApiDefinitionImport> {
     private final Map<Integer, List<Object>> headerMap = new HashMap<>();
     private ImportPoolsDTO dataPools;
     private final String ENV_NAME = "导入数据环境";
+    private static final String P0 = "P0";
 
 
     private String planName = PropertyConstant.DEFAULT;
@@ -128,20 +113,18 @@ public class JmeterDefinitionParser extends ApiImportAbstractParser<ApiDefinitio
             for (MsTestElement element : results) {
                 ApiDefinitionWithBLOBs apiDefinitionWithBLOBs = buildApiDefinition(element);
                 if (apiDefinitionWithBLOBs != null) {
-                    ApiTestCaseWithBLOBs apiTestCase = new ApiTestCaseWithBLOBs();
-                    BeanUtils.copyBean(apiTestCase, apiDefinitionWithBLOBs);
-                    apiTestCase.setApiDefinitionId(apiDefinitionWithBLOBs.getId());
-                    apiTestCase.setCaseStatus(ApiTestDataStatus.PREPARE.getValue());
-                    apiTestCase.setPriority("P0");
-                    definitionCases.add(apiTestCase);
-
-                    if (element.getHashTree() != null) {
-                        element.getHashTree().clear();
-                    }
+                    element.setEnable(true);
                     apiDefinitionWithBLOBs.setRequest(JSON.toJSONString(element));
                     HttpResponse defaultHttpResponse = getDefaultHttpResponse();
                     apiDefinitionWithBLOBs.setResponse(JSON.toJSONString(defaultHttpResponse));
                     definitions.add(apiDefinitionWithBLOBs);
+
+                    ApiTestCaseWithBLOBs apiTestCase = new ApiTestCaseWithBLOBs();
+                    BeanUtils.copyBean(apiTestCase, apiDefinitionWithBLOBs);
+                    apiTestCase.setApiDefinitionId(apiDefinitionWithBLOBs.getId());
+                    apiTestCase.setCaseStatus(ApiTestDataStatus.PREPARE.getValue());
+                    apiTestCase.setPriority(P0);
+                    definitionCases.add(apiTestCase);
                 }
             }
             apiImport.setData(definitions);
@@ -364,7 +347,7 @@ public class JmeterDefinitionParser extends ApiImportAbstractParser<ApiDefinitio
             if (key instanceof TestPlan) {
                 this.planName = ((TestPlan) key).getName();
                 elementNode = new MsJmeterElement();
-                ((MsJmeterElement) elementNode).setJmeterElement(MsJmeterParser.objToXml(key));
+                ((MsJmeterElement) elementNode).setJmeterElement(JMeterParser.objToXml(key));
                 ((MsJmeterElement) elementNode).setElementType(key.getClass().getSimpleName());
             }
             // 线程组
@@ -400,7 +383,7 @@ public class JmeterDefinitionParser extends ApiImportAbstractParser<ApiDefinitio
                 JSR223PostProcessor jsr223Sampler = (JSR223PostProcessor) key;
                 elementNode = new MsJSR223PostProcessor();
                 BeanUtils.copyBean(elementNode, jsr223Sampler);
-                ((MsJSR223PostProcessor) elementNode).setScript(jsr223Sampler.getPropertyAsString("script"));
+                ((MsJSR223PostProcessor) elementNode).setScript(jsr223Sampler.getPropertyAsString(ElementConstants.SCRIPT));
                 ((MsJSR223PostProcessor) elementNode).setScriptLanguage(jsr223Sampler.getPropertyAsString("scriptLanguage"));
             }
             // 前置脚本
@@ -408,8 +391,12 @@ public class JmeterDefinitionParser extends ApiImportAbstractParser<ApiDefinitio
                 JSR223PreProcessor jsr223Sampler = (JSR223PreProcessor) key;
                 elementNode = new MsJSR223PreProcessor();
                 BeanUtils.copyBean(elementNode, jsr223Sampler);
-                ((MsJSR223PreProcessor) elementNode).setScript(jsr223Sampler.getPropertyAsString("script"));
+                ((MsJSR223PreProcessor) elementNode).setScript(jsr223Sampler.getPropertyAsString(ElementConstants.SCRIPT));
                 ((MsJSR223PreProcessor) elementNode).setScriptLanguage(jsr223Sampler.getPropertyAsString("scriptLanguage"));
+            } else if (key instanceof BeanShellPostProcessor) {
+                elementNode = JMeterParser.getMsTestElement((BeanShellPostProcessor) key);
+            } else if (key instanceof BeanShellPreProcessor) {
+                elementNode = JMeterParser.getMsTestElement((BeanShellPreProcessor) key);
             }
             // 断言规则
             else if (key instanceof ResponseAssertion || key instanceof JSONPathAssertion || key instanceof XPath2Assertion || key instanceof JSR223Assertion || key instanceof DurationAssertion) {
@@ -512,7 +499,7 @@ public class JmeterDefinitionParser extends ApiImportAbstractParser<ApiDefinitio
             JSR223Assertion jsr223Assertion = (JSR223Assertion) key;
             msAssertionJSR223.setName(jsr223Assertion.getName());
             msAssertionJSR223.setDesc(jsr223Assertion.getName());
-            msAssertionJSR223.setScript(jsr223Assertion.getPropertyAsString("script"));
+            msAssertionJSR223.setScript(jsr223Assertion.getPropertyAsString(ElementConstants.SCRIPT));
             msAssertionJSR223.setScriptLanguage(jsr223Assertion.getPropertyAsString("scriptLanguage"));
             assertions.setName(jsr223Assertion.getName());
 

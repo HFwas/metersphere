@@ -32,17 +32,17 @@ public interface ExtApiScenarioMapper {
 
     List<ApiScenarioWithBLOBs> selectByIds(@Param("ids") String ids, @Param("order") String order);
 
-    List<ApiScenario> selectReference(@Param("request") ApiScenarioRequest request);
+    List<ApiScenarioDTO> selectReference(@Param("request") ApiScenarioRequest request);
 
     int removeToGcByExample(ApiScenarioExampleWithOperation example);
 
     int reduction(@Param("ids") List<String> ids);
 
-    long countByProjectID(String projectId);
+    long countByProjectID(@Param("projectId") String projectId, @Param("versionId") String versionId);
 
-    long countByProjectIDAndCreatInThisWeek(@Param("projectId") String projectId, @Param("firstDayTimestamp") long firstDayTimestamp, @Param("lastDayTimestamp") long lastDayTimestamp);
+    long countByProjectIDAndCreatInThisWeek(@Param("projectId") String projectId, @Param("versionId") String versionId, @Param("firstDayTimestamp") long firstDayTimestamp, @Param("lastDayTimestamp") long lastDayTimestamp);
 
-    List<ApiDataCountResult> countRunResultByProjectID(String projectId);
+    List<ApiDataCountResult> countRunResultByProjectID(@Param("projectId") String projectId, @Param("versionId") String versionId);
 
     List<String> selectIdsNotExistsInPlan(String projectId, String planId);
 
@@ -70,7 +70,7 @@ public interface ExtApiScenarioMapper {
 
     List<String> selectIdsByExecuteTimeIsNull();
 
-    Long countExecuteTimesByProjectID(String projectId);
+    long countExecuteTimesByProjectID(String projectId);
 
     List<String> selectProjectIds();
 
@@ -90,6 +90,8 @@ public interface ExtApiScenarioMapper {
 
     void addLatestVersion(String refId);
 
+    void updateVersionModule(@Param("refId") String refId, @Param("versionId") String versionId, @Param("moduleId") String moduleId, @Param("modulePath") String modulePath);
+
     List<String> selectRefIdsForVersionChange(@Param("versionId") String versionId, @Param("projectId") String projectId);
 
     List<ApiScenarioWithBLOBs> selectByStatusIsNotTrash();
@@ -102,9 +104,15 @@ public interface ExtApiScenarioMapper {
 
     List<ApiScenario> selectBaseInfoByProjectIdAndStatus(@Param("projectId") String projectId, @Param("status") String status);
 
+    List<ApiScenario> selectBaseInfoByCondition(@Param("projectId") String projectId, @Param("status") String status, @Param("request") ApiScenarioRequest request);
+
     List<ApiCountChartResult> countByRequest(ApiCountRequest request);
 
     List<ApiScenarioDTO> relevanceScenarioList(@Param("request") ApiScenarioRequest request);
 
     List<BaseCase> selectBaseCaseByProjectId(@Param("projectId") String projectId);
+
+    List<String> selectScenarioIdInExecutionInfoByProjectIdIsNull();
+
+    long countSourceIdByProjectIdIsNull();
 }

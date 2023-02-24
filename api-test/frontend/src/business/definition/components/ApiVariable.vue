@@ -1,116 +1,210 @@
 <template>
   <div style="margin-bottom: 20px">
-    <span class="kv-description" v-if="description">
-      {{ description }}
-    </span>
-    <el-row>
-      <el-checkbox v-model="isSelectAll" v-if="parameters.length > 1"/>
-    </el-row>
-    <div class="item kv-row" v-for="(item, index) in parameters" :key="index">
-      <el-row type="flex" :gutter="20" justify="space-between" align="middle">
-        <el-col class="kv-checkbox" v-if="isShowEnable">
-          <el-checkbox v-if="!isDisable(index)" v-model="item.enable"
-                       :disabled="isReadOnly"/>
-        </el-col>
-        <span style="margin-left: 10px" v-else></span>
-        <i class="el-icon-top" style="cursor:pointer" @click="moveTop(index)"/>
-        <i class="el-icon-bottom" style="cursor:pointer;" @click="moveBottom(index)"/>
+    <div style="overflow: auto; width: 100%">
+      <span class="kv-description" v-if="description">
+        {{ description }}
+      </span>
+      <el-table @cell-dblclick="clickRow" border :show-header="true" row-key="id" :data="parameters" ref="expandTable">
+        <el-table-column
+          v-for="item in tableColumnArr"
+          :key="item.id"
+          :prop="item.prop"
+          :label="item.label"
+          :min-width="getTableMinWidth(item.prop)"
+          show-overflow-tooltip>
+          <template v-slot:default="scope">
+            <div v-show="!scope.row.isEdit">
+              <div v-if="item.prop === 'required' || item.prop === 'urlEncode'">
+                <span class="param-span" v-if="scope.row[item.prop]">{{ $t('commons.yes') }}</span>
+                <span class="param-span" v-else>{{ $t('commons.no') }}</span>
+              </div>
+              <div v-else-if="item.prop === 'value' && isActive && scope.row.type === 'file'">
+                <ms-api-body-file-upload :parameter="scope.row" :id="id" :is-read-only="true" :disabled="true" />
+              </div>
+              <span v-else>
+                {{ scope.row[item.prop] }}
+              </span>
+            </div>
+            <div v-show="scope.row.isEdit">
+              <div v-if="item.prop === 'type'">
+                <el-select
+                  v-if="type === 'body'"
+                  :disabled="isReadOnly"
+                  v-model="scope.row.type"
+                  size="mini"
+                  @change="typeChange(scope.row)">
+                  <el-option value="text" />
+                  <el-option value="file" />
+                  <el-option value="json" />
+                </el-select>
+              </div>
+              <div v-else-if="item.prop === 'name'">
+                <el-input
+                  v-if="!suggestions"
+                  :disabled="isReadOnly"
+                  v-model="scope.row.name"
+                  size="small"
+                  maxlength="200"
+                  @change="change"
+                  :placeholder="keyText">
+                </el-input>
+                <el-autocomplete
+                  :disabled="isReadOnly"
+                  v-if="suggestions"
+                  v-model="scope.row.name"
+                  size="small"
+                  :fetch-suggestions="querySearch"
+                  @change="change"
+                  :placeholder="keyText"
+                  show-word-limit />
+              </div>
+              <div v-else-if="item.prop === 'required'">
+                <el-select v-model="scope.row.required" size="small" style="width: 99%">
+                  <el-option v-for="req in requireds" :key="req.id" :label="req.name" :value="req.id" />
+                </el-select>
+              </div>
+              <div v-else-if="item.prop === 'value'">
+                <div v-if="isActive && scope.row.type !== 'file'">
+                  <el-autocomplete
+                    :disabled="isReadOnly"
+                    size="small"
+                    class="input-with-autocomplete"
+                    v-model="scope.row.value"
+                    :fetch-suggestions="funcSearch"
+                    :placeholder="valueText"
+                    value-key="name"
+                    highlight-first-item
+                    @select="change">
+                    <i slot="suffix" class="el-input__icon el-icon-edit pointer" @click="advanced(scope.row)"></i>
+                  </el-autocomplete>
+                </div>
+                <div v-else-if="isActive && scope.row.type === 'file'">
+                  <ms-api-body-file-upload :parameter="scope.row" :id="id" :is-read-only="isReadOnly" />
+                </div>
+                <div v-else class="param-div-show">
+                  <span class="param-span">{{ item.value }}</span>
+                </div>
+              </div>
+              <div v-else-if="item.prop === 'contentType'">
+                <el-input
+                  :disabled="isReadOnly"
+                  v-model="scope.row.contentType"
+                  size="small"
+                  @change="change"
+                  :placeholder="$t('api_test.request.content_type')"
+                  show-word-limit />
+              </div>
+              <div v-else-if="item.prop === 'min'">
+                <el-input-number
+                  :min="0"
+                  v-model="scope.row.min"
+                  :controls="false"
+                  :placeholder="$t('schema.minLength')"
+                  size="small"
+                  style="width: 99%" />
+              </div>
+              <div v-else-if="item.prop === 'max'">
+                <el-input-number
+                  :min="0"
+                  v-model="scope.row.max"
+                  :controls="false"
+                  :placeholder="$t('schema.maxLength')"
+                  size="small"
+                  style="width: 99%" />
+              </div>
+              <div v-else-if="item.prop === 'description'">
+                <el-input
+                  v-model="scope.row.description"
+                  size="small"
+                  maxlength="200"
+                  :placeholder="$t('commons.description')"
+                  show-word-limit>
+                </el-input>
+              </div>
+              <div v-else-if="item.prop === 'urlEncode'">
+                <el-select v-model="scope.row.urlEncode" size="small" clearable style="width: 100px">
+                  <el-option
+                    v-for="item in options"
+                    :key="item.value"
+                    :label="item.label"
+                    :value="item.value"></el-option>
+                </el-select>
+              </div>
+              <div v-else>
+                {{ item.prop }}
+              </div>
+            </div>
+          </template>
+        </el-table-column>
 
-        <el-col class="item">
-          <el-input v-if="!suggestions" :disabled="isReadOnly" v-model="item.name" size="small" maxlength="200"
-                    @change="change" :placeholder="keyText" show-word-limit>
-            <template v-slot:prepend>
-              <el-select v-if="type === 'body'" :disabled="isReadOnly" class="kv-type" v-model="item.type"
-                         @change="typeChange(item)">
-                <el-option value="text"/>
-                <el-option value="file"/>
-                <el-option value="json"/>
-              </el-select>
-            </template>
-          </el-input>
-
-          <el-autocomplete :disabled="isReadOnly" v-if="suggestions" v-model="item.name" size="small"
-                           :fetch-suggestions="querySearch" @change="change" :placeholder="keyText" show-word-limit/>
-
-        </el-col>
-
-        <el-col class="item kv-select">
-          <el-select v-model="item.required" size="small">
-            <el-option v-for="req in requireds" :key="req.id" :label="req.name" :value="req.id"/>
-          </el-select>
-        </el-col>
-
-        <el-col class="item" v-if="isActive && item.type !== 'file'">
-          <el-autocomplete
-            :disabled="isReadOnly"
-            size="small"
-            class="input-with-autocomplete"
-            v-model="item.value"
-            :fetch-suggestions="funcSearch"
-            :placeholder="valueText"
-            value-key="name"
-            highlight-first-item
-            @select="change">
-            <i slot="suffix" class="el-input__icon el-icon-edit pointer" @click="advanced(item)"></i>
-          </el-autocomplete>
-        </el-col>
-
-
-        <el-col v-if="isActive && item.type === 'file'" class="item">
-          <ms-api-body-file-upload :parameter="item" :id="id" :is-read-only="isReadOnly"/>
-        </el-col>
-
-        <el-col v-if="type === 'body'" class="item kv-select">
-          <el-input :disabled="isReadOnly" v-model="item.contentType" size="small"
-                    @change="change" :placeholder="$t('api_test.request.content_type')" show-word-limit>
-          </el-input>
-        </el-col>
-
-        <el-col v-if="withMoreSetting" class="item kv-setting">
-          <el-tooltip effect="dark" :content="$t('schema.adv_setting')" placement="top">
-            <i class="el-icon-setting" @click="openApiVariableSetting(item)"/>
-          </el-tooltip>
-        </el-col>
-
-        <el-col class="item kv-delete">
-          <el-button size="mini" class="el-icon-delete-solid" circle @click="remove(index)"
-                     :disabled="isDisable(index) || isReadOnly"/>
-        </el-col>
-
-      </el-row>
+        <el-table-column prop="uuid" :label="$t('commons.operating')" width="140px" show-overflow-tooltip>
+          <template v-slot:default="scope">
+            <el-switch
+              size="mini"
+              style="margin-right: 5px"
+              :disabled="!(isShowEnable && !isDisable(scope.$index)) || isReadOnly"
+              v-model="scope.row.enable" />
+            <el-button
+              size="mini"
+              class="el-icon-delete-solid"
+              style="margin-right: 5px"
+              circle
+              @click="remove(scope.$index)"
+              :disabled="isDisable(scope.$index) || isReadOnly" />
+            <i
+              class="el-icon-top"
+              v-show="!(isDisable(scope.$index) || isReadOnly)"
+              style="cursor: pointer"
+              @click="moveTop(scope.$index)" />
+            <i
+              class="el-icon-bottom"
+              v-show="!(isDisable(scope.$index) || isReadOnly)"
+              style="cursor: pointer"
+              @click="moveBottom(scope.$index)" />
+          </template>
+        </el-table-column>
+      </el-table>
     </div>
-    <ms-api-variable-advance ref="variableAdvance" :environment="environment" :scenario="scenario"
-                             :append-to-body="appendDialogToBody"
-                             :parameters="parameters"
-                             :current-item="currentItem"
-                             :scenario-definition="scenarioDefinition"
-                             @advancedRefresh="reload"/>
 
-    <ms-api-variable-json :append-to-body="appendDialogToBody" ref="variableJson" @callback="callback"/>
+    <ms-api-variable-advance
+      ref="variableAdvance"
+      :environment="environment"
+      :scenario="scenario"
+      :append-to-body="appendDialogToBody"
+      :parameters="parameters"
+      :current-item="currentItem"
+      :scenario-definition="scenarioDefinition"
+      @advancedRefresh="reload" />
 
-    <api-variable-setting :append-to-body="appendDialogToBody" :suggestions="suggestions"
-                          ref="apiVariableSetting"/>
+    <ms-api-variable-json :append-to-body="appendDialogToBody" ref="variableJson" @callback="callback" />
 
+    <api-variable-setting :append-to-body="appendDialogToBody" :suggestions="suggestions" ref="apiVariableSetting" />
   </div>
 </template>
 
 <script>
-import {KeyValue, Scenario} from "../model/ApiTestModel";
-import {JMETER_FUNC, MOCKJS_FUNC} from "metersphere-frontend/src/utils/constants";
-import MsApiVariableAdvance from "./ApiVariableAdvance";
-import MsApiVariableJson from "./ApiVariableJson";
-import MsApiBodyFileUpload from "./body/ApiBodyFileUpload";
+import { KeyValue, Scenario } from '../model/ApiTestModel';
+import { JMETER_FUNC, MOCKJS_FUNC } from 'metersphere-frontend/src/utils/constants';
+import MsApiVariableAdvance from './ApiVariableAdvance';
+import MsApiVariableJson from './ApiVariableJson';
+import MsApiBodyFileUpload from './body/ApiBodyFileUpload';
 import Vue from 'vue';
-import ApiVariableSetting from "@/business/definition/components/ApiVariableSetting";
+import ApiVariableSetting from '@/business/definition/components/ApiVariableSetting';
+import { getShowFields } from 'metersphere-frontend/src/utils/custom_field';
 
 export default {
-  name: "MsApiVariable",
-  components: {ApiVariableSetting, MsApiBodyFileUpload, MsApiVariableAdvance, MsApiVariableJson},
+  name: 'MsApiVariable',
+  components: {
+    ApiVariableSetting,
+    MsApiBodyFileUpload,
+    MsApiVariableAdvance,
+    MsApiVariableJson,
+  },
   props: {
     id: String,
     urlEncode: {
       type: Boolean,
-      default: false
+      default: false,
     },
     keyPlaceholder: String,
     valuePlaceholder: String,
@@ -119,28 +213,32 @@ export default {
       type: Array,
       default() {
         return [];
-      }
+      },
     },
     rest: Array,
     environment: Object,
     scenario: Scenario,
     type: {
       type: String,
-      default: ''
+      default: '',
+    },
+    paramType: {
+      type: String,
+      default: 'request',
     },
     appendDialogToBody: {
       type: Boolean,
       default() {
         return true;
-      }
+      },
     },
     isReadOnly: {
       type: Boolean,
-      default: false
+      default: false,
     },
     isShowEnable: {
       type: Boolean,
-      default: true
+      default: true,
     },
     suggestions: Array,
     withMoreSetting: Boolean,
@@ -150,12 +248,26 @@ export default {
     return {
       currentItem: null,
       requireds: [
-        {name: this.$t('commons.selector.required'), id: true},
-        {name: this.$t('commons.selector.not_required'), id: false}
+        { name: this.$t('commons.selector.required'), id: true },
+        { name: this.$t('commons.selector.not_required'), id: false },
       ],
       isSelectAll: true,
       isActive: true,
-    }
+      paramColumns: [],
+      storageKey: 'API_PARAMS_SHOW_FIELD',
+      editRowIndex: -1,
+      tableColumnArr: [],
+      options: [
+        {
+          value: true,
+          label: this.$t('commons.yes'),
+        },
+        {
+          value: false,
+          label: this.$t('commons.no'),
+        },
+      ],
+    };
   },
   watch: {
     isSelectAll: function (to, from) {
@@ -165,16 +277,93 @@ export default {
         this.invertSelect();
       }
     },
+
+    paramColumns: {
+      handler(val) {
+        this.reload();
+      },
+      deep: true,
+    },
   },
   computed: {
     keyText() {
-      return this.keyPlaceholder || this.$t("api_test.key");
+      return this.keyPlaceholder || this.$t('api_test.key');
     },
     valueText() {
-      return this.valuePlaceholder || this.$t("api_test.value");
-    }
+      return this.valuePlaceholder || this.$t('api_test.value');
+    },
   },
   methods: {
+    closeAllTableDataEdit() {
+      this.parameters.forEach((item) => {
+        item.isEdit = false;
+      });
+    },
+    getTableMinWidth(col) {
+      if (col === 'name') {
+        return '200px';
+      } else if (col === 'value') {
+        return '300px';
+      } else if (col === 'description') {
+        return '200px';
+      } else {
+        return '120px';
+      }
+    },
+    clickRow(row, column, event) {
+      this.closeAllTableDataEdit();
+      if (!this.isReadOnly) {
+        this.$nextTick(() => {
+          this.$set(row, 'isEdit', true);
+        });
+      }
+    },
+    initTableColumn() {
+      this.tableColumnArr = [];
+      if (this.type === 'body') {
+        this.tableColumnArr.push({
+          id: 0,
+          prop: 'type',
+          label: this.$t('api_test.definition.document.request_param') + this.$t('commons.type'),
+        });
+      }
+      this.tableColumnArr.push({ id: 1, prop: 'name', label: this.$t('api_definition.document.name') });
+      this.tableColumnArr.push({ id: 3, prop: 'required', label: this.$t('api_definition.document.is_required') });
+      this.tableColumnArr.push({ id: 4, prop: 'value', label: this.$t('api_definition.document.value') });
+      if (this.type === 'body') {
+        this.tableColumnArr.push({ id: 2, prop: 'contentType', label: this.$t('api_definition.document.type') });
+      }
+      if (this.paramColumns) {
+        this.paramColumns.forEach((item) => {
+          let tableColumn = {};
+          if (item === 'MIX_LENGTH') {
+            tableColumn.id = 5;
+            tableColumn.prop = 'min';
+            tableColumn.label = this.$t('schema.minLength');
+          } else if (item === 'MAX_LENGTH') {
+            tableColumn.id = 6;
+            tableColumn.prop = 'max';
+            tableColumn.label = this.$t('schema.maxLength');
+          } else if (item === 'ENCODE') {
+            tableColumn.id = 7;
+            tableColumn.prop = 'urlEncode';
+            tableColumn.label = this.$t('commons.encode');
+          } else if (item === 'DESCRIPTION') {
+            tableColumn.id = 8;
+            tableColumn.prop = 'description';
+            tableColumn.label = this.$t('commons.description');
+          } else {
+            tableColumn = null;
+          }
+          if (tableColumn) {
+            this.tableColumnArr.push(tableColumn);
+          }
+        });
+      }
+    },
+    showColumns(columns) {
+      return this.paramColumns.indexOf(columns) >= 0;
+    },
     moveBottom(index) {
       if (this.parameters.length < 2 || index === this.parameters.length - 2) {
         return;
@@ -182,7 +371,7 @@ export default {
       let thisRow = this.parameters[index];
       let nextRow = this.parameters[index + 1];
       Vue.set(this.parameters, index + 1, thisRow);
-      Vue.set(this.parameters, index, nextRow)
+      Vue.set(this.parameters, index, nextRow);
     },
     moveTop(index) {
       if (index === 0) {
@@ -191,8 +380,7 @@ export default {
       let thisRow = this.parameters[index];
       let lastRow = this.parameters[index - 1];
       Vue.set(this.parameters, index - 1, thisRow);
-      Vue.set(this.parameters, index, lastRow)
-
+      Vue.set(this.parameters, index, lastRow);
     },
     remove: function (index) {
       // 移除整行输入控件及内容
@@ -203,7 +391,11 @@ export default {
       let isNeedCreate = true;
       let removeIndexArr = [];
       this.parameters.forEach((item, index) => {
-        if ((!item.name || item.name === '') && (!item.value || item.value === '') && (!item.files || item.files.length === 0)) {
+        if (
+          (!item.name || item.name === '') &&
+          (!item.value || item.value === '') &&
+          (!item.files || item.files.length === 0)
+        ) {
           // 多余的空行
           removeIndexArr.push(index);
         }
@@ -215,7 +407,11 @@ export default {
       }
       let removeIndex = -1;
       this.parameters.forEach((item, index) => {
-        if ((!item.name || item.name === '') && (!item.value || item.value === '') && (!item.files || item.files.length === 0)) {
+        if (
+          (!item.name || item.name === '') &&
+          (!item.value || item.value === '') &&
+          (!item.files || item.files.length === 0)
+        ) {
           // 多余的空行
           if (index !== this.parameters.length - 1) {
             removeIndex = index;
@@ -226,14 +422,24 @@ export default {
       });
 
       if (isNeedCreate) {
-        this.parameters.push(new KeyValue({
-          type: 'text',
-          enable: true,
-          urlEncode: this.urlEncode,
-          uuid: this.uuid(),
-          required: false,
-          contentType: 'text/plain'
-        }));
+        this.parameters.push(
+          new KeyValue({
+            contentType: 'text/plain',
+            description: null,
+            enable: true,
+            file: false,
+            files: null,
+            isEdit: false,
+            max: null,
+            min: null,
+            required: false,
+            type: 'text',
+            urlEncode: this.urlEncode,
+            uuid: this.uuid(),
+            valid: false,
+            value: null,
+          })
+        );
       }
       this.$emit('change', this.parameters);
       // TODO 检查key重复
@@ -248,7 +454,7 @@ export default {
     },
     createFilter(queryString) {
       return (restaurant) => {
-        return (restaurant.value.toLowerCase().indexOf(queryString.toLowerCase()) === 0);
+        return restaurant.value.toLowerCase().indexOf(queryString.toLowerCase()) === 0;
       };
     },
     funcSearch(queryString, cb) {
@@ -259,7 +465,7 @@ export default {
     },
     funcFilter(queryString) {
       return (func) => {
-        return (func.name.toLowerCase().indexOf(queryString.toLowerCase()) > -1);
+        return func.name.toLowerCase().indexOf(queryString.toLowerCase()) > -1;
       };
     },
     uuid: function () {
@@ -282,21 +488,21 @@ export default {
     },
     typeChange(item) {
       if (item.type === 'file') {
-        item.contentType = 'application/octet-stream';
+        this.$set(item, 'contentType', 'application/octet-stream');
       } else if (item.type === 'text') {
-        item.contentType = 'text/plain';
+        this.$set(item, 'contentType', 'text/plain');
       } else {
-        item.contentType = 'application/json'
+        this.$set(item, 'contentType', 'application/json');
       }
       this.reload();
     },
     selectAll() {
-      this.parameters.forEach(item => {
+      this.parameters.forEach((item) => {
         item.enable = true;
       });
     },
     invertSelect() {
-      this.parameters.forEach(item => {
+      this.parameters.forEach((item) => {
         item.enable = false;
       });
     },
@@ -315,18 +521,45 @@ export default {
     },
   },
   created() {
-    if (this.parameters.length === 0 || this.parameters[this.parameters.length - 1].name) {
-      this.parameters.push(new KeyValue({
-        type: 'text',
-        enable: true,
-        required: false,
-        urlEncode: this.urlEncode,
-        uuid: this.uuid(),
-        contentType: 'text/plain'
-      }));
+    if (this.paramType === 'response') {
+      this.storageKey = 'API_RESPONSE_PARAMS_SHOW_FIELD';
     }
-  }
-}
+    if (this.parameters.length === 0 || this.parameters[this.parameters.length - 1].name) {
+      this.parameters.push(
+        new KeyValue({
+          contentType: 'text/plain',
+          description: null,
+          enable: true,
+          file: false,
+          files: null,
+          isEdit: false,
+          max: null,
+          min: null,
+          required: false,
+          type: 'text',
+          urlEncode: this.urlEncode,
+          uuid: this.uuid(),
+          valid: false,
+          value: null,
+        })
+      );
+    }
+    let savedApiParamsShowFields = getShowFields(this.storageKey);
+    if (savedApiParamsShowFields) {
+      this.paramColumns = savedApiParamsShowFields;
+    }
+    this.parameters.forEach((item) => {
+      this.$set(item, 'isEdit', false);
+    });
+    this.initTableColumn();
+  },
+  activated() {
+    this.initTableColumn();
+  },
+  mounted() {
+    this.initTableColumn();
+  },
+};
 </script>
 
 <style scoped>
@@ -369,11 +602,20 @@ export default {
 
 .pointer {
   cursor: pointer;
-  color: #1E90FF;
+  color: #1e90ff;
 }
 
 .kv-setting {
   width: 40px;
   padding: 0px !important;
+}
+
+.param-header-span {
+  margin-bottom: 5px;
+  font-weight: 600;
+}
+
+.param-div-show {
+  min-height: 16px;
 }
 </style>

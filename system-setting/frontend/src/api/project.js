@@ -46,19 +46,14 @@ export function getAllServiceIntegration() {
   return get('/service/integration/all');
 }
 
-
-export function getJiraIssueType(param) {
-  return post('/project/issues/jira/issuetype', param);
-}
-
 export function getFieldTemplateCaseOption(projectId) {
-  return get(`/project/field/template/case/option/${projectId}`);
+  return get(projectId ? `/project/field/template/case/option/${projectId}` : `/project/field/template/case/option`);
 }
 
 export function getFieldTemplateIssueOption(projectId) {
-  return get(`/project/field/template/issue/option/${projectId}`);
+  return get(projectId ? `/project/field/template/issue/option/${projectId}` : `/project/field/template/issue/option`);
 }
 
 export function getFieldTemplateApiOption(projectId) {
-  return get(`/project/field/template/api/option/${projectId}`);
+  return get(projectId ? `/project/field/template/api/option/${projectId}` : `/project/field/template/api/option`);
 }

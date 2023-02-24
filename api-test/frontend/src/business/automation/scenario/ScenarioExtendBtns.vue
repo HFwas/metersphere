@@ -9,48 +9,48 @@
         <el-dropdown-item command="schedule" v-permission="['PROJECT_API_SCENARIO:READ+SCHEDULE']">
           {{ $t('api_test.automation.schedule') }}
         </el-dropdown-item>
-        <el-dropdown-item command="create_performance" v-permission="['PROJECT_API_SCENARIO:READ+CREATE_PERFORMANCE']"
-                          v-modules="['performance']">
+        <el-dropdown-item
+          command="create_performance"
+          v-permission="['PROJECT_API_SCENARIO:READ+CREATE_PERFORMANCE']"
+          v-modules="['performance']">
           {{ $t('api_test.create_performance_test') }}
         </el-dropdown-item>
       </el-dropdown-menu>
     </el-dropdown>
-    <ms-reference-view @openScenario="openScenario" ref="viewRef"/>
-    <ms-schedule-maintain ref="scheduleMaintain" @refreshTable="refreshTable" :request="request"/>
 
+    <ms-schedule-maintain ref="scheduleMaintain" @refreshTable="refreshTable" :request="request" />
   </div>
 </template>
 
 <script>
-import {genPerformanceTestJmx} from "@/api/scenario";
-import MsReferenceView from "@/business/automation/scenario/ReferenceView";
-import MsScheduleMaintain from "@/business/automation/schedule/ScheduleMaintain";
-import {getCurrentProjectID} from "metersphere-frontend/src/utils/token";
-import {hasPermission} from "metersphere-frontend/src/utils/permission";
-import {getUUID} from "metersphere-frontend/src/utils";
-import {usePerformanceStore} from "@/store";
+import { genPerformanceTestJmx } from '@/api/scenario';
+import MsScheduleMaintain from '@/business/automation/schedule/ScheduleMaintain';
+import { getCurrentProjectID } from 'metersphere-frontend/src/utils/token';
+import { hasPermission } from 'metersphere-frontend/src/utils/permission';
+import { getUUID } from 'metersphere-frontend/src/utils';
+import { usePerformanceStore } from '@/store';
 
 const performanceStore = usePerformanceStore();
 
 export default {
-  name: "MsScenarioExtendButtons",
-  components: {MsReferenceView, MsScheduleMaintain},
+  name: 'MsScenarioExtendButtons',
+  components: { MsScheduleMaintain },
   props: {
     row: Object,
-    request: {}
+    request: {},
   },
   methods: {
     hasPermission,
     handleCommand(cmd) {
       switch (cmd) {
-        case  "ref":
-          this.$refs.viewRef.open(this.row);
+        case 'ref':
+          this.$emit('showCaseRef', this.row);
           break;
-        case "schedule":
+        case 'schedule':
           this.$emit('openSchedule');
           this.$refs.scheduleMaintain.open(this.row);
           break;
-        case "create_performance":
+        case 'create_performance':
           this.createPerformance(this.row);
           break;
       }
@@ -68,7 +68,7 @@ export default {
       run.ids = scenarioIds;
       run.id = getUUID();
       run.name = row.name;
-      genPerformanceTestJmx(run).then(response => {
+      genPerformanceTestJmx(run).then((response) => {
         let jmxInfo = response.data.jmxInfoDTO;
         if (jmxInfo) {
           let projectEnvMap = response.data.projectEnvMap;
@@ -78,11 +78,12 @@ export default {
           jmxObj.attachFiles = jmxInfo.attachFiles;
           jmxObj.attachByteFiles = jmxInfo.attachByteFiles;
           jmxObj.scenarioId = row.id;
+          jmxObj.caseId = null;
           jmxObj.version = row.version;
           jmxObj.projectEnvMap = projectEnvMap;
-          performanceStore.$patch({'test': {name: row.name, jmx: jmxObj}});
+          performanceStore.$patch({ test: { name: row.name, jmx: jmxObj }, scenarioJmxs: null });
           this.$router.push({
-            path: "/performance/test/create"
+            path: '/performance/test/create',
           });
         }
       });
@@ -90,10 +91,8 @@ export default {
     openScenario(item) {
       this.$emit('openScenario', item);
     },
-    refreshTable() {
-
-    },
-  }
+    refreshTable() {},
+  },
 };
 </script>
 

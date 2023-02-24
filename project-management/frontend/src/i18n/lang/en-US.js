@@ -6,6 +6,7 @@ const message = {
   pj: {
     environment_import_repeat_tip: "(Environment configuration with the same name filtered {0})",
     check_third_project_success: "inspection passed",
+    api_run_pool_title: 'Interface execution resource pool',
   },
   file_manage: {
     my_file: 'My File',
@@ -34,6 +35,15 @@ const message = {
   },
   project_version: {
     version_time: 'Version cycle',
+  },
+  environment: {
+    export_variable_tip : "Export interface test variables",
+    need_expire_time : "Please enter an expiration time",
+    need_relevance_ui_scenario : "Please associate the login scenario",
+    view_ui_relevane : "View Relevane",
+    cancel_ui_relevane : "Relevant",
+    re_ui_relevane : "Relevane",
+    relevance_ui : "Relevance login scene/command",
   }
 }
 

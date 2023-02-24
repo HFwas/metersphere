@@ -8,6 +8,7 @@ public class ShiroUtils {
 
         filterChainDefinitionMap.put("/resource/md/get/**", "anon");
         filterChainDefinitionMap.put("/resource/ui/get/**", "anon");
+        filterChainDefinitionMap.put("/platform/plugin/resource/**", "anon");
         filterChainDefinitionMap.put("/attachment/preview/**", "anon");
         filterChainDefinitionMap.put("/*.worker.js", "anon");
         filterChainDefinitionMap.put("/*.html", "anon");
@@ -36,7 +37,9 @@ public class ShiroUtils {
         filterChainDefinitionMap.put("/api/jmeter/download", "anon");
         filterChainDefinitionMap.put("/api/jmeter/download/files", "anon");
         filterChainDefinitionMap.put("/api/jmeter/download/jar", "anon");
+        filterChainDefinitionMap.put("/api/jmeter/download/jar/**", "anon");
         filterChainDefinitionMap.put("/api/jmeter/download/plug/jar", "anon");
+        filterChainDefinitionMap.put("/api/jmeter/get-script", "anon");
 
         // for swagger
         filterChainDefinitionMap.put("/swagger-ui.html", "anon");

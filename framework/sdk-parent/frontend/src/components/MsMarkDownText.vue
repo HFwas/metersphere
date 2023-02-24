@@ -1,5 +1,5 @@
 <template>
-  <mavon-editor :id="id" :editable="!disabled" @imgAdd="imgAdd" :default-open="defaultOpenValue"
+  <mavon-editor v-loading="loading" :id="id" :editable="!disabled" @imgAdd="imgAdd" :default-open="defaultOpenValue"
                 :xss-options="xssOptions" :style="{'min-height': customMinHeight + 'px', 'min-width': '100px'}"
                 @change="change" :image-click="imageClick"
                 :subfield="false" :toolbars="toolbars" :language="language" :toolbarsFlag="!disabled"
@@ -80,7 +80,7 @@ export default {
   },
   data() {
     return {
-      result: {loading: false},
+      loading: false,
       id: getUUID(),
       xssOptions: {
         whiteList: {
@@ -183,13 +183,13 @@ export default {
   },
   methods: {
     imgAdd(pos, file) {
-      this.result.loading = true;
+      this.loading = true;
       uploadMarkDownImg(file)
         .then((r) => {
           this.$success(this.$t('commons.save_success'));
           let url = '/resource/md/get?fileName=' + r.data;
           this.$refs.md.$img2Url(pos, url);
-          this.result.loading = false;
+          this.loading = false;
         });
       this.$emit('imgAdd', file);
     },
@@ -217,11 +217,11 @@ export default {
       let imgTag = document.createElement("img");
       imgTag.src = url;
       imgTag.classList.add("el-image-viewer__img");
-      imgTag.style.transformStyle = "scale(1) rotate(0deg)";
-      imgTag.style.marginLeft = "0px";
-      imgTag.style.marginTop = "0px";
+      imgTag.style.marginLeft = "10px";
+      imgTag.style.marginTop = "10px";
       imgTag.style.maxHeight = "100%";
       imgTag.style.maxWidth = "100%";
+      imgTag.style['transform'] = 'scale(1) rotate(0deg)';
       // 创建el-image-viewer__canvas元素div
       let canvas = document.createElement("div");
       canvas.classList.add("el-image-viewer__canvas");
@@ -243,8 +243,8 @@ export default {
       wrap.addEventListener("click", function () {
         wrap.remove();
       });
-      wrap.appendChild(canvas);
       wrap.appendChild(mask);
+      wrap.appendChild(canvas);
       // 获取body的第一个子节点
       let first = document.body.firstChild;
       // 将div插入
@@ -272,5 +272,4 @@ export default {
 :deep(.v-note-op .v-left-item.transition .add-image-link-wrapper .add-image-link .op-btn.sure) {
   background: #783887;
 }
-
 </style>

@@ -34,6 +34,7 @@ import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.bind.annotation.PathVariable;
 
 import javax.annotation.Resource;
 import java.util.*;
@@ -352,6 +353,15 @@ public class TestPlanLoadCaseService {
         testPlanLoadCaseMapper.deleteByExample(example);
     }
 
+    public void deleteByPlanIds(List<String> planIds) {
+        if (CollectionUtils.isEmpty(planIds)) {
+            return;
+        }
+        TestPlanLoadCaseExample example = new TestPlanLoadCaseExample();
+        example.createCriteria().andTestPlanIdIn(planIds);
+        testPlanLoadCaseMapper.deleteByExample(example);
+    }
+
 
     public List<TestPlanLoadCaseDTO> getAllCases(String planId) {
         List<TestPlanLoadCaseDTO> cases = extTestPlanLoadCaseMapper.getCases(planId, null);
@@ -397,6 +407,17 @@ public class TestPlanLoadCaseService {
         TestPlanLoadCaseWithBLOBs testPlanLoadCase = testPlanLoadCaseMapper.selectByPrimaryKey(loadCaseId);
         if (testPlanLoadCase != null) {
             return testPlanLoadCase.getLoadConfiguration();
+        }
+        return StringUtils.EMPTY;
+    }
+
+    public String getPlanLoadCaseResourcePoolId(String loadReportId) {
+        if (StringUtils.isBlank(loadReportId)) {
+            return StringUtils.EMPTY;
+        }
+        LoadTestReportWithBLOBs loadCases = loadTestReportMapper.selectByPrimaryKey(loadReportId);
+        if (loadCases != null) {
+            return loadCases.getTestResourcePoolId();
         }
         return StringUtils.EMPTY;
     }

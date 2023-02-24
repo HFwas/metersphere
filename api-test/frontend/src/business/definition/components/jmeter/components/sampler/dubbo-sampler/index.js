@@ -1,21 +1,21 @@
-import Sampler from "../sampler";
-import {ConfigCenter, ConsumerAndService, RegistryCenter} from "../../../../../model/ApiTestModel";
+import Sampler from '../sampler';
+import { ConfigCenter, ConsumerAndService, RegistryCenter } from '../../../../../model/ApiTestModel';
 
 const DEFAULT_OPTIONS = {
   options: {
     attributes: {
-      enabled: "true"
+      enabled: 'true',
     },
-  }
+  },
 };
 export default class DubboSampler extends Sampler {
   static PROTOCOLS = {
-    DUBBO: "dubbo://",
-    RMI: "rmi://",
-  }
+    DUBBO: 'dubbo://',
+    RMI: 'rmi://',
+  };
   constructor(options = DEFAULT_OPTIONS) {
     super(options);
-    this.type = "DubboSampler";
+    this.type = 'DubboSampler';
     this.hashTree = [];
     this.protocol = options.protocol || DubboSampler.PROTOCOLS.DUBBO;
     this.interface = options.interface;
@@ -31,5 +31,5 @@ export default class DubboSampler extends Sampler {
 }
 
 export const schema = {
-  DubboSampler: DubboSampler
-}
+  DubboSampler: DubboSampler,
+};

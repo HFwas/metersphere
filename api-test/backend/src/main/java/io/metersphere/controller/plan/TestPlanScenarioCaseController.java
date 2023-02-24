@@ -175,6 +175,11 @@ public class TestPlanScenarioCaseController {
         return testPlanScenarioCaseService.getApiScenarioEnv(planId);
     }
 
+    @GetMapping("/get/project/ids/{planId}")
+    public List<String> getApiScenarioProjectIds(@PathVariable("planId") String planId) {
+        return testPlanScenarioCaseService.getApiScenarioProjectIds(planId);
+    }
+
     @PostMapping("/plan/report")
     public ApiPlanReportDTO buildApiReport(@RequestBody ApiPlanReportRequest request) {
         return testPlanScenarioCaseService.buildApiReport(request);
@@ -183,11 +188,6 @@ public class TestPlanScenarioCaseController {
     @PostMapping("/plan/execute/report")
     public ApiPlanReportDTO buildExecuteApiReport(@RequestBody ApiPlanReportRequest request) {
         return testPlanScenarioCaseService.buildExecuteApiReport(request);
-    }
-
-    @PostMapping("/plan/report/schedule/info/{planId}")
-    public TestPlanApiReportInfoDTO genApiReportInfoForSchedule(@PathVariable("planId") String planId, @RequestBody RunModeConfigDTO runModeConfigDTO) {
-        return testPlanScenarioCaseService.genApiReportInfoForSchedule(planId, runModeConfigDTO);
     }
 
     @GetMapping("/is/executing/{planId}")
@@ -230,6 +230,7 @@ public class TestPlanScenarioCaseController {
     public Map<String, List<String>> getPlanProjectEnvMap(@RequestBody List<String> resourceIds) {
         return testPlanScenarioCaseService.getPlanProjectEnvMap(resourceIds);
     }
+
     @GetMapping("/get-scenario-id/{id}")
     public String getScenarioId(@PathVariable("id") String planScenarioId) {
         return testPlanScenarioCaseService.getScenarioId(planScenarioId);

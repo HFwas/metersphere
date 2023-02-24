@@ -15,7 +15,9 @@ import io.metersphere.base.mapper.ext.ExtApiScenarioReportMapper;
 import io.metersphere.base.mapper.ext.ExtApiScenarioReportResultMapper;
 import io.metersphere.base.mapper.plan.TestPlanApiScenarioMapper;
 import io.metersphere.commons.constants.*;
+import io.metersphere.commons.enums.ApiHomeFilterEnum;
 import io.metersphere.commons.enums.ApiReportStatus;
+import io.metersphere.commons.enums.ExecutionExecuteTypeEnum;
 import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.utils.*;
 import io.metersphere.commons.vo.ResultVO;
@@ -28,6 +30,7 @@ import io.metersphere.log.vo.OperatingLogDetails;
 import io.metersphere.log.vo.api.ModuleReference;
 import io.metersphere.notice.sender.NoticeModel;
 import io.metersphere.notice.service.NoticeSendService;
+import io.metersphere.service.BaseShareInfoService;
 import io.metersphere.service.BaseUserService;
 import io.metersphere.service.ServiceUtils;
 import io.metersphere.service.SystemParameterService;
@@ -84,6 +87,8 @@ public class ApiScenarioReportService {
     private BaseUserService userService;
     @Resource
     private TestPlanApiScenarioMapper testPlanApiScenarioMapper;
+    @Resource
+    BaseShareInfoService baseShareInfoService;
 
     public void saveResult(ResultDTO dto) {
         // 报告详情内容
@@ -92,25 +97,6 @@ public class ApiScenarioReportService {
 
     public void batchSaveResult(List<ResultDTO> dtos) {
         apiScenarioReportResultService.batchSave(dtos);
-    }
-
-
-    public ApiScenarioReport testEnded(ResultDTO dto) {
-        if (!StringUtils.equals(dto.getReportType(), RunModeConstants.SET_REPORT.toString())) {
-            // 更新控制台信息
-            apiScenarioReportStructureService.update(dto.getReportId(), dto.getConsole(), false);
-        }
-        // 优化当前执行携带结果作为状态判断依据
-        ApiScenarioReport scenarioReport;
-        if (StringUtils.equals(dto.getRunMode(), ApiRunMode.SCENARIO_PLAN.name())) {
-            scenarioReport = updatePlanCase(dto);
-        } else if (StringUtils.equalsAny(dto.getRunMode(), ApiRunMode.SCHEDULE_SCENARIO_PLAN.name(), ApiRunMode.JENKINS_SCENARIO_PLAN.name())) {
-            scenarioReport = updateSchedulePlanCase(dto);
-        } else {
-            scenarioReport = updateScenario(dto);
-        }
-        // 串行队列
-        return scenarioReport;
     }
 
     public ApiScenarioReportResult get(String reportId, boolean selectReportContent) {
@@ -146,6 +132,7 @@ public class ApiScenarioReportService {
             reportResult.setTestId(reportId);
             ApiScenarioReportDTO dto = apiScenarioReportStructureService.apiIntegratedReport(reportId);
             apiScenarioReportStructureService.initProjectEnvironmentByEnvConfig(dto, result.getEnvConfig());
+            apiScenarioReportStructureService.getEnvConfig(dto, result.getEnvConfig());
             reportResult.setContent(JSON.toJSONString(dto));
             return reportResult;
         }
@@ -173,6 +160,43 @@ public class ApiScenarioReportService {
                     && request.getFilters().get(CommonConstants.TRIGGER_MODE).contains("API")
                     && !request.getFilters().get(CommonConstants.TRIGGER_MODE).contains(ReportTriggerMode.JENKINS_RUN_TEST_PLAN.name())) {
                 request.getFilters().get(CommonConstants.TRIGGER_MODE).add(ReportTriggerMode.JENKINS_RUN_TEST_PLAN.name());
+            }
+
+            if (StringUtils.startsWith(request.getSelectDataRange(), "scheduleExecution")) {
+                if (request.getFilters() == null) {
+                    request.setFilters(new HashMap<>() {{
+                        this.put(CommonConstants.TRIGGER_MODE, new ArrayList<>() {{
+                            this.add(ReportTriggerMode.SCHEDULE.name());
+                        }});
+                    }});
+                } else {
+                    if (request.getFilters().containsKey(CommonConstants.TRIGGER_MODE)
+                            && request.getFilters().get(CommonConstants.TRIGGER_MODE).contains(ReportTriggerMode.SCHEDULE.name())) {
+                        request.getFilters().get(CommonConstants.TRIGGER_MODE).add(ReportTriggerMode.SCHEDULE.name());
+                    } else {
+                        request.getFilters().put(CommonConstants.TRIGGER_MODE, new ArrayList<>() {{
+                            this.add(ReportTriggerMode.SCHEDULE.name());
+                        }});
+                    }
+                }
+                List<String> statusList = request.getFilters().get(CommonConstants.STATUS);
+                if (statusList == null) {
+                    statusList = new ArrayList<>();
+                }
+                switch (request.getSelectDataRange()) {
+                    case ApiHomeFilterEnum.SCHEDULE_EXECUTION_PASS:
+                        statusList.add(ApiReportStatus.SUCCESS.name());
+                        break;
+                    case ApiHomeFilterEnum.SCHEDULE_EXECUTION_FAKE_ERROR:
+                        statusList.add(ApiReportStatus.FAKE_ERROR.name());
+                        break;
+                    case ApiHomeFilterEnum.SCHEDULE_EXECUTION_FAILED:
+                        statusList.add(ApiReportStatus.ERROR.name());
+                        break;
+                }
+                if (CollectionUtils.isNotEmpty(statusList)) {
+                    request.getFilters().put(CommonConstants.STATUS, statusList);
+                }
             }
         }
         return request;
@@ -225,7 +249,7 @@ public class ApiScenarioReportService {
         report.setProjectId(projectId);
         report.setScenarioName(scenarioNames);
         report.setScenarioId(scenarioIds);
-        if (StringUtils.isNotEmpty(report.getTriggerMode()) && report.getTriggerMode().equals("CASE")) {
+        if (StringUtils.isNotEmpty(report.getTriggerMode()) && report.getTriggerMode().equals(CommonConstants.CASE)) {
             report.setTriggerMode(TriggerMode.MANUAL.name());
         }
         apiScenarioReportMapper.insert(report);
@@ -241,14 +265,14 @@ public class ApiScenarioReportService {
         if (StringUtils.equals(reportType, RunModeConstants.SET_REPORT.toString())) {
             return report;
         }
-        if (StringUtils.equals(runMode, "CASE")) {
+        if (StringUtils.equals(runMode, CommonConstants.CASE)) {
             report.setTriggerMode(TriggerMode.MANUAL.name());
         }
         report.setStatus(status);
         report.setName(report.getScenarioName() + "-" + DateUtils.getTimeStr(System.currentTimeMillis()));
         report.setEndTime(System.currentTimeMillis());
         report.setUpdateTime(System.currentTimeMillis());
-        if (StringUtils.isNotEmpty(report.getTriggerMode()) && report.getTriggerMode().equals("CASE")) {
+        if (StringUtils.isNotEmpty(report.getTriggerMode()) && report.getTriggerMode().equals(CommonConstants.CASE)) {
             report.setTriggerMode(TriggerMode.MANUAL.name());
         }
         apiScenarioReportMapper.updateByPrimaryKeySelective(report);
@@ -270,7 +294,7 @@ public class ApiScenarioReportService {
         report.setStatus(test.getStatus());
         report.setUserId(test.getUserId());
         report.setExecuteType(test.getExecuteType());
-        if (StringUtils.isNotEmpty(report.getTriggerMode()) && report.getTriggerMode().equals("CASE")) {
+        if (StringUtils.isNotEmpty(report.getTriggerMode()) && report.getTriggerMode().equals(CommonConstants.CASE)) {
             report.setTriggerMode(TriggerMode.MANUAL.name());
         }
         apiScenarioReportMapper.updateByPrimaryKeySelective(report);
@@ -401,7 +425,7 @@ public class ApiScenarioReportService {
                 // 更新报告
                 apiScenarioReportMapper.updateByPrimaryKey(report);
                 //场景集合报告，按照集合报告的结果作为场景的最后执行结果
-                scenarioExecutionInfoService.insertExecutionInfoByScenarioIds(report.getScenarioId(), report.getStatus(), report.getTriggerMode());
+                scenarioExecutionInfoService.insertExecutionInfoByScenarioIds(report.getScenarioId(), report.getStatus(), report.getTriggerMode(), report.getProjectId(), ExecutionExecuteTypeEnum.BASIC.name());
                 isActuator = !StringUtils.equals(report.getActuator(), StorageConstants.LOCAL.name());
             }
         }
@@ -412,34 +436,6 @@ public class ApiScenarioReportService {
         }
         // 更新控制台信息
         FixedCapacityUtil.remove(reportId);
-    }
-
-    public ApiScenarioReport updateScenario(ResultDTO dto) {
-        // 更新报告状态
-        ResultVO resultVO = ReportStatusUtil.computedProcess(dto);
-        ApiScenarioReport report = editReport(dto.getReportType(), dto.getReportId(), resultVO.getStatus(), dto.getRunMode());
-        // 更新场景状态
-        ApiScenarioWithBLOBs scenario = apiScenarioMapper.selectByPrimaryKey(dto.getTestId());
-        if (scenario == null) {
-            scenario = apiScenarioMapper.selectByPrimaryKey(report.getScenarioId());
-        }
-        if (scenario != null) {
-            scenario.setLastResult(resultVO.getStatus());
-            scenario.setPassRate(resultVO.computerPassRate());
-            scenario.setReportId(dto.getReportId());
-            int executeTimes = 0;
-            if (scenario.getExecuteTimes() != null) {
-                executeTimes = scenario.getExecuteTimes().intValue();
-            }
-            scenario.setExecuteTimes(executeTimes + 1);
-            apiScenarioMapper.updateByPrimaryKey(scenario);
-        }
-
-        // 发送通知
-        if (scenario != null && report != null) {
-            sendNotice(scenario, report);
-        }
-        return report;
     }
 
     public String getEnvironment(ApiScenarioWithBLOBs apiScenario) {
@@ -469,7 +465,7 @@ public class ApiScenarioReportService {
         return environment;
     }
 
-    private void sendNotice(ApiScenarioWithBLOBs scenario, ApiScenarioReport result) {
+    public void sendNotice(ApiScenarioWithBLOBs scenario, ApiScenarioReport result) {
 
         BeanMap beanMap = new BeanMap(scenario);
 
@@ -493,11 +489,22 @@ public class ApiScenarioReportService {
         BaseSystemConfigDTO baseSystemConfigDTO = systemParameterService.getBaseInfo();
         String reportUrl = baseSystemConfigDTO.getUrl() + "/#/api/automation/report/view/" + result.getId();
         paramMap.put("reportUrl", reportUrl);
+        String shareUrl = getScenarioShareUrl(result.getId(), userId);
+        paramMap.put("scenarioShareUrl", baseSystemConfigDTO.getUrl() + "/api/share-api-report" + shareUrl);
         String context = "${operator}执行接口自动化" + status + ": ${name}";
         NoticeModel noticeModel = NoticeModel.builder().operator(userId).context(context).subject("接口自动化通知").paramMap(paramMap).event(event).build();
 
         Project project = projectMapper.selectByPrimaryKey(scenario.getProjectId());
         noticeSendService.send(project, NoticeConstants.TaskType.API_AUTOMATION_TASK, noticeModel);
+    }
+
+    public String getScenarioShareUrl(String scenarioReportId, String userId) {
+        ShareInfo shareRequest = new ShareInfo();
+        shareRequest.setCustomData(scenarioReportId);
+        shareRequest.setShareType(ShareType.API_REPORT.name());
+        shareRequest.setCreateUserId(userId);
+        ShareInfo shareInfo = baseShareInfoService.generateShareInfo(shareRequest);
+        return baseShareInfoService.conversionShareInfoToDTO(shareInfo).getShareUrl();
     }
 
     public String update(ApiScenarioReportResult test) {
@@ -679,7 +686,7 @@ public class ApiScenarioReportService {
         return ids;
     }
 
-    public long countByProjectIdAndCreateAndByScheduleInThisWeek(String projectId) {
+    public long countByProjectIdAndCreateAndByScheduleInThisWeek(String projectId, String executeType, String version) {
         Map<String, Date> startAndEndDateInWeek = DateUtils.getWeedFirstTimeAndLastTime(new Date());
 
         Date firstTime = startAndEndDateInWeek.get("firstTime");
@@ -688,11 +695,11 @@ public class ApiScenarioReportService {
         if (firstTime == null || lastTime == null) {
             return 0;
         } else {
-            return extApiScenarioReportMapper.countByProjectIdAndCreateAndByScheduleInThisWeek(projectId, firstTime.getTime(), lastTime.getTime());
+            return extApiScenarioReportMapper.countByProjectIdAndCreateAndByScheduleInThisWeek(projectId, executeType, version, firstTime.getTime(), lastTime.getTime());
         }
     }
 
-    public long countByProjectIdAndCreateInThisWeek(String projectId) {
+    public long countByProjectIdAndCreateInThisWeek(String projectId, String executeType, String version) {
         Map<String, Date> startAndEndDateInWeek = DateUtils.getWeedFirstTimeAndLastTime(new Date());
 
         Date firstTime = startAndEndDateInWeek.get("firstTime");
@@ -701,12 +708,12 @@ public class ApiScenarioReportService {
         if (firstTime == null || lastTime == null) {
             return 0;
         } else {
-            return extApiScenarioReportMapper.countByProjectIdAndCreateInThisWeek(projectId, firstTime.getTime(), lastTime.getTime());
+            return extApiScenarioReportMapper.countByProjectIdAndCreateInThisWeek(projectId, executeType, version, firstTime.getTime(), lastTime.getTime());
         }
     }
 
-    public List<ApiDataCountResult> countByProjectIdGroupByExecuteResult(String projectId) {
-        return extApiScenarioReportMapper.countByProjectIdGroupByExecuteResult(projectId);
+    public List<ApiDataCountResult> countByProjectIdGroupByExecuteResult(String projectId, String version) {
+        return extApiScenarioReportMapper.countByProjectIdGroupByExecuteResult(projectId, version);
     }
 
     public List<ApiScenarioReport> selectLastReportByIds(List<String> ids) {
@@ -797,7 +804,7 @@ public class ApiScenarioReportService {
         if (initModel.getConfig() != null && StringUtils.isNotBlank(initModel.getConfig().getResourcePoolId())) {
             report.setActuator(initModel.getConfig().getResourcePoolId());
         } else {
-            report.setActuator("LOCAL");
+            report.setActuator(StorageEnums.LOCAL.name());
         }
         report.setTriggerMode(initModel.getTriggerMode());
         report.setReportVersion(2);

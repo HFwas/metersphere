@@ -9,13 +9,14 @@
     <el-tag size="mini" type="danger" v-else-if="getStatus(status) === 'error'">
       {{ showStatus(status) }}
     </el-tag>
-    <el-tag size="mini" type="danger" style="background-color: #F6972A; color: #FFFFFF"
-            v-else-if="getStatus(status) === 'fake_error'">
+    <el-tag
+      size="mini"
+      type="danger"
+      style="background-color: #f6972a; color: #ffffff"
+      v-else-if="getStatus(status) === 'fake_error'">
       FakeError
     </el-tag>
-    <span v-else-if="status === '-'" size="mini" type="info">
-      -
-    </span>
+    <span v-else-if="status === '-'" size="mini" type="info"> - </span>
     <el-tag v-else size="mini" type="info">
       {{ showStatus(status) }}
     </el-tag>
@@ -24,28 +25,26 @@
 
 <script>
 export default {
-  name: "MsApiReportStatus",
+  name: 'MsApiReportStatus',
 
   props: {
-    status: String
+    status: String,
   },
   methods: {
     getStatus(status) {
       if (status) {
         return status.toLowerCase();
       }
-      return "PENDING";
+      return 'PENDING';
     },
     showStatus(status) {
       if (!status) {
         status = 'PENDING';
       }
       return status.toLowerCase()[0].toUpperCase() + status.toLowerCase().substr(1);
-    }
-  }
-}
+    },
+  },
+};
 </script>
 
-<style scoped>
-
-</style>
+<style scoped></style>

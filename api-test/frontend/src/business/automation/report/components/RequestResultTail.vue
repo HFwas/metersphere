@@ -24,15 +24,28 @@
       <div v-show="isActive">
         <el-tabs v-model="activeName" v-show="isActive" v-if="hasSub">
           <el-tab-pane :label="$t('api_report.sub_result')" name="sub">
-            <ms-request-sub-result class="sub-result" v-for="(sub, index) in request.subRequestResults"
-                                   :key="index" :indexNumber="index" :request="sub"/>
+            <ms-request-sub-result
+              class="sub-result"
+              v-for="(sub, index) in request.subRequestResults"
+              :key="index"
+              :indexNumber="index"
+              :request="sub" />
           </el-tab-pane>
           <el-tab-pane :label="$t('api_report.request_result')" name="result">
-            <ms-response-text :console="console" :request-type="requestType" :response="request.responseResult" :request="request"/>
+            <ms-response-text
+              :console="console"
+              :request-type="requestType"
+              :response="request.responseResult"
+              :request="request" />
           </el-tab-pane>
         </el-tabs>
         <div v-else>
-          <ms-response-text :console="console" :request-type="requestType" v-if="isCodeEditAlive" :response="request.responseResult" :request="request"/>
+          <ms-response-text
+            :console="console"
+            :request-type="requestType"
+            v-if="isCodeEditAlive"
+            :response="request.responseResult"
+            :request="request" />
         </div>
       </div>
     </el-collapse-transition>
@@ -40,16 +53,23 @@
 </template>
 
 <script>
-import MsRequestMetric from "./RequestMetric";
-import MsAssertionResults from "./AssertionResults";
-import MsRequestText from "./RequestText";
-import MsResponseText from "./ResponseText";
-import MsRequestResult from "./RequestResult";
-import MsRequestSubResult from "./RequestSubResult";
+import MsRequestMetric from './RequestMetric';
+import MsAssertionResults from './AssertionResults';
+import MsRequestText from './RequestText';
+import MsResponseText from './ResponseText';
+import MsRequestResult from './RequestResult';
+import MsRequestSubResult from './RequestSubResult';
 
 export default {
-  name: "MsRequestResultTail",
-  components: {MsResponseText, MsRequestText, MsAssertionResults, MsRequestMetric, MsRequestResult, MsRequestSubResult},
+  name: 'MsRequestResultTail',
+  components: {
+    MsResponseText,
+    MsRequestText,
+    MsAssertionResults,
+    MsRequestMetric,
+    MsRequestResult,
+    MsRequestSubResult,
+  },
   props: {
     request: Object,
     scenarioName: String,
@@ -60,9 +80,9 @@ export default {
   data() {
     return {
       isActive: true,
-      activeName: "sub",
-      isCodeEditAlive: true
-    }
+      activeName: 'sub',
+      isCodeEditAlive: true,
+    };
   },
 
   methods: {
@@ -72,24 +92,24 @@ export default {
     reload() {
       this.isCodeEditAlive = false;
       this.$nextTick(() => (this.isCodeEditAlive = true));
-    }
+    },
   },
 
   watch: {
     'request.responseResult'() {
       this.reload();
-    }
+    },
   },
 
   computed: {
     assertion() {
-      return this.request.passAssertions + " / " + this.request.totalAssertions;
+      return this.request.passAssertions + ' / ' + this.request.totalAssertions;
     },
     hasSub() {
       return this.request.subRequestResults.length > 0;
     },
-  }
-}
+  },
+};
 </script>
 
 <style scoped>
@@ -100,13 +120,13 @@ export default {
 }
 
 .request-result .info {
-  background-color: #F9F9F9;
+  background-color: #f9f9f9;
   margin-left: 20px;
   cursor: pointer;
 }
 
 .request-result .method {
-  color: #1E90FF;
+  color: #1e90ff;
   font-size: 14px;
   font-weight: 500;
   line-height: 40px;
@@ -134,20 +154,19 @@ export default {
 }
 
 .sub-result .info {
-  background-color: #FFF;
+  background-color: #fff;
 }
 
 .sub-result .method {
-  border-left: 5px solid #1E90FF;
+  border-left: 5px solid #1e90ff;
   padding-left: 20px;
 }
 
 .sub-result:last-child {
-  border-bottom: 1px solid #EBEEF5;
+  border-bottom: 1px solid #ebeef5;
 }
 
 .request-result .icon.is-active {
   transform: rotate(90deg);
 }
-
 </style>

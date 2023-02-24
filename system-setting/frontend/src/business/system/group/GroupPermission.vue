@@ -1,12 +1,11 @@
 <template>
   <div>
     <span v-for="(permission, index) in permissions" :key="index">
-      <el-checkbox v-if="permission.license" v-xpack class="permission-checkbox"
-                   v-model="permission['checked']" @change="change($event, permission)" :disabled="readOnly">
-        {{ $t(permission.name) }}
-      </el-checkbox>
-      <el-checkbox v-else class="permission-checkbox"
-                   v-model="permission['checked']" @change="change($event, permission)" :disabled="isReadOnly(permission)">
+      <el-checkbox
+        class="permission-checkbox"
+        v-model="permission['checked']"
+        @change="change($event, permission)"
+        :disabled="isReadOnly(permission)">
         {{ $t(permission.name) }}
       </el-checkbox>
     </span>
@@ -14,19 +13,21 @@
 </template>
 
 <script>
+import {SUPER_GROUP} from 'metersphere-frontend/src/utils/constants';
+
 export default {
   name: "GroupPermission",
   props: {
     permissions: {
       type: Array,
       default() {
-        return []
+        return [];
       }
     },
     selected: {
       type: Array,
       default() {
-        return []
+        return [];
       }
     },
     readOnly: {
@@ -45,7 +46,11 @@ export default {
   computed: {
     isReadOnly() {
       return function (permission) {
-        // 禁止取消系统管理员用户组的读取和设置权限
+        // 禁止取消系统管理员用户组权限
+        if (this.group.id === SUPER_GROUP) {
+          return true;
+        }
+        // 禁止取消系统管理员用户组和超级管理员用户组的读取和设置权限
         const isSystemGroupPermission = permission.id === 'SYSTEM_GROUP:READ' || permission.id === 'SYSTEM_GROUP:READ+SETTING_PERMISSION';
         const isDefaultSystemGroup = this.group.id === 'admin' && isSystemGroupPermission;
         return this.readOnly || isDefaultSystemGroup;

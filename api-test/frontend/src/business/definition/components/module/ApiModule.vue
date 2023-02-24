@@ -22,7 +22,6 @@
       :update-permission="['PROJECT_API_DEFINITION:READ+EDIT_API']"
       @nodeSelectEvent="nodeChange"
       ref="nodeTree">
-
       <template v-slot:header>
         <api-module-header
           :show-operator="showOperator"
@@ -39,7 +38,7 @@
           @refreshTable="$emit('refreshTable')"
           @schedule="$emit('schedule')"
           @refresh="refresh"
-          @debug="debug"/>
+          @debug="debug" />
       </template>
     </ms-node-tree>
   </div>
@@ -53,16 +52,16 @@ import {
   getApiModuleByTrash,
   getApiModules,
   getUserDefaultApiType,
-  posModule
-} from "@/api/definition-module";
-import MsAddBasisApi from "../basis/AddBasisApi";
-import SelectMenu from "@/business/commons/SelectMenu";
-import {OPTIONS} from "../../model/JsonData";
-import ApiImport from "../import/ApiImport";
-import MsNodeTree from "@/business/commons/NodeTree";
-import ApiModuleHeader from "./ApiModuleHeader";
-import {buildTree} from "metersphere-frontend/src/model/NodeTree";
-import {getCurrentProjectID} from "metersphere-frontend/src/utils/token";
+  posModule, postApiModuleByTrash, postApiModules,
+} from '@/api/definition-module';
+import MsAddBasisApi from '../basis/AddBasisApi';
+import SelectMenu from '@/business/commons/SelectMenu';
+import { OPTIONS } from '../../model/JsonData';
+import ApiImport from '../import/ApiImport';
+import MsNodeTree from '@/business/commons/NodeTree';
+import ApiModuleHeader from './ApiModuleHeader';
+import { buildTree } from 'metersphere-frontend/src/model/NodeTree';
+import { getCurrentProjectID } from 'metersphere-frontend/src/utils/token';
 
 export default {
   name: 'MsApiModule',
@@ -71,7 +70,7 @@ export default {
     MsNodeTree,
     MsAddBasisApi,
     SelectMenu,
-    ApiImport
+    ApiImport,
   },
   data() {
     return {
@@ -79,32 +78,33 @@ export default {
       refreshDataOver: true,
       condition: {
         protocol: OPTIONS[0].value,
-        filterText: "",
-        trashEnable: false
+        filterText: '',
+        trashEnable: false,
       },
       data: [],
       currentModule: {},
-    }
+      param: {},
+    };
   },
   props: {
     isReadOnly: {
       type: Boolean,
       default() {
         return false;
-      }
+      },
     },
     defaultProtocol: String,
     showCaseNum: {
       type: Boolean,
       default() {
         return true;
-      }
+      },
     },
     isTrashData: {
       type: Boolean,
       default() {
         return false;
-      }
+      },
     },
     showOperator: Boolean,
     currentVersion: String,
@@ -118,7 +118,7 @@ export default {
       type: Array,
       default() {
         return OPTIONS;
-      }
+      },
     },
     selectProjectId: {
       type: String,
@@ -128,8 +128,8 @@ export default {
         } else {
           return getCurrentProjectID();
         }
-      }
-    }
+      },
+    },
   },
   computed: {
     isRelevanceModel() {
@@ -141,7 +141,7 @@ export default {
       } else {
         return getCurrentProjectID();
       }
-    }
+    },
   },
   mounted() {
     this.initProtocol();
@@ -156,6 +156,7 @@ export default {
       this.list();
     },
     'condition.trashEnable'() {
+      this.param = {};
       this.$emit('enableTrash', this.condition.trashEnable);
     },
     relevanceProjectId() {
@@ -165,6 +166,7 @@ export default {
       this.list();
     },
     isTrashData() {
+      this.param = {};
       this.condition.trashEnable = this.isTrashData;
       this.list();
     },
@@ -172,7 +174,19 @@ export default {
       if (this.condition.protocol !== this.defaultProtocol) {
         this.condition.protocol = this.defaultProtocol;
       }
-    }
+    },
+  },
+  created(){
+    this.$EventBus.$on("apiConditionBus", (param)=>{
+      this.param = param;
+      this.list();
+    })
+  },
+  beforeDestroy() {
+    this.$EventBus.$off("apiConditionBus", (param)=>{
+      this.param = param;
+      this.list();
+    })
   },
   methods: {
     initProtocol() {
@@ -184,7 +198,7 @@ export default {
         this.list();
       } else if (!this.isRelevance && !isRedirectPage && this.selectDefaultProtocol) {
         //展示页面是非引用页面才会查询上一次接口类型
-        getUserDefaultApiType().then(response => {
+        getUserDefaultApiType().then((response) => {
           this.condition.protocol = response.data;
           this.$emit('protocolChange', this.condition.protocol);
           this.list();
@@ -198,9 +212,9 @@ export default {
       let isRedirectPage = false;
       if (this.$route.params.dataSelectRange) {
         let item = JSON.parse(JSON.stringify(this.$route.params.dataSelectRange)).param;
-        if (item ) {
+        if (item) {
           let type = item.taskGroup.toString();
-          if (type === "SWAGGER_IMPORT") {
+          if (type === 'SWAGGER_IMPORT') {
             isRedirectPage = true;
           }
         }
@@ -215,17 +229,17 @@ export default {
         projectId = this.projectId ? this.projectId : getCurrentProjectID();
       }
       if (this.isRelevanceModel) {
-        this.result = getApiModules(this.relevanceProjectId, this.condition.protocol, this.currentVersion).then(response => {
-          this.setData(response);
-        });
+        this.result = getApiModules(this.relevanceProjectId, this.condition.protocol, this.currentVersion).then(
+          (response) => {
+            this.setData(response);
+          }
+        );
       } else if (this.isTrashData) {
-        this.result = getApiModuleByTrash((projectId),
-          this.condition.protocol, this.currentVersion).then(response => {
+        this.result = postApiModuleByTrash(projectId, this.condition.protocol, this.currentVersion, this.param).then((response) => {
           this.setData(response);
         });
       } else {
-        this.result = getApiModules((projectId),
-          this.condition.protocol, this.currentVersion).then(response => {
+        this.result = postApiModules(projectId, this.condition.protocol, this.currentVersion, this.param).then((response) => {
           this.setData(response);
         });
       }
@@ -233,9 +247,9 @@ export default {
     setNohupData(response, selectNodeId) {
       if (response.data != undefined && response.data != null) {
         let treeData = response.data;
-        treeData.forEach(node => {
-          node.name = node.name === '未规划接口' ? this.$t('api_test.definition.unplanned_api') : node.name
-          buildTree(node, {path: ''});
+        treeData.forEach((node) => {
+          node.name = node.name === '未规划接口' ? this.$t('api_test.definition.unplanned_api') : node.name;
+          buildTree(node, { path: '' });
         });
         this.data = treeData;
         this.$nextTick(() => {
@@ -245,15 +259,15 @@ export default {
               this.$refs.nodeTree.justSetCurrentKey(selectNodeId);
             }
           }
-        })
+        });
       }
     },
     setData(response) {
       if (response.data != undefined && response.data != null) {
         this.data = response.data;
-        this.data.forEach(node => {
-          node.name = node.name === '未规划接口' ? this.$t('api_test.definition.unplanned_api') : node.name
-          buildTree(node, {path: ''});
+        this.data.forEach((node) => {
+          node.name = node.name === '未规划接口' ? this.$t('api_test.definition.unplanned_api') : node.name;
+          buildTree(node, { path: '' });
         });
         this.$emit('setModuleOptions', this.data);
         this.$emit('setNodeTree', this.data);
@@ -265,64 +279,86 @@ export default {
     edit(param) {
       param.projectId = this.projectId;
       param.protocol = this.condition.protocol;
-      editModule(param).then(() => {
-        this.$success(this.$t('commons.save_success'));
-        this.refresh();
-      }, (error) => {
-        this.list();
-      });
+      editModule(param).then(
+        () => {
+          this.$success(this.$t('commons.save_success'));
+          this.refresh();
+        },
+        (error) => {
+          this.list();
+        }
+      );
     },
     add(param) {
       param.projectId = this.projectId;
       param.protocol = this.condition.protocol;
-      addModule(param).then(() => {
-        this.$success(this.$t('commons.save_success'));
-        this.list();
-      }, (error) => {
-        this.list();
-      });
+      addModule(param).then(
+        () => {
+          this.$success(this.$t('commons.save_success'));
+          this.list();
+        },
+        (error) => {
+          this.list();
+        }
+      );
     },
     remove(nodeIds) {
-      delModule(nodeIds).then(() => {
-        this.list();
-        this.refresh();
-        this.removeModuleId(nodeIds);
-      }, (error) => {
-        this.list();
-      });
+      delModule(nodeIds).then(
+        () => {
+          this.list();
+          this.refresh();
+          this.removeModuleId(nodeIds);
+        },
+        (error) => {
+          this.list();
+        }
+      );
     },
     drag(param, list) {
-      dragModule(param).then(() => {
-        posModule(list).then(() => {
+      dragModule(param).then(
+        () => {
+          posModule(list).then(() => {
+            this.list();
+          });
+        },
+        (error) => {
           this.list();
-        });
-      }, (error) => {
-        this.list();
-      });
+        }
+      );
     },
     nodeChange(node, nodeIds, pNodes) {
       this.currentModule = node.data;
       if (node.data.id === 'root') {
-        this.$emit("nodeSelectEvent", node, [], pNodes);
+        this.$emit('nodeSelectEvent', node, [], pNodes);
       } else {
-        this.$emit("nodeSelectEvent", node, nodeIds, pNodes);
+        this.$emit('nodeSelectEvent', node, nodeIds, pNodes);
       }
       this.nohupReloadTree(node.data.id);
     },
     nohupReloadTree(selectNodeId) {
       if (this.isRelevanceModel) {
-        getApiModules(this.relevanceProjectId, this.condition.protocol +
-          (this.currentVersion ? '/' + this.currentVersion : '')).then(response => {
+        getApiModules(
+          this.relevanceProjectId,
+          this.condition.protocol + (this.currentVersion ? '/' + this.currentVersion : '')
+        ).then((response) => {
           this.setNohupData(response, selectNodeId);
         });
       } else if (this.isTrashData) {
-        getApiModuleByTrash(this.projectId, this.condition.protocol +
-          (this.currentVersion ? '/' + this.currentVersion : '')).then(response => {
+        postApiModuleByTrash(
+          this.projectId,
+          this.condition.protocol,
+          this.currentVersion,
+          this.param
+        ).then((response) => {
           this.setNohupData(response, selectNodeId);
         });
       } else {
-        getApiModules(this.projectId, this.condition.protocol +
-          (this.currentVersion ? '/' + this.currentVersion : '')).then(response => {
+        postApiModules(
+          this.projectId,
+          this.condition.protocol,
+          this.currentVersion,
+          this.param
+        ).then((response) => {
           this.setNohupData(response, selectNodeId);
         });
       }
@@ -348,7 +384,12 @@ export default {
       this.$emit('refreshTable');
     },
     removeModuleId(nodeIds) {
-      if (localStorage.getItem('tcp') || localStorage.getItem('http') || localStorage.getItem('sql') || localStorage.getItem('dubbo')) {
+      if (
+        localStorage.getItem('tcp') ||
+        localStorage.getItem('http') ||
+        localStorage.getItem('sql') ||
+        localStorage.getItem('dubbo')
+      ) {
         if (this.condition.protocol === 'TCP') {
           if (localStorage.getItem('tcp') === nodeIds[0]) {
             localStorage.setItem('tcp', undefined);
@@ -367,11 +408,9 @@ export default {
           }
         }
       }
-    }
-  }
-}
+    },
+  },
+};
 </script>
 
-<style scoped>
-
-</style>
+<style scoped></style>

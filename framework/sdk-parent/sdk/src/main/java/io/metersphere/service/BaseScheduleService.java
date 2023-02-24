@@ -59,6 +59,8 @@ public class BaseScheduleService {
 
     public int editSchedule(Schedule schedule) {
         schedule.setUpdateTime(System.currentTimeMillis());
+        schedule.setCreateTime(null);
+        schedule.setUserId(null);
         return scheduleMapper.updateByPrimaryKeySelective(schedule);
     }
 
@@ -89,6 +91,15 @@ public class BaseScheduleService {
         ScheduleExample scheduleExample = new ScheduleExample();
         scheduleExample.createCriteria().andResourceIdEqualTo(resourceId);
         removeJob(resourceId, group);
+        return scheduleMapper.deleteByExample(scheduleExample);
+    }
+
+    public int deleteByResourceIds(List<String> resourceIds, String group) {
+        ScheduleExample scheduleExample = new ScheduleExample();
+        scheduleExample.createCriteria().andResourceIdIn(resourceIds);
+        for (String resourceId : resourceIds) {
+            removeJob(resourceId, group);
+        }
         return scheduleMapper.deleteByExample(scheduleExample);
     }
 
@@ -212,11 +223,12 @@ public class BaseScheduleService {
         });
     }
 
-    public long countTaskByProjectId(String projectId) {
-        return baseScheduleMapper.countTaskByProjectId(projectId);
+    public List<Schedule> selectScenarioTaskByProjectId(String projectId, String versionId) {
+        return baseScheduleMapper.selectScenarioTaskByProjectId(projectId, versionId);
     }
 
-    public long countTaskByProjectIdInThisWeek(String projectId) {
+
+    public long countTaskByProjectIdInThisWeek(String projectId, String versionId) {
         Map<String, Date> startAndEndDateInWeek = DateUtils.getWeedFirstTimeAndLastTime(new Date());
 
         Date firstTime = startAndEndDateInWeek.get("firstTime");
@@ -225,7 +237,7 @@ public class BaseScheduleService {
         if (firstTime == null || lastTime == null) {
             return 0;
         } else {
-            return baseScheduleMapper.countTaskByProjectIdAndCreateTimeRange(projectId, firstTime.getTime(), lastTime.getTime());
+            return baseScheduleMapper.countTaskByProjectIdAndCreateTimeRange(projectId, versionId, firstTime.getTime(), lastTime.getTime());
         }
     }
 

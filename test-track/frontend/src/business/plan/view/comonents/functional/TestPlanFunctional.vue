@@ -116,12 +116,18 @@ export default {
     this.clearSelectNode();
     this.initData();
     this.openTestCaseEdit(this.$route.path);
+    if (this.condition.name) {
+      this.condition.name = undefined;
+    }
   },
   watch: {
     '$route'(to, from) {
       this.openTestCaseEdit(to.path);
     },
     planId() {
+      if (this.condition.name) {
+        this.condition.name = undefined;
+      }
       this.clearSelectNode();
       this.initData();
     }

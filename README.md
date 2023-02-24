@@ -4,7 +4,6 @@
   <a href="https://www.gnu.org/licenses/gpl-3.0.html"><img src="https://shields.io/github/license/metersphere/metersphere" alt="License: GPL v3"></a>
   <a href="https://www.codacy.com/gh/metersphere/metersphere/dashboard?utm_source=github.com&amp;utm_medium=referral&amp;utm_content=metersphere/metersphere&amp;utm_campaign=Badge_Grade"><img src="https://app.codacy.com/project/badge/Grade/da67574fd82b473992781d1386b937ef" alt="Codacy"></a>
   <a href="https://github.com/metersphere/metersphere/releases"><img src="https://img.shields.io/github/v/release/metersphere/metersphere" alt="GitHub release"></a>
-  <a href="https://github.com/metersphere/metersphere/releases/latest"><img src="https://img.shields.io/github/downloads/metersphere/metersphere/total" alt="Latest release"></a>
   <a href="https://github.com/metersphere/metersphere"><img src="https://img.shields.io/github/stars/metersphere/metersphere?color=%231890FF&style=flat-square" alt="Stars"></a>
 </p>
 <hr />
@@ -28,17 +27,13 @@ MeterSphere 是一站式开源持续测试平台, 涵盖测试跟踪、接口测
 
 ### UI 展示
 
-![UI展示](https://metersphere.oss-cn-hangzhou.aliyuncs.com/img/UIdemo.gif)
-
-> 如需进一步了解 MeterSphere 开源项目，推荐阅读 [MeterSphere 的初心和使命](https://mp.weixin.qq.com/s/DpCt3BNgBTlV3sJ5qtPmZw)
+![UI展示](https://www.fit2cloud.com/metersphere/images/ms-dashboard.jpeg)
 
 ### 功能架构
 
 ![产品定位](https://metersphere.oss-cn-hangzhou.aliyuncs.com/img/ms-architecture.png)
 
 ### 在线体验
-
-> 2022 年 7 月 1 日，MeterSphere 专业测试云正式上线！
 
 **[免费试用](https://www.metersphere.com/)**
 
@@ -102,7 +97,7 @@ MeterSphere 的最新 LTS 版本为 v1.20 LTS。MeterSphere 下一个 LTS 版本
 
 ### License & Copyright
 
-Copyright (c) 2014-2022 飞致云 FIT2CLOUD, All rights reserved.
+Copyright (c) 2014-2023 飞致云 FIT2CLOUD, All rights reserved.
 
 Licensed under The GNU General Public License version 3 (GPLv3)  (the "License"); you may not use this file except in compliance with the License. You may obtain a copy of the License at
 

@@ -17,6 +17,7 @@ import io.metersphere.commons.utils.Pager;
 import io.metersphere.commons.utils.WebSocketUtil;
 import io.metersphere.dto.BaseCase;
 import io.metersphere.dto.MsExecResponseDTO;
+import io.metersphere.i18n.Translator;
 import io.metersphere.log.annotation.MsAuditLog;
 import io.metersphere.notice.annotation.SendNotice;
 import io.metersphere.request.ResetOrderRequest;
@@ -36,6 +37,7 @@ import org.springframework.web.multipart.MultipartFile;
 import javax.annotation.Resource;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping(value = "/api/automation")
@@ -272,11 +274,6 @@ public class ApiScenarioController {
         apiAutomationService.batchUpdateEnv(request);
     }
 
-    @PostMapping("/getReference")
-    public ReferenceDTO getReference(@RequestBody ApiScenarioRequest request) {
-        return apiAutomationService.getReference(request);
-    }
-
     @PostMapping("/scenario/plan")
     public String addScenarioToPlan(@RequestBody SaveApiPlanRequest request) {
         return apiAutomationService.addScenarioToPlan(request);
@@ -373,7 +370,7 @@ public class ApiScenarioController {
         try {
             return apiAutomationService.verifyScenarioEnv(request);
         } catch (Exception e) {
-            MSException.throwException("场景步骤解析错误，检查是否包含插件步骤!");
+            MSException.throwException(Translator.get("scenario_step_parsing_error_check"));
         }
         return false;
     }
@@ -383,7 +380,7 @@ public class ApiScenarioController {
         try {
             return apiAutomationService.verifyScenarioEnv(scenarioId);
         } catch (Exception e) {
-            MSException.throwException("场景步骤解析错误，检查是否包含插件步骤!");
+            MSException.throwException(Translator.get("scenario_step_parsing_error_check"));
         }
         return false;
     }
@@ -416,6 +413,11 @@ public class ApiScenarioController {
     @PostMapping(value = "/env")
     public List<String> getEnvProjects(@RequestBody RunScenarioRequest request) {
         return apiAutomationService.getProjects(request);
+    }
+
+    @PostMapping(value = "/env/map")
+    public Map<String, List<String>> getProjectEnvMap(@RequestBody RunScenarioRequest request) {
+        return apiAutomationService.getProjectEnvMap(request);
     }
 
     /**

@@ -53,7 +53,7 @@ public class MsLoopController extends MsTestElement {
         // 自身场景
         if (CollectionUtils.isNotEmpty(config.getVariables())) {
             ElementUtil.addCsvDataSet(groupTree, config.getVariables(), config, "shareMode.thread");
-            ElementUtil.addCounter(groupTree, config.getVariables(), true);
+            ElementUtil.addCounter(groupTree, config.getVariables());
             ElementUtil.addRandom(groupTree, config.getVariables());
         }
         // 当前引用场景
@@ -73,7 +73,7 @@ public class MsLoopController extends MsTestElement {
 
             if (CollectionUtils.isNotEmpty(variables)) {
                 ElementUtil.addCsvDataSet(groupTree, variables, config, "shareMode.thread");
-                ElementUtil.addCounter(groupTree, variables, true);
+                ElementUtil.addCounter(groupTree, variables);
                 ElementUtil.addRandom(groupTree, variables);
             }
         }
@@ -205,9 +205,9 @@ public class MsLoopController extends MsTestElement {
         sampler.setName("MS_CLEAR_LOOPS_VAR_" + ms_current_timer);
         sampler.setProperty(TestElement.TEST_CLASS, JSR223Sampler.class.getName());
         sampler.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("TestBeanGUI"));
-        sampler.setProperty("scriptLanguage", "beanshell");
-        ScriptFilter.verify("beanshell", this.getName(), script());
-        sampler.setProperty("script", "vars.put(\"" + ms_current_timer + "\", null);");
+        sampler.setProperty("scriptLanguage", ElementConstants.BEANSHELL);
+        ScriptFilter.verify(ElementConstants.BEANSHELL, this.getName(), script());
+        sampler.setProperty(ElementConstants.SCRIPT, "vars.put(\"" + ms_current_timer + "\", null);");
         hashTree.add(sampler);
     }
 
@@ -235,11 +235,11 @@ public class MsLoopController extends MsTestElement {
             jsr223PreProcessor.setName("循环超时处理");
             jsr223PreProcessor.setProperty(TestElement.TEST_CLASS, JSR223Sampler.class.getName());
             jsr223PreProcessor.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("TestBeanGUI"));
-            jsr223PreProcessor.setProperty("scriptLanguage", "beanshell");
+            jsr223PreProcessor.setProperty("scriptLanguage", ElementConstants.BEANSHELL);
 
-            ScriptFilter.verify("beanshell", this.getName(), script());
+            ScriptFilter.verify(ElementConstants.BEANSHELL, this.getName(), script());
 
-            jsr223PreProcessor.setProperty("script", script());
+            jsr223PreProcessor.setProperty(ElementConstants.SCRIPT, script());
             hashTree.add(jsr223PreProcessor);
             return hashTree;
         }

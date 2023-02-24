@@ -6,25 +6,33 @@
         <ms-form-divider :title="$t('test_track.plan_view.base_info')"/>
         <el-form-item v-if="!enableThirdPartTemplate" :label="$t('commons.title')" prop="title">
           <el-row>
-            <el-col  :span="22">
+            <el-col :span="22">
               <el-input v-model="form.title" autocomplete="off" class="top-input-class"></el-input>
             </el-col>
-            <el-col  :span="2">
-              <el-tooltip :content="$t('commons.follow')" placement="bottom"  effect="dark" v-if="!showFollow">
-                <i class="el-icon-star-off" style="color: #783987; font-size: 25px; margin-left: 15px;cursor: pointer;position: relative;top: 5px" @click="saveFollow" />
+            <el-col :span="2">
+              <el-tooltip :content="$t('commons.follow')" placement="bottom" effect="dark" v-if="!showFollow">
+                <i class="el-icon-star-off"
+                   style="color: #783987; font-size: 25px; margin-left: 15px;cursor: pointer;position: relative;top: 5px"
+                   @click="saveFollow"/>
               </el-tooltip>
-              <el-tooltip :content="$t('commons.cancel')" placement="bottom"  effect="dark" v-if="showFollow" >
-                <i class="el-icon-star-on" style="color: #783987; font-size: 28px; margin-left: 15px; cursor: pointer;position: relative;top: 5px" @click="saveFollow" />
+              <el-tooltip :content="$t('commons.cancel')" placement="bottom" effect="dark" v-if="showFollow">
+                <i class="el-icon-star-on"
+                   style="color: #783987; font-size: 28px; margin-left: 15px; cursor: pointer;position: relative;top: 5px"
+                   @click="saveFollow"/>
               </el-tooltip>
             </el-col>
           </el-row>
         </el-form-item>
         <div v-else style="text-align: right; margin-bottom: 5px">
-          <el-tooltip :content="$t('commons.follow')" placement="bottom"  effect="dark" v-if="!showFollow">
-            <i class="el-icon-star-off" style="color: #783987; font-size: 25px; margin-left: 15px;cursor: pointer;position: relative;top: 5px" @click="saveFollow" />
+          <el-tooltip :content="$t('commons.follow')" placement="bottom" effect="dark" v-if="!showFollow">
+            <i class="el-icon-star-off"
+               style="color: #783987; font-size: 25px; margin-left: 15px;cursor: pointer;position: relative;top: 5px"
+               @click="saveFollow"/>
           </el-tooltip>
-          <el-tooltip :content="$t('commons.cancel')" placement="bottom"  effect="dark" v-if="showFollow" >
-            <i class="el-icon-star-on" style="color: #783987; font-size: 28px; margin-left: 15px; cursor: pointer;position: relative;top: 5px" @click="saveFollow" />
+          <el-tooltip :content="$t('commons.cancel')" placement="bottom" effect="dark" v-if="showFollow">
+            <i class="el-icon-star-on"
+               style="color: #783987; font-size: 28px; margin-left: 15px; cursor: pointer;position: relative;top: 5px"
+               @click="saveFollow"/>
           </el-tooltip>
         </div>
 
@@ -34,7 +42,10 @@
             :form="customFieldForm"
             :default-open="richTextDefaultOpen"
             :form-label-width="formLabelWidth"
-            :issue-template="issueTemplate"/>
+            :issue-template="issueTemplate"
+            @inputSearch="handleInputSearch"
+            ref="customFieldItem"
+          />
         </el-form>
 
         <el-row v-if="platformTransitions">
@@ -64,26 +75,6 @@
               <el-select v-model="form.tapdUsers" multiple filterable
                          :placeholder="$t('test_track.issue.please_choose_current_owner')">
                 <el-option v-for="(userInfo, index) in tapdUsers" :key="index" :label="userInfo.user"
-                           :value="userInfo.user"/>
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8" v-if="hasZentaoId">
-            <el-form-item :label-width="formLabelWidth" :label="$t('test_track.issue.zentao_bug_build')"
-                          prop="zentaoBuilds">
-              <el-select v-model="form.zentaoBuilds" multiple filterable
-                         :placeholder="$t('test_track.issue.zentao_bug_build')">
-                <el-option v-for="(build, index) in Builds" :key="index" :label="build.name"
-                           :value="build.id"/>
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8" v-if="hasZentaoId">
-            <el-form-item :label-width="formLabelWidth" :label="$t('test_track.issue.zentao_bug_assigned')"
-                          prop="zentaoAssigned">
-              <el-select v-model="form.zentaoAssigned" filterable
-                         :placeholder="$t('test_track.issue.please_choose_current_owner')">
-                <el-option v-for="(userInfo, index) in zentaoUsers" :key="index" :label="userInfo.name"
                            :value="userInfo.user"/>
               </el-select>
             </el-form-item>
@@ -118,10 +109,14 @@
                         :on-success="handleSuccess"
                         :on-error="handleError"
                         :disabled="readOnly || type === 'copy'">
-                        <el-button :disabled="readOnly || type === 'copy'" type="text">{{$t('permission.project_file.local_upload')}}</el-button>
+                        <el-button :disabled="readOnly || type === 'copy'" type="text">
+                          {{ $t('permission.project_file.local_upload') }}
+                        </el-button>
                       </el-upload>
                     </div>
-                    <el-button type="text" :disabled="readOnly || type === 'copy'" @click="associationFile">{{ $t('permission.project_file.associated_files') }}</el-button>
+                    <el-button type="text" :disabled="readOnly || type === 'copy'" @click="associationFile">
+                      {{ $t('permission.project_file.associated_files') }}
+                    </el-button>
                     <i class="el-icon-plus" slot="reference"/>
                   </el-popover>
                 </div>
@@ -198,20 +193,21 @@ import CustomFiledComponent from "metersphere-frontend/src/components/template/C
 import TestCaseIssueList from "@/business/issue/TestCaseIssueList";
 import IssueEditDetail from "@/business/issue/IssueEditDetail";
 import {byteToSize, getTypeByFileName, getUUID} from "metersphere-frontend/src/utils";
-import {getCurrentProjectID, getCurrentUser, getCurrentWorkspaceId, getCurrentUserId} from "metersphere-frontend/src/utils/token"
+import {
+  getCurrentProjectID,
+  getCurrentUser,
+  getCurrentWorkspaceId,
+  getCurrentUserId
+} from "metersphere-frontend/src/utils/token"
 import {hasLicense} from "metersphere-frontend/src/utils/permission";
 import {
   enableThirdPartTemplate,
   getIssuePartTemplateWithProject,
-  getPlatformTransitions,
-  getIssuesById,
   saveOrUpdateIssue,
   saveFollow,
   getFollow,
   getComments,
-  getZentaoBuilds,
-  getZentaoUser,
-  getTapdUser
+  getTapdUser, getPlatformTransitions, getPlatformFormOption
 } from "@/api/issue";
 import {
   uploadIssueAttachment,
@@ -250,7 +246,7 @@ export default {
   data() {
     return {
       type: null,
-      issueId:'',
+      issueId: '',
       result: {
         loading: false
       },
@@ -275,17 +271,12 @@ export default {
         description: '',
         creator: null,
         remark: null,
-        tapdUsers:[],
-        zentaoBuilds:[],
-        zentaoAssigned: '',
+        tapdUsers: [],
         platformStatus: null,
         copyIssueId: ''
       },
       tapdUsers: [],
-      zentaoUsers: [],
-      Builds: [],
       hasTapdId: false,
-      hasZentaoId: false,
       platformTransitions: null,
       currentProject: null,
       toolbars: {
@@ -335,6 +326,7 @@ export default {
       relateFiles: [],
       unRelateFiles: [],
       dumpFile: {},
+      enableThirdPartTemplate: false
     };
   },
   props: {
@@ -356,9 +348,6 @@ export default {
     projectId() {
       return getCurrentProjectID();
     },
-    enableThirdPartTemplate() {
-      return enableThirdPartTemplate(this.currentProject);
-    },
   },
   watch: {
     tabActiveName() {
@@ -376,9 +365,7 @@ export default {
         description: '',
         creator: null,
         remark: null,
-        tapdUsers:[],
-        zentaoBuilds:[],
-        zentaoAssigned: '',
+        tapdUsers: [],
         platformStatus: null
       };
       this.customFieldForm = null;
@@ -386,6 +373,7 @@ export default {
       if (this.$refs.testCaseIssueList) {
         this.$refs.testCaseIssueList.tableData = [];
       }
+      this.$refs.form.clearValidate();
     },
     open(data, type) {
       this.uploadFiles = [];
@@ -403,6 +391,11 @@ export default {
           this.currentProject = project;
           this.init(template, data);
           this.getDataInfoAsync(data);
+
+          enableThirdPartTemplate(this.currentProject.id)
+            .then(r => {
+              this.enableThirdPartTemplate = r.data;
+            });
         });
       });
     },
@@ -416,11 +409,6 @@ export default {
               break;
             }
           }
-        });
-        getIssuesById(data.id).then(response => {
-          this.form.tapdUsers = response.data.tapdUsers;
-          this.form.zentaoBuilds = response.data.zentaoBuilds;
-          this.form.zentaoAssigned = response.data.zentaoAssigned;
         });
       } else {
         this.issueId = null;
@@ -440,7 +428,8 @@ export default {
       let platform = this.issueTemplate.platform;
 
       this.platformTransitions = null;
-      if (this.form.platformId) {
+      // 编辑的时候才展示
+      if (this.form.platformId && this.form.id) {
         let data = {
           platformKey: this.form.platformId,
           projectId: getCurrentProjectID(),
@@ -457,24 +446,12 @@ export default {
         projectId: this.projectId,
         workspaceId: getCurrentWorkspaceId()
       }
-      if (platform === 'Zentao') {
-        this.hasZentaoId = true;
-        getZentaoBuilds(data)
-        .then((response) => {
-          if (response.data) {
-            this.Builds = response.data;
-          }
-          getZentaoUser(data)
-          .then((response) => {
-            this.zentaoUsers = response.data;
-          })
-        })
-      } else if (platform === 'Tapd') {
+      if (platform === 'Tapd') {
         this.hasTapdId = true;
         getTapdUser(data)
-        .then((response) => {
-          this.tapdUsers = response.data;
-        })
+          .then((response) => {
+            this.tapdUsers = response.data;
+          })
       }
     },
     initEdit(data) {
@@ -586,11 +563,16 @@ export default {
       let param = this.buildPram();
       this.parseOldFields(param);
       let option = this.getOption(param);
-      saveOrUpdateIssue(option.url, option.data).then((response) => {
-        this.$emit('close');
-        this.$success(this.$t('commons.save_success'));
-        this.$emit('refresh', response.data);
-      })
+      this.result.loading = true;
+      saveOrUpdateIssue(option.url, option.data)
+        .then((response) => {
+          this.$emit('close');
+          this.$success(this.$t('commons.save_success'));
+          this.$emit('refresh', response.data);
+          this.result.loading = false;
+        }).catch(() => {
+          this.result.loading = false;
+        });
     },
     parseOldFields(param) {
       let customFieldsStr = param.customFields;
@@ -627,30 +609,30 @@ export default {
         }
       };
     },
-    saveFollow(){
-      if(!this.form.follows){
+    saveFollow() {
+      if (!this.form.follows) {
         this.form.follows = [];
       }
-      if(this.showFollow){
+      if (this.showFollow) {
         this.showFollow = false;
         for (let i = 0; i < this.form.follows.length; i++) {
-          if(this.form.follows[i]===this.currentUser().id){
-            this.form.follows.splice(i,1)
+          if (this.form.follows[i] === this.currentUser().id) {
+            this.form.follows.splice(i, 1)
             break;
           }
         }
-        if(this.url === "issues/update"){
+        if (this.url === "issues/update") {
           saveFollow(this.issueId, this.form.follows).then(() => {
             this.$success(this.$t('commons.cancel_follow_success'));
           })
         }
-      }else {
+      } else {
         this.showFollow = true;
-        if(!this.form.follows){
+        if (!this.form.follows) {
           this.form.follows = [];
         }
         this.form.follows.push(this.currentUser().id)
-        if(this.url === "issues/update"){
+        if (this.url === "issues/update") {
           saveFollow(this.issueId, this.form.follows).then(() => {
             this.$success(this.$t('commons.follow_success'));
           })
@@ -679,8 +661,8 @@ export default {
         name: file.name,
         size: byteToSize(file.size),
         updateTime: new Date().getTime(),
-        progress: this.type === 'add' || this.isCaseEdit? 100 : 0,
-        status: this.type === 'add' || this.isCaseEdit? 'toUpload' : 0,
+        progress: this.type === 'add' || this.isCaseEdit ? 100 : 0,
+        status: this.type === 'add' || this.isCaseEdit ? 'toUpload' : 0,
         creator: user.name,
         type: getTypeByFileName(file.name),
         isLocal: true
@@ -702,27 +684,27 @@ export default {
       let CancelToken = axios.CancelToken
       let self = this;
       uploadIssueAttachment(file, data, CancelToken, self.cancelFileToken, progressCallback)
-      .then(response => { // 成功回调
-        progress = 100;
-        param.onSuccess(response);
-        progressCallback({progress, status: 'success'});
-        self.cancelFileToken.forEach((token, index, array)=>{
-          if(token.name == file.name){
-            array.splice(token,1)
-          }
-        })
-      }).catch(({error}) => { // 失败回调
+        .then(response => { // 成功回调
+          progress = 100;
+          param.onSuccess(response);
+          progressCallback({progress, status: 'success'});
+          self.cancelFileToken.forEach((token, index, array) => {
+            if (token.name == file.name) {
+              array.splice(token, 1)
+            }
+          })
+        }).catch(({error}) => { // 失败回调
         progress = 100;
         progressCallback({progress, status: 'error'});
-        self.cancelFileToken.forEach((token, index, array)=>{
-          if(token.name == file.name){
-            array.splice(token,1)
+        self.cancelFileToken.forEach((token, index, array) => {
+          if (token.name == file.name) {
+            array.splice(token, 1)
           }
         })
       });
     },
     showProgress(file, params) {
-      const { progress, status } = params
+      const {progress, status} = params
       const arr = [...this.tableData].map(item => {
         if (item.name === file.name) {
           item.progress = progress
@@ -737,18 +719,29 @@ export default {
     },
     handleSuccess(response, file, fileList) {
       let readyFiles = fileList.filter(item => item.status === 'success')
-      if (readyFiles.length === fileList.length ) {
+      if (readyFiles.length === fileList.length) {
         this.getFileMetaData(this.issueId);
       }
     },
     handleError(err, file, fileList) {
       let readyFiles = fileList.filter(item => item.status === 'success')
-      if (readyFiles.length === fileList.length ) {
+      if (readyFiles.length === fileList.length) {
         this.getFileMetaData(this.issueId);
       }
     },
+    handleInputSearch(data, query) {
+      getPlatformFormOption({
+        optionMethod: data.optionMethod,
+        workspaceId: getCurrentWorkspaceId(),
+        platform: this.issueTemplate.platform,
+        query
+      }).then((r) => {
+        data.options = r.data;
+        this.$refs.customFieldItem.stopLoading();
+      });
+    },
     handleDelete(file, index) {
-      this.$alert((this.cancelFileToken.length > 0 ? this.$t('load_test.delete_file_when_uploading') + '<br/>': "") +  this.$t('load_test.delete_file_confirm') + file.name + "?", '', {
+      this.$alert((this.cancelFileToken.length > 0 ? this.$t('load_test.delete_file_when_uploading') + '<br/>' : "") + this.$t('load_test.delete_file_confirm') + file.name + "?", '', {
         confirmButtonText: this.$t('commons.confirm'),
         dangerouslyUseHTMLString: true,
         callback: (action) => {
@@ -772,10 +765,10 @@ export default {
         this.uploadFiles.splice(delIndex, 1);
       } else {
         deleteIssueAttachment(file.id)
-        .then(() => {
-          this.$success(this.$t('commons.delete_success'));
-          this.getFileMetaData(this.issueId);
-        });
+          .then(() => {
+            this.$success(this.$t('commons.delete_success'));
+            this.getFileMetaData(this.issueId);
+          });
       }
     },
     handleUnRelate(file, index) {
@@ -797,11 +790,11 @@ export default {
               let data = {'belongType': 'issue', 'belongId': this.issueId, 'metadataRefIds': this.unRelateFiles};
               this.result.loading = true;
               unrelatedAttachment(data)
-              .then(() => {
-                this.$success(this.$t('commons.unrelated_success'));
-                this.result.loading = false;
-                this.getFileMetaData(this.issueId);
-              })
+                .then(() => {
+                  this.$success(this.$t('commons.unrelated_success'));
+                  this.result.loading = false;
+                  this.getFileMetaData(this.issueId);
+                })
             }
           }
         }
@@ -827,7 +820,7 @@ export default {
       for (let row of rows) {
         let rowIndex = this.tableData.findIndex(item => item.name === row.name);
         if (rowIndex >= 0) {
-          this.$error(this.$t('load_test.exist_related_file') + ": "  + row.name);
+          this.$error(this.$t('load_test.exist_related_file') + ": " + row.name);
           repeatRecord = true;
           break;
         }
@@ -856,21 +849,23 @@ export default {
           let data = {'belongType': 'issue', 'belongId': this.issueId, 'metadataRefIds': metadataRefIds};
           this.result.loading = true;
           relatedAttachment(data)
-          .then(() => {
-            this.$success(this.$t('commons.relate_success'));
-            this.result.loading = false;
-            this.getFileMetaData(this.issueId);
-          });
+            .then(() => {
+              this.$success(this.$t('commons.relate_success'));
+              this.result.loading = false;
+              this.getFileMetaData(this.issueId);
+            });
         }
       }
     },
     setModuleId(moduleId) {
-      let data = {id: getUUID(), resourceId: getCurrentProjectID(), moduleId: moduleId,
-        projectId: getCurrentProjectID(), fileName: this.dumpFile.name, attachmentId: this.dumpFile.id};
+      let data = {
+        id: getUUID(), resourceId: getCurrentProjectID(), moduleId: moduleId,
+        projectId: getCurrentProjectID(), fileName: this.dumpFile.name, attachmentId: this.dumpFile.id
+      };
       dumpAttachment(data)
-      .then(() => {
-        this.$success(this.$t("organization.integration.successful_operation"));
-      });
+        .then(() => {
+          this.$success(this.$t("organization.integration.successful_operation"));
+        });
     },
     getFileMetaData(id) {
       if (this.type === 'edit') {
@@ -926,7 +921,7 @@ export default {
   margin-left: 20px;
 }
 
-.top-input-class{
+.top-input-class {
   width: 100%;
 }
 

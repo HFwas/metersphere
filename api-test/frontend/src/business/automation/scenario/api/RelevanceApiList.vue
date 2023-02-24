@@ -1,9 +1,6 @@
 <template>
   <div v-loading="result">
-    <api-list-container
-      :is-api-list-enable="isApiListEnable"
-      @isApiListEnableChange="isApiListEnableChange">
-
+    <api-list-container :is-api-list-enable="isApiListEnable" @isApiListEnableChange="isApiListEnableChange">
       <template>
         <slot name="version"></slot>
       </template>
@@ -23,33 +20,29 @@
         @selectCountChange="selectCountChange"
         @refreshTable="initTable"
         ref="apitable">
-
         <template v-slot:header>
-          <ms-environment-select :project-id="projectId" v-if="isTestPlan || isScript" :is-read-only="isReadOnly"
-                                 @setEnvironment="setEnvironment" ref="msEnvironmentSelect"/>
+          <ms-environment-select
+            :project-id="projectId"
+            v-if="isTestPlan || isScript"
+            :is-read-only="isReadOnly"
+            @setEnvironment="setEnvironment"
+            ref="msEnvironmentSelect" />
         </template>
-
       </api-table-list>
-
     </api-list-container>
-
   </div>
-
 </template>
 
 <script>
-
-import {getDefinitionPage, getRelevanceDefinitionPage} from "@/api/definition";
-import ApiListContainer from "@/business/definition/components/list/ApiListContainer";
-import MsEnvironmentSelect from "@/business/definition/components/case/MsEnvironmentSelect";
-import {buildBatchParam} from "metersphere-frontend/src/utils/tableUtils";
-import {
-  TEST_PLAN_RELEVANCE_API_DEFINITION_CONFIGS,
-} from "metersphere-frontend/src/components/search/search-components";
-import ApiTableList from "@/business/definition/components/complete/ApiTableList";
+import { getDefinitionPage, getRelevanceDefinitionPage } from '@/api/definition';
+import ApiListContainer from '@/business/definition/components/list/ApiListContainer';
+import MsEnvironmentSelect from '@/business/definition/components/case/MsEnvironmentSelect';
+import { buildBatchParam } from 'metersphere-frontend/src/utils/tableUtils';
+import { TEST_PLAN_RELEVANCE_API_DEFINITION_CONFIGS } from 'metersphere-frontend/src/components/search/search-components';
+import ApiTableList from '@/business/definition/components/complete/ApiTableList';
 
 export default {
-  name: "RelevanceApiList",
+  name: 'RelevanceApiList',
   components: {
     ApiTableList,
     MsEnvironmentSelect,
@@ -58,12 +51,12 @@ export default {
   data() {
     return {
       condition: {
-        components: TEST_PLAN_RELEVANCE_API_DEFINITION_CONFIGS
+        components: TEST_PLAN_RELEVANCE_API_DEFINITION_CONFIGS,
       },
       result: false,
-      screenHeight: 'calc(100vh - 400px)',//屏幕高度,
+      screenHeight: 'calc(100vh - 400px)', //屏幕高度,
       tableData: [],
-      environmentId: "",
+      environmentId: '',
       total: 0,
       selectRows: new Set(),
     };
@@ -81,7 +74,7 @@ export default {
       type: Boolean,
       default() {
         return false;
-      }
+      },
     },
     isApiListEnable: {
       type: Boolean,
@@ -89,7 +82,7 @@ export default {
     },
     isReadOnly: {
       type: Boolean,
-      default: false
+      default: false,
     },
     isCaseRelevance: {
       type: Boolean,
@@ -100,8 +93,8 @@ export default {
     isTestPlan: Boolean,
     versionEnable: {
       type: Boolean,
-      default: false
-    }
+      default: false,
+    },
   },
   created() {
     this.condition.versionId = this.currentVersion;
@@ -116,7 +109,7 @@ export default {
     },
     projectId() {
       this.condition = {
-        components: TEST_PLAN_RELEVANCE_API_DEFINITION_CONFIGS
+        components: TEST_PLAN_RELEVANCE_API_DEFINITION_CONFIGS,
       };
       this.selectNodeIds.length = 0;
       this.initTable();
@@ -124,7 +117,7 @@ export default {
     currentVersion() {
       this.condition.versionId = this.currentVersion;
       this.initTable();
-    }
+    },
   },
   methods: {
     setSelectRow(setSelectRow) {
@@ -139,7 +132,7 @@ export default {
     initTable(projectId) {
       this.condition.moduleIds = this.selectNodeIds;
       if (this.trashEnable) {
-        this.condition.filters = {status: ["Trash"]};
+        this.condition.filters = { status: ['Trash'] };
         this.condition.moduleIds = [];
       }
       if (projectId != null && typeof projectId === 'string') {
@@ -151,23 +144,33 @@ export default {
       if (this.currentProtocol != null) {
         this.condition.protocol = this.currentProtocol;
       } else {
-        this.condition.protocol = "HTTP";
+        this.condition.protocol = 'HTTP';
       }
       if (this.condition.filters) {
-        this.condition.filters.status = ["Prepare", "Underway", "Completed"];
+        this.condition.filters.status = ['Prepare', 'Underway', 'Completed'];
       } else {
-        this.condition.filters = {status: ["Prepare", "Underway", "Completed"]};
+        this.condition.filters = {
+          status: ['Prepare', 'Underway', 'Completed'],
+        };
       }
       if (this.isTestPlan) {
         this.condition.planId = this.planId;
         this.$nextTick(() => {
-          this.result = getRelevanceDefinitionPage(this.$refs.apitable.currentPage, this.$refs.apitable.pageSize, this.condition).then(response => {
+          this.result = getRelevanceDefinitionPage(
+            this.$refs.apitable.currentPage,
+            this.$refs.apitable.pageSize,
+            this.condition
+          ).then((response) => {
             this.setData(response);
           });
         });
       } else {
         this.$nextTick(() => {
-          this.result = getDefinitionPage(this.$refs.apitable.currentPage, this.$refs.apitable.pageSize, this.condition).then(response => {
+          this.result = getDefinitionPage(
+            this.$refs.apitable.currentPage,
+            this.$refs.apitable.pageSize,
+            this.condition
+          ).then((response) => {
             this.setData(response);
           });
         });
@@ -176,7 +179,7 @@ export default {
     setData(response) {
       this.total = response.data.itemCount;
       this.tableData = response.data.listObject;
-      this.tableData.forEach(item => {
+      this.tableData.forEach((item) => {
         if (item.tags && item.tags.length > 0) {
           item.tags = JSON.parse(item.tags);
         }
@@ -188,8 +191,8 @@ export default {
     getConditions() {
       let sampleSelectRows = this.selectRows;
       let param = buildBatchParam(this, undefined, this.projectId);
-      param.ids = Array.from(sampleSelectRows).map(row => row.id);
-      let tableDataIds = Array.from(this.tableData).map(row => row.id);
+      param.ids = Array.from(sampleSelectRows).map((row) => row.id);
+      let tableDataIds = Array.from(this.tableData).map((row) => row.id);
       param.ids.sort((a, b) => {
         return tableDataIds.indexOf(a) - tableDataIds.indexOf(b);
       });
@@ -201,16 +204,14 @@ export default {
       }
     },
     clearEnvAndSelect() {
-      this.environmentId = "";
+      this.environmentId = '';
       if (this.$refs.msEnvironmentSelect) {
-        this.$refs.msEnvironmentSelect.environmentId = "";
+        this.$refs.msEnvironmentSelect.environmentId = '';
       }
       this.clear();
-    }
+    },
   },
-}
+};
 </script>
 
-<style scoped>
-
-</style>
+<style scoped></style>

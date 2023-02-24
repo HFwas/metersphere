@@ -76,7 +76,7 @@
                 </el-col>
                 <el-col :span="18">
                   <div v-if="testType === 'API'">
-                    <el-checkbox v-model="runConfig.runWithinResourcePool" style="padding-right: 10px;">
+                    <el-checkbox v-model="runConfig.runWithinResourcePool" style="padding-right: 10px;" :disabled="runMode === 'POOL'">
                       {{ $t('run_mode.run_with_resource_pool') }}
                     </el-checkbox>
                     <el-select :disabled="!runConfig.runWithinResourcePool" v-model="runConfig.resourcePoolId"
@@ -99,7 +99,7 @@
                 </el-col>
                 <el-col :span="18">
                   <div v-if="testType === 'API'">
-                    <el-checkbox v-model="runConfig.runWithinResourcePool" style="padding-right: 10px;">
+                    <el-checkbox v-model="runConfig.runWithinResourcePool" style="padding-right: 10px;" :disabled="runMode === 'POOL'">
                       {{ $t('run_mode.run_with_resource_pool') }}
                     </el-checkbox>
                     <el-select :disabled="!runConfig.runWithinResourcePool" v-model="runConfig.resourcePoolId"
@@ -203,6 +203,8 @@ import {
 import {saveNotice} from "@/api/notice";
 import {getProjectMember} from "@/api/user";
 import {getQuotaValidResourcePools} from "@/api/remote/resource-pool";
+import {getProjectConfig} from "@/api/project";
+import {getSystemBaseSetting} from "metersphere-frontend/src/api/system";
 
 function defaultCustomValidate() {
   return {pass: true};
@@ -266,6 +268,7 @@ export default {
       }
     };
     return {
+      runMode: "",
       isHasLicense: hasLicense(),
       result: {},
       scheduleReceiverOptions: [],
@@ -314,6 +317,29 @@ export default {
     };
   },
   methods: {
+    query() {
+      this.loading = true;
+      this.result = getSystemBaseSetting().then(response => {
+        if (!response.data.runMode) {
+          response.data.runMode = 'LOCAL'
+        }
+        this.runMode = response.data.runMode;
+        if (this.runMode === 'POOL') {
+          this.runConfig.runWithinResourcePool = true;
+          this.getProjectApplication();
+        } else {
+          this.loading = false;
+        }
+      })
+    },
+    getProjectApplication() {
+      getProjectConfig(getCurrentProjectID(), "").then(res => {
+        if (res.data && res.data.poolEnable && res.data.resourcePoolId) {
+          this.runConfig.resourcePoolId = res.data.resourcePoolId;
+        }
+        this.loading = false;
+      });
+    },
     currentUser: () => {
       return getCurrentUser();
     },
@@ -342,6 +368,9 @@ export default {
       return param;
     },
     open(row) {
+      if (this.isHasLicense) {
+        this.query();
+      }
       this.planId = row.id;
       //测试计划页面跳转来的
       let paramTestId = row.id;
@@ -396,6 +425,10 @@ export default {
       });
     },
     saveCron() {
+      if (this.runConfig.runWithinResourcePool && this.runConfig.resourcePoolId == null) {
+        this.$warning(this.$t('workspace.env_group.please_select_run_within_resource_pool'));
+        return;
+      }
       this.$refs['from'].validate((valid) => {
         if (valid) {
           this.intervalShortValidate();

@@ -16,6 +16,9 @@
       <ms-table :data="tableData" :select-node-ids="selectNodeIds" :condition="condition" :page-size="pageSize"
                 :total="total" enableSelection
                 :screenHeight="screenHeight"
+                row-key="id"
+                :reserve-option="true"
+                :page-refresh="pageRefresh"
                 @refresh="initTable"
                 @selectCountChange="selectCountChange"
                 operator-width="170px"
@@ -89,7 +92,7 @@
           </template>
         </ms-table-column>
       </ms-table>
-      <ms-table-pagination :change="initTable" :current-page.sync="currentPage" :page-size.sync="pageSize"
+      <ms-table-pagination :change="pageChange" :current-page.sync="currentPage" :page-size.sync="pageSize"
                            :total="total"/>
     </api-list-container>
 
@@ -111,7 +114,7 @@ import {
 } from "metersphere-frontend/src/components/search/search-components";
 import MsSearch from "metersphere-frontend/src/components/search/MsSearch";
 import ApiListContainer from "@/business/plan/view/comonents/api/ApiListContainer";
-import {buildBatchParam, hasLicense, isProjectVersionEnable} from "@/business/utils/sdk-utils";
+import {buildBatchParam, hasLicense, isProjectVersionEnable, parseTag} from "@/business/utils/sdk-utils";
 import PriorityTableItem from "@/business/common/tableItems/planview/PriorityTableItem";
 import {apiDefinitionGet} from "@/api/remote/api/api-definition";
 import {testPlanApiCaseRelevanceList} from "@/api/remote/plan/test-plan-api-case";
@@ -157,6 +160,7 @@ export default {
       total: 0,
       environmentId: "",
       versionEnable: false,
+      pageRefresh: false
     };
   },
   props: {
@@ -220,7 +224,11 @@ export default {
     selectCountChange(data) {
       this.$emit('selectCountChange', data);
     },
-    initTable(projectId) {
+    pageChange() {
+      this.initTable(null, "page");
+    },
+    initTable(projectId, data) {
+      this.pageRefresh = data === "page";
       this.condition.status = "";
       this.condition.moduleIds = this.selectNodeIds;
       if (projectId != null && typeof projectId === 'string') {
@@ -238,11 +246,7 @@ export default {
           this.loading = false;
           this.total = response.data.itemCount;
           this.tableData = response.data.listObject;
-          this.tableData.forEach(item => {
-            if (item.tags && item.tags.length > 0) {
-              item.tags = JSON.parse(item.tags);
-            }
-          });
+          parseTag(this.tableData);
         });
     },
     clear() {

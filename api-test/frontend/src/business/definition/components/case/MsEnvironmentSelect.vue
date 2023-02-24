@@ -1,15 +1,26 @@
 <template>
   <span>
-    <el-select :disabled="isReadOnly" v-model="environmentId" size="small" class="environment-select"
-               :placeholder="$t('api_test.definition.request.run_env')" clearable @clear="clear">
-      <el-option v-for="(environment, key) in environments" :key="key"
-                 :label="environment.name"
-                 :value="environment.id"/>
+    <el-select
+      :disabled="isReadOnly"
+      v-model="environmentId"
+      size="small"
+      class="environment-select"
+      :placeholder="$t('api_test.definition.request.run_env')"
+      clearable
+      filterable
+      @click.native="refreshEnv"
+      @clear="clear">
+      <el-option
+        v-for="(environment, key) in environments"
+        :key="key"
+        :label="environment.name"
+        :value="environment.id" />
       <el-button class="environment-button" size="mini" type="primary" @click="openEnvironmentConfig">
         {{ $t('api_test.environment.environment_config') }}
       </el-button>
       <template v-slot:empty>
-        <div class="empty-environment">
+       <!--这里只做没有可搜索内容时使用，否则如果没有符合搜索条件的，也会显示该项，与上面的btn重复显示 -->
+        <div class="empty-environment" v-if="environments.length===0">
           <el-button class="environment-button" size="mini" type="primary" @click="openEnvironmentConfig">
             {{ $t('api_test.environment.environment_config') }}
           </el-button>
@@ -17,26 +28,26 @@
       </template>
     </el-select>
     <!-- 环境 -->
-    <api-environment-config ref="environmentConfig" @close="environmentConfigClose"/>
+    <api-environment-config ref="environmentConfig" @close="environmentConfigClose" />
   </span>
 </template>
 
 <script>
-import {parseEnvironment} from "@/business/environment/model/EnvironmentModel";
-import {getEnvironmentByProjectId} from "metersphere-frontend/src/api/environment";
+import { parseEnvironment } from '@/business/environment/model/EnvironmentModel';
+import { getEnvironmentByProjectId } from 'metersphere-frontend/src/api/environment';
 
 export default {
-  name: "MsEnvironmentSelect",
+  name: 'MsEnvironmentSelect',
   components: {
-    ApiEnvironmentConfig: () => import('metersphere-frontend/src/components/environment/ApiEnvironmentConfig')
+    ApiEnvironmentConfig: () => import('metersphere-frontend/src/components/environment/ApiEnvironmentConfig'),
   },
   data() {
     return {
       environments: [],
       environment: undefined,
       isShow: true,
-      environmentId: ""
-    }
+      environmentId: '',
+    };
   },
   props: ['projectId', 'isReadOnly', 'useEnvironment'],
   created() {
@@ -54,9 +65,12 @@ export default {
     },
     useEnvironment() {
       this.getEnvironments();
-    }
+    },
   },
   methods: {
+    refreshEnv() {
+      this.getEnvironments();
+    },
     refreshEnvironment() {
       this.$emit('setEnvironment', this.environment);
     },
@@ -65,9 +79,9 @@ export default {
     },
     getEnvironments() {
       if (this.projectId) {
-        getEnvironmentByProjectId(this.projectId).then(response => {
+        getEnvironmentByProjectId(this.projectId).then((response) => {
           this.environments = response.data;
-          this.environments.forEach(environment => {
+          this.environments.forEach((environment) => {
             parseEnvironment(environment);
             if (this.useEnvironment && this.useEnvironment === environment.id) {
               this.environmentId = this.useEnvironment;
@@ -96,13 +110,11 @@ export default {
     environmentConfigClose() {
       this.getEnvironments();
     },
-  }
-}
+  },
+};
 </script>
 
 <style scoped>
-
-
 .environment-button {
   margin-left: 20px;
   padding: 7px;
@@ -112,5 +124,4 @@ export default {
   margin-left: 20px;
   min-width: 100px;
 }
-
 </style>

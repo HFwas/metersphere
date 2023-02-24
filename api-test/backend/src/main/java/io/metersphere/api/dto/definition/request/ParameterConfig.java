@@ -6,12 +6,10 @@ import io.metersphere.api.dto.scenario.HttpConfig;
 import io.metersphere.api.dto.scenario.HttpConfigCondition;
 import io.metersphere.api.dto.scenario.KeyValue;
 import io.metersphere.api.dto.scenario.environment.EnvironmentConfig;
-import io.metersphere.service.definition.ApiDefinitionService;
-import io.metersphere.service.definition.ApiTestCaseService;
-import io.metersphere.service.plan.TestPlanApiCaseService;
 import io.metersphere.base.domain.ApiDefinition;
 import io.metersphere.base.domain.ApiTestCaseWithBLOBs;
 import io.metersphere.base.domain.TestPlanApiCase;
+import io.metersphere.commons.constants.CommonConstants;
 import io.metersphere.commons.constants.ConditionType;
 import io.metersphere.commons.utils.CommonBeanFactory;
 import io.metersphere.constants.RunModeConstants;
@@ -19,12 +17,17 @@ import io.metersphere.environment.ssl.MsKeyStore;
 import io.metersphere.jmeter.utils.ScriptEngineUtils;
 import io.metersphere.plugin.core.MsParameter;
 import io.metersphere.plugin.core.MsTestElement;
+import io.metersphere.service.definition.ApiDefinitionService;
+import io.metersphere.service.definition.ApiTestCaseService;
+import io.metersphere.service.plan.TestPlanApiCaseService;
 import lombok.Data;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.config.Arguments;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Data
 public class ParameterConfig extends MsParameter {
@@ -89,7 +92,7 @@ public class ParameterConfig extends MsParameter {
     private boolean runLocal;
 
     private String browserLanguage;
-
+    private boolean isApi;
     /**
      * 排除生成临界控制器的场景
      */
@@ -130,7 +133,7 @@ public class ParameterConfig extends MsParameter {
                     ApiDefinition apiDefinition = null;
                     ApiDefinitionService apiDefinitionService = CommonBeanFactory.getBean(ApiDefinitionService.class);
                     ApiTestCaseService apiTestCaseService = CommonBeanFactory.getBean(ApiTestCaseService.class);
-                    if (StringUtils.isNotEmpty(samplerProxy.getRefType()) && samplerProxy.getRefType().equals("CASE")) {
+                    if (StringUtils.isNotEmpty(samplerProxy.getRefType()) && samplerProxy.getRefType().equals(CommonConstants.CASE)) {
                         ApiTestCaseWithBLOBs caseWithBLOBs = apiTestCaseService.get(samplerProxy.getId());
                         if (caseWithBLOBs != null) {
                             apiDefinition = apiDefinitionService.get(caseWithBLOBs.getApiDefinitionId());
@@ -220,5 +223,51 @@ public class ParameterConfig extends MsParameter {
                 }
             }
         }
+    }
+
+    public void margeVariables(List<ScenarioVariable> variables, List<ScenarioVariable> transferVariables) {
+        if (CollectionUtils.isNotEmpty(transferVariables)) {
+            List<ScenarioVariable> constants = variables.stream()
+                    .filter(ScenarioVariable::isConstantValid).collect(Collectors.toList());
+
+            Map<String, List<ScenarioVariable>> transferVariableGroup = transferVariables.stream()
+                    .collect(Collectors.groupingBy(ScenarioVariable::getName, LinkedHashMap::new, Collectors.toList()));
+
+            Map<String, List<ScenarioVariable>> constantsGroup = constants.stream()
+                    .collect(Collectors.groupingBy(ScenarioVariable::getName, LinkedHashMap::new, Collectors.toList()));
+            // 更新相同名称的值
+            for (ScenarioVariable constant : constants) {
+                if (transferVariableGroup.containsKey(constant.getName())
+                        && CollectionUtils.isNotEmpty(transferVariableGroup.get(constant.getName()))) {
+                    constant.setValue(transferVariableGroup.get(constant.getName()).get(0).getValue());
+                }
+            }
+            // 添加当前没有的值
+            List<ScenarioVariable> transferConstants = transferVariables.stream()
+                    .filter(ScenarioVariable::isConstantValid).collect(Collectors.toList());
+            transferConstants.forEach(item -> {
+                if (!constantsGroup.containsKey(item.getName())) {
+                    variables.add(item);
+                }
+            });
+        }
+    }
+
+    public void margeParentVariables(List<ScenarioVariable> variables, MsTestElement parent) {
+        // 取出父级场景且父场景不是顶级场景
+        MsScenario scenario = getScenario(parent);
+        if (scenario == null || BooleanUtils.isFalse(scenario.getMixEnable()) || CollectionUtils.isEmpty(scenario.getVariables())) {
+            return;
+        }
+        this.margeVariables(variables, scenario.getVariables());
+    }
+
+    private MsScenario getScenario(MsTestElement parent) {
+        if (parent != null && parent instanceof MsScenario) {
+            return parent.getParent() != null ? (MsScenario) parent : null;
+        } else if (parent != null && parent.getParent() != null) {
+            getScenario(parent.getParent());
+        }
+        return null;
     }
 }

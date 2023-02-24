@@ -1,55 +1,48 @@
 <template>
-
-  <el-dialog :append-to-body="appendToBody"
-    :visible.sync="dialogVisible" destroy-on-close @close="close">
+  <el-dialog :append-to-body="appendToBody" :visible.sync="dialogVisible" destroy-on-close @close="close">
     <div style="padding: 10px">
-      <el-switch active-text="JSON-SCHEMA" v-model="item.jsonType" @change="formatChange" active-value="JSON-SCHEMA"/>
+      <el-switch active-text="JSON-SCHEMA" v-model="item.jsonType" @change="formatChange" active-value="JSON-SCHEMA" />
     </div>
     <div v-if="codeEditActive">
-      <ms-json-code-edit
-        v-if="item.jsonType==='JSON-SCHEMA'"
-        :body="item"
-        ref="jsonCodeEdit"/>
+      <ms-json-code-edit v-if="item.jsonType === 'JSON-SCHEMA'" :body="item" ref="jsonCodeEdit" />
       <ms-code-edit
         v-else
         :read-only="isReadOnly"
         :data.sync="item.value"
         :mode="'json'"
         height="400px"
-        ref="codeEdit"/>
+        ref="codeEdit" />
     </div>
   </el-dialog>
 </template>
 
 <script>
-
-import MsCodeEdit from "metersphere-frontend/src/components/MsCodeEdit";
-import Convert from "@/business/commons/json-schema/convert/convert";
-import MsJsonCodeEdit from "@/business/commons/json-schema/JsonSchemaEditor";
-
+import MsCodeEdit from 'metersphere-frontend/src/components/MsCodeEdit';
+import Convert from '@/business/commons/json-schema/convert/convert';
+import MsJsonCodeEdit from '@/business/commons/json-schema/JsonSchemaEditor';
 
 export default {
-  name: "MsApiVariableJson",
-  components: {MsJsonCodeEdit, MsCodeEdit},
+  name: 'MsApiVariableJson',
+  components: { MsJsonCodeEdit, MsCodeEdit },
   props: {
     isReadOnly: {
       type: Boolean,
-      default: false
+      default: false,
     },
     appendToBody: {
       type: Boolean,
       default() {
         return false;
-      }
+      },
     },
   },
   data() {
     return {
       dialogVisible: false,
-      jsonSchema: "JSON",
+      jsonSchema: 'JSON',
       codeEditActive: true,
-      item: {}
-    }
+      item: {},
+    };
   },
   watch: {
     'item.value'() {
@@ -61,10 +54,10 @@ export default {
             this.item.jsonSchema = this.deepAssign(this.item.jsonSchema, data);
           }
         } catch (ex) {
-          this.item.jsonSchema = "";
+          this.item.jsonSchema = '';
         }
       }
-    }
+    },
   },
 
   methods: {
@@ -105,10 +98,9 @@ export default {
       this.item = {};
       this.reloadCodeEdit();
     },
-    close(){
+    close() {
       this.saveAdvanced();
-    }
+    },
   },
-
-}
+};
 </script>

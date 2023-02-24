@@ -3,20 +3,28 @@
     <el-row>
       <el-col>
         <span v-if="!debug">
-          <el-input v-if="nameIsEdit" size="mini" @blur="handleSave(report.name)" @keyup.enter.native="handleSaveKeyUp"
-                    style="width: 200px" v-model="report.name" maxlength="60" show-word-limit/>
+          <el-input
+            v-if="nameIsEdit"
+            size="mini"
+            @blur="handleSave(report.name)"
+            @keyup.enter.native="handleSaveKeyUp"
+            style="width: 200px"
+            v-model="report.name"
+            maxlength="60"
+            show-word-limit />
           <span v-else>
-             <el-link v-if="isSingleScenario"
-                      type="primary"
-                      class="report-name"
-                      @click="redirect">
+            <el-link v-if="isSingleScenario" type="primary" class="report-name" @click="redirect">
               {{ report.name }}
             </el-link>
             <span v-else>
               {{ report.name }}
             </span>
-            <i v-if="showCancelButton" class="el-icon-edit" style="cursor:pointer" @click="nameIsEdit = true"
-               @click.stop/>
+            <i
+              v-if="showCancelButton"
+              class="el-icon-edit"
+              style="cursor: pointer"
+              @click="nameIsEdit = true"
+              @click.stop />
           </span>
         </span>
         <span v-if="report.endTime || report.createTime">
@@ -26,31 +34,38 @@
           <span class="time"> {{ report.endTime | datetimeFormat }}</span>
         </span>
         <div style="float: right">
-          <el-button v-if="!isPlan && (!debug || exportFlag) && !isTemplate"
-                     v-permission="['PROJECT_API_REPORT:READ+EXPORT']" :disabled="isReadOnly" class="export-button"
-                     plain type="primary" size="mini" @click="handleExport(report.name)" style="margin-right: 10px">
+          <el-button
+            v-if="!isPlan && (!debug || exportFlag) && !isTemplate"
+            v-permission="['PROJECT_API_REPORT:READ+EXPORT']"
+            :disabled="isReadOnly"
+            class="export-button"
+            plain
+            type="primary"
+            size="mini"
+            @click="handleExport(report.name)"
+            style="margin-right: 10px">
             {{ $t('test_track.plan_view.export_report') }}
           </el-button>
 
           <el-popover
             v-if="!isPlan && (!debug || exportFlag) && !isTemplate"
             v-permission="['PROJECT_PERFORMANCE_REPORT:READ+EXPORT']"
-            style="margin-right: 10px;float: right;"
+            style="margin-right: 10px"
             placement="bottom"
             trigger="click"
+            popperClass="ms-custom-message-class"
             width="300">
             <p>{{ shareUrl }}</p>
-            <span style="color: red;float: left;margin-left: 10px;" v-if="application.typeValue">{{
-                $t('commons.validity_period') + application.typeValue
-              }}</span>
+            <span style="color: red; float: left; margin-left: 10px" v-if="application.typeValue">{{
+              $t('commons.validity_period') + application.typeValue
+            }}</span>
             <div style="text-align: right; margin: 0">
-              <el-button type="primary" size="mini" :disabled="!shareUrl"
-                         v-clipboard:copy="shareUrl">{{ $t("commons.copy") }}
+              <el-button type="primary" size="mini" :disabled="!shareUrl" v-clipboard:copy="shareUrl"
+                >{{ $t('commons.copy') }}
               </el-button>
             </div>
             <template v-slot:reference>
-              <el-button :disabled="isReadOnly" type="danger" plain size="mini"
-                         @click="handleShare(report)">
+              <el-button :disabled="isReadOnly" type="danger" plain size="mini" @click="handleShare(report)">
                 {{ $t('test_track.plan_view.share_report') }}
               </el-button>
             </template>
@@ -66,30 +81,48 @@
         </div>
       </el-col>
     </el-row>
-    <el-row v-if="showProjectEnv" type="flex">
+    <el-row type="flex" style="margin-top: 5px">
+      <el-col v-if="this.mode">
+        <div style="float: left">
+          <span> {{ $t('report.run_model') + ':' }} </span>
+        </div>
+        <div style="color: #61c550; margin-left: 10px; float: left">
+          {{ getModeName(this.mode) }}
+        </div>
+      </el-col>
+      <el-col v-if="this.poolName">
+        <div style="float: left">
+          <span> {{ $t('load_test.select_resource_pool') + ':' }} </span>
+        </div>
+        <div style="color: #61c550; margin-left: 10px; float: left">
+          {{ this.poolName }}
+        </div>
+      </el-col>
+      <el-col></el-col>
+    </el-row>
+    <el-row v-if="showProjectEnv" type="flex" style="margin-top: 5px">
       <span> {{ $t('commons.environment') + ':' }} </span>
-      <div v-for="(values,key) in projectEnvMap" :key="key" style="margin-right: 10px">
-        {{ key + ":" }}
-        <ms-tag v-for="(item,index) in values" :key="index" type="success" :content="item"
-                style="margin-left: 2px"/>
+      <div v-for="(values, key) in projectEnvMap" :key="key" style="margin-right: 10px">
+        {{ key + ':' }}
+        <ms-tag v-for="(item, index) in values" :key="index" type="success" :content="item" style="margin-left: 2px" />
       </div>
     </el-row>
   </header>
 </template>
 
 <script>
-
-import {generateShareInfoWithExpired, getShareRedirectUrl} from "../../../api/share";
-import {getCurrentProjectID, getCurrentWorkspaceId} from "metersphere-frontend/src/utils/token";
-import MsTag from "metersphere-frontend/src/components/MsTag";
-import {getProjectApplicationConfig} from "../../../api/project";
-import {apiTestReRun} from "../../../api/xpack";
-import {getUUID} from "metersphere-frontend/src/utils";
-import {getApiScenarioIdByPlanScenarioId} from "@/api/test-plan";
+import { generateShareInfoWithExpired, getShareRedirectUrl } from '../../../api/share';
+import { getCurrentProjectID, getCurrentWorkspaceId } from 'metersphere-frontend/src/utils/token';
+import MsTag from 'metersphere-frontend/src/components/MsTag';
+import {apiProjectByScenarioId, getProjectApplicationConfig} from '../../../api/project';
+import { apiTestReRun } from '../../../api/xpack';
+import { getUUID } from 'metersphere-frontend/src/utils';
+import { getApiScenarioIdByPlanScenarioId } from '@/api/test-plan';
+import {getScenarioReport} from '../../../api/scenario-report';
 
 export default {
-  name: "MsApiReportViewHeader",
-  components: {MsTag},
+  name: 'MsApiReportViewHeader',
+  components: { MsTag },
   props: {
     report: {},
     projectEnvMap: {},
@@ -107,20 +140,22 @@ export default {
       type: Boolean,
       default: false,
     },
-    isPlan: Boolean
+    isPlan: Boolean,
+    poolName: String,
+    mode: String,
   },
   computed: {
     showProjectEnv() {
       return this.projectEnvMap && JSON.stringify(this.projectEnvMap) !== '{}';
     },
     path() {
-      return "/api/test/edit?id=" + this.report.testId;
+      return '/api/test/edit?id=' + this.report.testId;
     },
     scenarioId() {
       if (typeof this.report.scenarioId === 'string') {
         return this.report.scenarioId;
       } else {
-        return "";
+        return '';
       }
     },
     isSingleScenario() {
@@ -136,9 +171,9 @@ export default {
     return {
       isReadOnly: false,
       nameIsEdit: false,
-      shareUrl: "",
-      application: {}
-    }
+      shareUrl: '',
+      application: {},
+    };
   },
   methods: {
     handleExport(name) {
@@ -155,28 +190,38 @@ export default {
       let resourceId = this.scenarioId;
       getApiScenarioIdByPlanScenarioId(this.scenarioId).then((res) => {
         resourceId = res.data;
-        this.showDetails(resourceId);
+          apiProjectByScenarioId(resourceId).then((response) =>{
+            if (response.data) {
+              let projectId = response.data.id;
+              let workspaceId = response.data.workspaceId;
+              let projectName = response.data.name;
+              let workspaceName = response.data.workspaceName;
+              this.showDetails(resourceId, projectId, projectName, workspaceId, workspaceName);
+            }
+          })
       });
     },
-    showDetails(resourceId) {
+    showDetails(resourceId, projectId, projectName, workspaceId, workspaceName) {
       let uuid = getUUID().substring(1, 5);
-      let projectId = getCurrentProjectID();
-      let workspaceId = getCurrentWorkspaceId();
-      let prefix = "/#";
-      if (this.$route && this.$route.path.startsWith('/api/automation/report')
-        && this.$route.query && this.$route.query.list) {
-        prefix = ""
+      let prefix = '/#';
+      if (
+        this.$route &&
+        this.$route.path.startsWith('/api/automation/report') &&
+        this.$route.query &&
+        this.$route.query.list
+      ) {
+        prefix = '';
       }
-      let path = `${prefix}/api/automation/?redirectID=${uuid}&dataType=scenario&projectId=${projectId}&workspaceId=${workspaceId}&resourceId=${resourceId}`;
+      let path = `${prefix}/api/automation/?redirectID=${uuid}&dataType=scenario&projectId=${projectId}&workspaceId=${workspaceId}&resourceId=${resourceId}&projectName=${projectName}&workspaceName=${workspaceName}`;
       let data = this.$router.resolve({
-        path: path
+        path: path,
       });
       window.open(data.href, '_blank');
     },
     rerun() {
       let type = this.report.reportType;
-      let rerunObj = {type: type, reportId: this.report.id}
-      apiTestReRun(rerunObj).then(res => {
+      let rerunObj = { type: type, reportId: this.report.id };
+      apiTestReRun(rerunObj).then((res) => {
         if (res.data !== 'SUCCESS') {
           this.$error(res.data);
         } else {
@@ -201,7 +246,7 @@ export default {
       });
     },
     getProjectApplication() {
-      getProjectApplicationConfig(getCurrentProjectID(), "/API_SHARE_REPORT_TIME").then(res => {
+      getProjectApplicationConfig(getCurrentProjectID(), '/API_SHARE_REPORT_TIME').then((res) => {
         if (res.data && res.data.typeValue) {
           let quantity = res.data.typeValue.substring(0, res.data.typeValue.length - 1);
           let unit = res.data.typeValue.substring(res.data.typeValue.length - 1);
@@ -218,12 +263,19 @@ export default {
         }
       });
     },
-  }
-}
+    getModeName(mode) {
+      switch (mode) {
+        case 'serial':
+          return this.$t('run_mode.serial');
+        case 'parallel':
+          return this.$t('run_mode.parallel');
+      }
+    },
+  },
+};
 </script>
 
 <style scoped>
-
 .export-button {
   float: right;
   margin-right: 10px;
@@ -232,8 +284,8 @@ export default {
 .rerun-button {
   float: right;
   margin-right: 10px;
-  background-color: #F2F9EF;
-  color: #87C45D;
+  background-color: #f2f9ef;
+  color: #87c45d;
 }
 
 .report-name {

@@ -1,6 +1,6 @@
 import {isLogin, login, logout, updateInfo} from '../../api/user'
 import {getLanguage, setLanguage} from "@/i18n";
-import {PROJECT_ID, TokenKey, WORKSPACE_ID} from "../../utils/constants";
+import {PROJECT_ID, SUPER_GROUP, TokenKey, WORKSPACE_ID} from "../../utils/constants";
 
 function saveSessionStorage(response) {
   // 登录信息保存 cookie
@@ -21,7 +21,8 @@ function saveSessionStorage(response) {
   } else {
     let v = user.userGroups.filter(ug => ug.group && ug.group.type === 'PROJECT')
       .filter(ug => ug.sourceId === currentProjectId);
-    if (v.length === 0) {
+    let index = user.groups.findIndex(g => g.id === SUPER_GROUP);
+    if (v.length === 0 && index === -1) {
       sessionStorage.setItem(PROJECT_ID, user.lastProjectId);
     }
   }
@@ -45,7 +46,6 @@ export default {
   persist: true,
   getters: {
     currentUser(store) {
-      // console.log('查询用户信息: ', store.$state);
       return store.$state
     },
   },
@@ -89,6 +89,7 @@ export default {
             if (res && res.code === 'ECONNABORTED') {
               return;
             }
+            // 后台直接删除redis中的token，前端也需要删除
             clearSessionStorage()
             reject(res)
           })
@@ -110,17 +111,20 @@ export default {
     },
 
     userLogout() {
-      clearSessionStorage();
       return new Promise((resolve, reject) => {
-        logout().then(() => {
-          location.href = '/#/login';
-          location.reload();
-          resolve();
-        }).catch(error => {
-          location.href = '/#/login';
-          location.reload();
-          reject(error);
-        })
+        logout()
+          .then(() => {
+            clearSessionStorage();
+            location.href = '/#/login';
+            location.reload();
+            resolve();
+          })
+          .catch(error => {
+            clearSessionStorage();
+            location.href = '/#/login';
+            location.reload();
+            reject(error);
+          });
       })
     },
     switchWorkspace(response) {

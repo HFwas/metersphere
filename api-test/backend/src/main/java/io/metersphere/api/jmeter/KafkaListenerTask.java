@@ -1,12 +1,13 @@
 package io.metersphere.api.jmeter;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.metersphere.api.exec.queue.PoolExecBlockingQueueUtil;
+import io.metersphere.commons.constants.ApiRunMode;
+import io.metersphere.commons.constants.ExtendedParameter;
+import io.metersphere.commons.utils.JSON;
+import io.metersphere.dto.ResultDTO;
 import io.metersphere.service.ApiExecutionQueueService;
 import io.metersphere.service.TestResultService;
-import io.metersphere.commons.constants.ApiRunMode;
-import io.metersphere.dto.ResultDTO;
 import io.metersphere.utils.LoggerUtil;
 import lombok.Data;
 import org.apache.commons.collections.CollectionUtils;
@@ -21,8 +22,6 @@ public class KafkaListenerTask implements Runnable {
     private ConsumerRecord<?, String> record;
     private ApiExecutionQueueService apiExecutionQueueService;
     private TestResultService testResultService;
-    private ObjectMapper mapper;
-
     private static final Map<String, String> RUN_MODE_MAP = new HashMap<String, String>() {{
         this.put(ApiRunMode.SCHEDULE_API_PLAN.name(), "schedule-task");
         this.put(ApiRunMode.JENKINS_API_PLAN.name(), "schedule-task");
@@ -54,10 +53,10 @@ public class KafkaListenerTask implements Runnable {
             if (dto == null) {
                 return;
             }
-            if (dto.getArbitraryData() != null && dto.getArbitraryData().containsKey("TEST_END")
-                    && (Boolean) dto.getArbitraryData().get("TEST_END")) {
+            if (dto.getArbitraryData() != null && dto.getArbitraryData().containsKey(ExtendedParameter.TEST_END)
+                    && (Boolean) dto.getArbitraryData().get(ExtendedParameter.TEST_END)) {
                 resultDTOS.add(dto);
-                LoggerUtil.info("KAFKA消费结果处理状态：" + dto.getArbitraryData().get("TEST_END"), String.valueOf(record.key()));
+                LoggerUtil.info("KAFKA消费结果处理状态：" + dto.getArbitraryData().get(ExtendedParameter.TEST_END), String.valueOf(record.key()));
             }
             // 携带结果
             if (CollectionUtils.isNotEmpty(dto.getRequestResults())) {
@@ -98,9 +97,8 @@ public class KafkaListenerTask implements Runnable {
 
     private ResultDTO formatResult() {
         try {
-            // 多态JSON普通转换会丢失内容，需要通过 ObjectMapper 获取
             if (StringUtils.isNotEmpty(record.value())) {
-                return mapper.readValue(record.value(), new TypeReference<ResultDTO>() {
+                return JSON.parseObject(record.value(), new TypeReference<ResultDTO>() {
                 });
             }
         } catch (Exception e) {

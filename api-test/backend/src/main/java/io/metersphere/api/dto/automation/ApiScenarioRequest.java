@@ -19,6 +19,7 @@ public class ApiScenarioRequest extends BaseQueryRequest {
     private long scheduleCreateTime = 0;
     private String executeStatus;
     private String selectDataType;
+    private String selectDataRange;
     private boolean notInTestPlan;
     private String reviewId;
     private String versionId;
@@ -33,6 +34,9 @@ public class ApiScenarioRequest extends BaseQueryRequest {
      * 是否需要查询环境字段
      */
     private boolean selectEnvironment = false;
+
+    // 查询功能用例需要关联的场景测试列表
+    private String testCaseId;
 
     //测试计划关联场景过滤掉步骤为0的场景
     private String stepTotal;

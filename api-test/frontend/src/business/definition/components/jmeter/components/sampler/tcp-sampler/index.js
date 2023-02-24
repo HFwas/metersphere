@@ -1,22 +1,22 @@
-import Sampler from "../sampler";
+import Sampler from '../sampler';
 
 const DEFAULT_OPTIONS = {
   options: {
     attributes: {
-      guiclass: "TCPSamplerGui",
-      testclass: "TCPSampler",
-      testname: "TCPSampler",
-      enabled: "true"
+      guiclass: 'TCPSamplerGui',
+      testclass: 'TCPSampler',
+      testname: 'TCPSampler',
+      enabled: 'true',
     },
-  }
+  },
 };
 
 export default class TCPSampler extends Sampler {
-  static CLASSES = ["TCPClientImpl", "BinaryTCPClientImpl", "LengthPrefixedBinaryTCPClientImpl"]
+  static CLASSES = ['TCPClientImpl', 'BinaryTCPClientImpl', 'LengthPrefixedBinaryTCPClientImpl'];
 
   constructor(options = DEFAULT_OPTIONS) {
     super(options);
-    this.type = "TCPSampler";
+    this.type = 'TCPSampler';
     this.classname = options.classname || TCPSampler.CLASSES[0];
     this.server = options.server;
     this.port = options.port;
@@ -38,5 +38,5 @@ export default class TCPSampler extends Sampler {
 }
 
 export const schema = {
-  TCPSampler: TCPSampler
-}
+  TCPSampler: TCPSampler,
+};

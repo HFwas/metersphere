@@ -1,6 +1,5 @@
 <template>
   <div>
-
     <slot name="header"></slot>
 
     <ms-node-tree
@@ -23,38 +22,31 @@
       @filter="filter"
       @nodeSelectEvent="nodeChange"
       ref="nodeTree">
-
       <template v-slot:header>
-        <ms-search-bar
-          :show-operator="showOperator && !isTrashData"
+        <ms-search-bar :show-operator="showOperator && !isTrashData" :condition="condition" :commands="operators" />
+        <module-trash-button
+          v-if="!isReadOnly && !isTrashData"
           :condition="condition"
-          :commands="operators"/>
-        <module-trash-button v-if="!isReadOnly && !isTrashData" :condition="condition" :exe="enableTrash"
-                             :total='total'/>
+          :exe="enableTrash"
+          :total="total" />
       </template>
-
     </ms-node-tree>
 
-    <ms-add-basis-scenario
-      :module-options="data"
-      @saveAsEdit="saveAsEdit"
-      @refresh="refresh"
-      ref="basisScenario"/>
+    <ms-add-basis-scenario :module-options="data" @saveAsEdit="saveAsEdit" @refresh="refresh" ref="basisScenario" />
 
-    <api-import ref="apiImport" :moduleOptions="data" @refreshAll="$emit('refreshAll')"/>
+    <api-import ref="apiImport" :moduleOptions="data" @refreshAll="$emit('refreshAll')" />
   </div>
-
 </template>
 
 <script>
-import SelectMenu from "@/business/commons/SelectMenu";
-import MsAddBasisScenario from "@/business/automation/scenario/AddBasisScenario";
-import MsNodeTree from "@/business/commons/NodeTree";
-import {buildTree} from "metersphere-frontend/src/model/NodeTree";
-import ModuleTrashButton from "../../definition/components/module/ModuleTrashButton";
-import ApiImport from "./common/ScenarioImport";
-import MsSearchBar from "metersphere-frontend/src/components/search/MsSearchBar";
-import {getCurrentProjectID} from "metersphere-frontend/src/utils/token";
+import SelectMenu from '@/business/commons/SelectMenu';
+import MsAddBasisScenario from '@/business/automation/scenario/AddBasisScenario';
+import MsNodeTree from '@/business/commons/NodeTree';
+import { buildTree } from 'metersphere-frontend/src/model/NodeTree';
+import ModuleTrashButton from '../../definition/components/module/ModuleTrashButton';
+import ApiImport from './common/ScenarioImport';
+import MsSearchBar from 'metersphere-frontend/src/components/search/MsSearchBar';
+import { getCurrentProjectID } from 'metersphere-frontend/src/utils/token';
 import {
   addScenarioModule,
   delScenarioModule,
@@ -63,8 +55,10 @@ import {
   getModuleByProjectId,
   getModuleByRelevanceProjectId,
   getModuleByTrash,
-  posScenarioModule
-} from "@/api/scenario-module";
+  posScenarioModule,
+  postModuleByProjectId,
+  postModuleByTrash,
+} from '@/api/scenario-module';
 
 export default {
   name: 'MsApiScenarioModule',
@@ -81,7 +75,7 @@ export default {
       type: Boolean,
       default() {
         return false;
-      }
+      },
     },
     showOperator: Boolean,
     relevanceProjectId: String,
@@ -92,14 +86,14 @@ export default {
       type: Boolean,
       default() {
         return true;
-      }
+      },
     },
     selectProjectId: {
       type: String,
       default() {
         return getCurrentProjectID();
-      }
-    }
+      },
+    },
   },
   computed: {
     isRelevanceModel() {
@@ -111,27 +105,28 @@ export default {
       } else {
         return getCurrentProjectID();
       }
-    }
+    },
   },
   data() {
     return {
       result: false,
       condition: {
-        filterText: "",
-        trashEnable: false
+        filterText: '',
+        trashEnable: false,
       },
+      param: {},
       data: [],
       currentModule: undefined,
       operators: [
         {
           label: this.$t('api_test.automation.add_scenario'),
           callback: this.addScenario,
-          permissions: ['PROJECT_API_SCENARIO:READ+CREATE']
+          permissions: ['PROJECT_API_SCENARIO:READ+CREATE'],
         },
         {
           label: this.$t('api_test.api_import.label'),
           callback: this.handleImport,
-          permissions: ['PROJECT_API_SCENARIO:READ+IMPORT_SCENARIO']
+          permissions: ['PROJECT_API_SCENARIO:READ+IMPORT_SCENARIO'],
         },
         {
           label: this.$t('report.export'),
@@ -141,19 +136,19 @@ export default {
               permissions: ['PROJECT_API_SCENARIO:READ+EXPORT_SCENARIO'],
               callback: () => {
                 this.exportAPI();
-              }
+              },
             },
             {
               label: this.$t('report.export_jmeter_format'),
               permissions: ['PROJECT_API_SCENARIO:READ+EXPORT_SCENARIO'],
               callback: () => {
                 this.$emit('exportJmx');
-              }
-            }
-          ]
-        }
-      ]
-    }
+              },
+            },
+          ],
+        },
+      ],
+    };
   },
   mounted() {
     this.list();
@@ -163,6 +158,7 @@ export default {
       this.filter();
     },
     'condition.trashEnable'() {
+      this.param = {};
       this.$emit('enableTrash', this.condition.trashEnable);
     },
     relevanceProjectId() {
@@ -170,17 +166,29 @@ export default {
     },
     isTrashData() {
       this.condition.trashEnable = this.isTrashData;
+      this.param = {};
+    },
+  },
+  created() {
+    this.$EventBus.$on('scenarioConditionBus', (param) => {
+      this.param = param;
       this.list();
-    }
+    });
+  },
+  beforeDestroy() {
+    this.$EventBus.$off('scenarioConditionBus', (param) => {
+      this.param = param;
+      this.list();
+    });
   },
   methods: {
     handleImport() {
       if (this.projectId) {
-        this.result = getModuleByProjectId(this.projectId).then(response => {
+        this.result = getModuleByProjectId(this.projectId).then((response) => {
           if (response.data != undefined && response.data != null) {
             this.data = response.data;
-            this.data.forEach(node => {
-              buildTree(node, {path: ''});
+            this.data.forEach((node) => {
+              buildTree(node, { path: '' });
             });
           }
         });
@@ -192,15 +200,15 @@ export default {
     },
     list(projectId) {
       if (this.isRelevanceModel) {
-        this.result = getModuleByRelevanceProjectId(this.relevanceProjectId).then(response => {
+        this.result = getModuleByRelevanceProjectId(this.relevanceProjectId).then((response) => {
           this.setData(response);
         });
       } else if (this.isTrashData) {
-        this.result = getModuleByTrash(projectId ? projectId : this.projectId).then(response => {
+        this.result = postModuleByTrash(projectId ? projectId : this.projectId, this.param).then((response) => {
           this.setData(response);
         });
       } else {
-        this.result = getModuleByProjectId(projectId ? projectId : this.projectId).then(response => {
+        this.result = postModuleByProjectId(projectId ? projectId : this.projectId, this.param).then((response) => {
           this.setData(response);
         });
       }
@@ -208,9 +216,9 @@ export default {
     setData(response) {
       if (response.data != undefined && response.data != null) {
         this.data = response.data;
-        this.data.forEach(node => {
-          node.name = node.name === '未规划场景' ? this.$t('api_test.automation.unplanned_scenario') : node.name
-          buildTree(node, {path: ''});
+        this.data.forEach((node) => {
+          node.name = node.name === '未规划场景' ? this.$t('api_test.automation.unplanned_scenario') : node.name;
+          buildTree(node, { path: '' });
         });
         this.$emit('setModuleOptions', this.data);
         this.$emit('setNodeTree', this.data);
@@ -222,13 +230,16 @@ export default {
     edit(param) {
       param.projectId = this.projectId;
       param.protocol = this.condition.protocol;
-      editScenarioModule(param).then(() => {
-        this.$success(this.$t('commons.save_success'));
-        this.list();
-        this.refresh();
-      }, (error) => {
-        this.list();
-      });
+      editScenarioModule(param).then(
+        () => {
+          this.$success(this.$t('commons.save_success'));
+          this.list();
+          this.refresh();
+        },
+        (error) => {
+          this.list();
+        }
+      );
     },
     add(param) {
       param.projectId = this.projectId;
@@ -238,71 +249,78 @@ export default {
         this.$error(this.$t('commons.warning_module_add'));
         return;
       } else {
-        addScenarioModule(param).then(() => {
-          this.$success(this.$t('commons.save_success'));
-          this.list();
-        }, (error) => {
-          this.list();
-        });
+        addScenarioModule(param).then(
+          () => {
+            this.$success(this.$t('commons.save_success'));
+            this.list();
+          },
+          (error) => {
+            this.list();
+          }
+        );
       }
-
     },
     remove(nodeIds) {
-      delScenarioModule(nodeIds).then(() => {
-        this.list();
-        this.refresh();
-        this.removeModuleId(nodeIds);
-      }, (error) => {
-        this.list();
-      });
+      delScenarioModule(nodeIds).then(
+        () => {
+          this.list();
+          this.refresh();
+          this.removeModuleId(nodeIds);
+        },
+        (error) => {
+          this.list();
+        }
+      );
     },
     drag(param, list) {
-      dragScenarioModule(param).then(() => {
-        posScenarioModule(list).then(() => {
+      dragScenarioModule(param).then(
+        () => {
+          posScenarioModule(list).then(() => {
+            this.list();
+          });
+        },
+        (error) => {
           this.list();
-        });
-      }, (error) => {
-        this.list();
-      });
+        }
+      );
     },
     nodeChange(node, nodeIds, pNodes) {
       this.currentModule = node.data;
       if (node.data.id === 'root') {
-        this.$emit("nodeSelectEvent", node, [], pNodes);
+        this.$emit('nodeSelectEvent', node, [], pNodes);
       } else {
-        this.$emit("nodeSelectEvent", node, nodeIds, pNodes);
+        this.$emit('nodeSelectEvent', node, nodeIds, pNodes);
       }
       this.nohupReloadTree(node.data.id);
     },
     //后台更新节点数据
     nohupReloadTree(selectNodeId) {
       if (this.isRelevanceModel) {
-        getModuleByRelevanceProjectId(this.relevanceProjectId).then(response => {
+        getModuleByRelevanceProjectId(this.relevanceProjectId).then((response) => {
           this.setModuleList(response, selectNodeId);
         });
       } else if (this.isTrashData) {
         if (!this.projectId) {
           return;
         }
-        getModuleByTrash(this.projectId).then(response => {
+        postModuleByTrash(this.projectId, this.param).then((response) => {
           this.setModuleList(response, selectNodeId);
         });
       } else {
         if (!this.projectId) {
           return;
         }
-        getModuleByProjectId(this.projectId).then(response => {
+        postModuleByProjectId(this.projectId, this.param).then((response) => {
           this.setModuleList(response, selectNodeId);
         });
       }
-
     },
     setModuleList(response, selectNodeId) {
       if (response.data != undefined && response.data != null) {
         this.data = response.data;
-        this.data.forEach(node => {
-          node.name = node.name === '未规划场景' ? this.$t('api_test.automation.unplanned_scenario') : node.name
-          buildTree(node, {path: ''});
+        this.data.forEach((node) => {
+          node.name = node.name === '未规划场景' ? this.$t('api_test.automation.unplanned_scenario') : node.name;
+          buildTree(node, { path: '' });
         });
 
         this.$nextTick(() => {
@@ -312,7 +330,7 @@ export default {
               this.$refs.nodeTree.justSetCurrentKey(selectNodeId);
             }
           }
-        })
+        });
       }
     },
     exportAPI() {
@@ -322,26 +340,28 @@ export default {
       this.$emit('saveAsEdit', data);
     },
     refresh() {
-      this.$emit("refreshAll");
+      this.$emit('refreshAll');
     },
     addScenario() {
       if (!this.projectId) {
         this.$warning(this.$t('commons.check_project_tip'));
         return;
       }
+      if (!this.currentModule) {
+        this.$error(this.$t('test_track.case.input_module'));
+      }
       this.$refs.basisScenario.open(this.currentModule);
     },
     enableTrash() {
       this.condition.trashEnable = true;
-      this.$emit('enableTrash', this.condition.trashEnable);
     },
     removeModuleId(nodeIds) {
       if (localStorage.getItem('scenarioModule') && localStorage.getItem('scenarioModule') === nodeIds[0]) {
         localStorage.setItem('scenarioModule', undefined);
       }
-    }
-  }
-}
+    },
+  },
+};
 </script>
 
 <style scoped>
@@ -390,9 +410,4 @@ export default {
 :deep(.el-tree-node__content) {
   height: 33px;
 }
-
-.ms-api-buttion {
-  width: 30px;
-}
-
 </style>

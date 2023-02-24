@@ -6,32 +6,35 @@
           <ms-table-header :condition.sync="condition" v-if="loadIsOver" @search="search" :show-create="false">
             <template v-slot:button>
               <el-button-group>
-
                 <el-tooltip class="item" effect="dark" content="left" :disabled="true" placement="left">
-                  <el-button plain :class="{active: leftActive}" @click="changeTab('left')">
+                  <el-button plain :class="{ active: leftActive }" @click="changeTab('left')">
                     {{ $t('commons.scenario') }}
                   </el-button>
                 </el-tooltip>
 
                 <el-tooltip class="item" effect="dark" content="right" :disabled="true" placement="right">
-                  <el-button plain :class="{active: rightActive}" @click="changeTab('right')">
+                  <el-button plain :class="{ active: rightActive }" @click="changeTab('right')">
                     {{ $t('api_test.definition.request.case') }}
                   </el-button>
                 </el-tooltip>
-
               </el-button-group>
             </template>
           </ms-table-header>
         </template>
 
-
-        <el-table ref="reportListTable" border :data="tableData" class="adjust-table table-content" @sort-change="sort"
-                  @select-all="handleSelectAll"
-                  @select="handleSelect"
-                  :height="screenHeight"
-                  @filter-change="filter" @row-click="handleView" v-if="loadIsOver">
-          <el-table-column
-            type="selection"/>
+        <el-table
+          ref="reportListTable"
+          border
+          :data="tableData"
+          class="adjust-table table-content"
+          @sort-change="sort"
+          @select-all="handleSelectAll"
+          @select="handleSelect"
+          :height="screenHeight"
+          @filter-change="filter"
+          @row-click="handleView"
+          v-if="loadIsOver">
+          <el-table-column type="selection" />
           <el-table-column width="40" :resizable="false" align="center">
             <el-dropdown slot="header" style="width: 14px">
               <span class="el-dropdown-link" style="width: 14px">
@@ -47,7 +50,7 @@
               </el-dropdown-menu>
             </el-dropdown>
             <template v-slot:default="scope">
-              <show-more-btn :is-show="scope.row.showMore" :buttons="buttons" :size="selectDataCounts"/>
+              <show-more-btn :is-show="scope.row.showMore" :buttons="buttons" :size="selectDataCounts" />
             </template>
           </el-table-column>
 
@@ -62,9 +65,12 @@
             min-width="200px">
           </ms-table-column>
 
-          <el-table-column prop="reportType" :label="$t('load_test.report_type')" width="150"
-                           column-key="reportType"
-                           :filters="reportTypeFilters">
+          <el-table-column
+            prop="reportType"
+            :label="$t('load_test.report_type')"
+            width="150"
+            column-key="reportType"
+            :filters="reportTypeFilters">
             <template v-slot:default="scope">
               <div v-if="scope.row.reportType === 'SCENARIO_INTEGRATED'">
                 <el-tag size="mini" type="primary">
@@ -92,8 +98,12 @@
               </div>
             </template>
           </el-table-column>
-          <ms-table-column prop="userName" :label="$t('api_test.creator')" width="150" show-overflow-tooltip
-                           :filters="userFilters"/>
+          <ms-table-column
+            prop="userName"
+            :label="$t('api_test.creator')"
+            width="150"
+            show-overflow-tooltip
+            :filters="userFilters" />
           <el-table-column prop="createTime" min-width="120" :label="$t('commons.create_time')" sortable>
             <template v-slot:default="scope">
               <span>{{ scope.row.createTime | datetimeFormat }}</span>
@@ -109,86 +119,99 @@
               </span>
             </template>
           </el-table-column>
-          <el-table-column prop="triggerMode" width="150" :label="$t('commons.trigger_mode.name')"
-                           column-key="triggerMode" :filters="triggerFilters">
+          <el-table-column
+            prop="triggerMode"
+            width="150"
+            :label="$t('commons.trigger_mode.name')"
+            column-key="triggerMode"
+            :filters="triggerFilters">
             <template v-slot:default="scope">
-              <report-trigger-mode-item :trigger-mode="scope.row.triggerMode"/>
+              <report-trigger-mode-item :trigger-mode="scope.row.triggerMode" />
             </template>
           </el-table-column>
-          <el-table-column
-            :label="$t('commons.status')"
-            :filters="statusFilters"
-            column-key="status"
-            prop="status">
-            <template v-slot:default="{row}">
-              <ms-api-report-status :status="row.status"/>
+          <el-table-column :label="$t('commons.status')" :filters="statusFilters" column-key="status" prop="status">
+            <template v-slot:default="{ row }">
+              <ms-api-report-status :status="row.status" />
             </template>
           </el-table-column>
           <el-table-column width="150" :label="$t('commons.operating')">
             <template v-slot:default="scope">
               <div>
                 <ms-table-operator-button
-                  :tip="$t('api_report.detail')" icon="el-icon-s-data"
-                  @exec="handleView(scope.row)" type="primary"/>
+                  :tip="$t('api_report.detail')"
+                  icon="el-icon-s-data"
+                  @exec="handleView(scope.row)"
+                  type="primary" />
                 <ms-table-operator-button
                   :tip="$t('api_report.delete')"
                   v-permission="['PROJECT_API_REPORT:READ+DELETE']"
-                  icon="el-icon-delete" @exec="handleDelete(scope.row)" type="danger"/>
+                  icon="el-icon-delete"
+                  @exec="handleDelete(scope.row)"
+                  type="danger" />
               </div>
             </template>
           </el-table-column>
         </el-table>
-        <ms-table-pagination :change="search" :current-page.sync="currentPage" :page-size.sync="pageSize"
-                             :total="total"/>
+        <ms-table-pagination
+          :change="search"
+          :current-page.sync="currentPage"
+          :page-size.sync="pageSize"
+          :total="total" />
       </el-card>
       <ms-rename-report-dialog ref="renameDialog" @submit="rename($event)"></ms-rename-report-dialog>
-      <el-dialog :close-on-click-modal="false" :title="$t('test_track.plan_view.test_result')" width="60%"
-                 :visible.sync="resVisible" class="api-import" destroy-on-close @close="resVisible=false">
-        <ms-request-result-tail :report-id="reportId" :response="response" ref="debugResult"/>
+      <el-dialog
+        :close-on-click-modal="false"
+        :title="$t('test_track.plan_view.test_result')"
+        width="60%"
+        :visible.sync="resVisible"
+        class="api-import"
+        destroy-on-close
+        @close="resVisible = false">
+        <ms-request-result-tail :report-id="reportId" :response="response" ref="debugResult" />
       </el-dialog>
     </ms-main-container>
   </ms-container>
 </template>
 <script>
-import {getCurrentProjectID} from "metersphere-frontend/src/utils/token";
-import {REPORT_CASE_CONFIGS, REPORT_CONFIGS} from "metersphere-frontend/src/components/search/search-components";
-import {_filter, _sort} from "metersphere-frontend/src/utils/tableUtils";
-import MsRenameReportDialog from "metersphere-frontend/src/components/report/MsRenameReportDialog";
-import MsTableColumn from "metersphere-frontend/src/components/table/MsTableColumn";
-import MsRequestResultTail from "@/business/definition/components/response/RequestResultTail";
-import MsTabButton from "@/business/commons/MsTabs";
-import {getMaintainer} from "@/api/project";
-import {delBatchReport, delReport, getReportPage, reportReName} from "@/api/scenario-report";
-import {getApiReportPage} from "@/api/definition-report";
-import {REPORT_STATUS} from "@/business/commons/js/commons";
+import { getCurrentProjectID } from 'metersphere-frontend/src/utils/token';
+import { REPORT_CASE_CONFIGS, REPORT_CONFIGS } from 'metersphere-frontend/src/components/search/search-components';
+import { _filter, _sort } from 'metersphere-frontend/src/utils/tableUtils';
+import MsRenameReportDialog from 'metersphere-frontend/src/components/report/MsRenameReportDialog';
+import MsTableColumn from 'metersphere-frontend/src/components/table/MsTableColumn';
+import MsRequestResultTail from '@/business/definition/components/response/RequestResultTail';
+import MsTabButton from '@/business/commons/MsTabs';
+import { getMaintainer } from '@/api/project';
+import { delBatchReport, delReport, getReportPage, reportReName } from '@/api/scenario-report';
+import { getApiReportPage } from '@/api/definition-report';
+import { REPORT_STATUS } from '@/business/commons/js/commons';
 
 export default {
   components: {
-    ReportTriggerModeItem: () => import("metersphere-frontend/src/components/tableItem/ReportTriggerModeItem"),
-    MsTableOperatorButton: () => import("metersphere-frontend/src/components/MsTableOperatorButton"),
-    MsApiReportStatus: () => import("./ApiReportStatus"),
-    MsMainContainer: () => import("metersphere-frontend/src/components/MsMainContainer"),
-    MsContainer: () => import("metersphere-frontend/src/components/MsContainer"),
-    MsTableHeader: () => import("metersphere-frontend/src/components/MsTableHeader"),
-    MsTablePagination: () => import("metersphere-frontend/src/components/pagination/TablePagination"),
-    ShowMoreBtn: () => import("@/business/commons/ShowMoreBtn"),
+    ReportTriggerModeItem: () => import('metersphere-frontend/src/components/tableItem/ReportTriggerModeItem'),
+    MsTableOperatorButton: () => import('metersphere-frontend/src/components/MsTableOperatorButton'),
+    MsApiReportStatus: () => import('./ApiReportStatus'),
+    MsMainContainer: () => import('metersphere-frontend/src/components/MsMainContainer'),
+    MsContainer: () => import('metersphere-frontend/src/components/MsContainer'),
+    MsTableHeader: () => import('metersphere-frontend/src/components/MsTableHeader'),
+    MsTablePagination: () => import('metersphere-frontend/src/components/pagination/TablePagination'),
+    ShowMoreBtn: () => import('@/business/commons/ShowMoreBtn'),
     MsRenameReportDialog,
     MsTableColumn,
     MsTabButton,
     MsRequestResultTail,
   },
   props: {
-    reportType: String
+    reportType: String,
   },
   data() {
     return {
       result: false,
       resVisible: false,
       response: {},
-      reportId: "",
+      reportId: '',
       debugVisible: false,
       condition: {
-        components: REPORT_CONFIGS
+        components: REPORT_CONFIGS,
       },
       tableData: [],
       multipleSelection: [],
@@ -197,63 +220,75 @@ export default {
       loadIsOver: true,
       total: 0,
       loading: false,
-      currentProjectId: "",
+      currentProjectId: '',
       statusFilters: REPORT_STATUS,
       reportTypeFilters: [],
       reportScenarioFilters: [
-        {text: this.$t('api_test.scenario.independent') + this.$t('commons.scenario'), value: 'SCENARIO_INDEPENDENT'},
-        {text: this.$t('api_test.scenario.integrated') + this.$t('commons.scenario'), value: 'SCENARIO_INTEGRATED'}
+        {
+          text: this.$t('api_test.scenario.independent') + this.$t('commons.scenario'),
+          value: 'SCENARIO_INDEPENDENT',
+        },
+        {
+          text: this.$t('api_test.scenario.integrated') + this.$t('commons.scenario'),
+          value: 'SCENARIO_INTEGRATED',
+        },
       ],
       reportCaseFilters: [
-        {text: this.$t('api_test.scenario.independent') + 'case', value: 'API_INDEPENDENT'},
-        {text: this.$t('api_test.scenario.integrated') + 'case', value: 'API_INTEGRATED'},
+        {
+          text: this.$t('api_test.scenario.independent') + 'case',
+          value: 'API_INDEPENDENT',
+        },
+        {
+          text: this.$t('api_test.scenario.integrated') + 'case',
+          value: 'API_INTEGRATED',
+        },
       ],
       triggerFilters: [
-        {text: this.$t('commons.trigger_mode.manual'), value: 'MANUAL'},
-        {text: this.$t('commons.trigger_mode.schedule'), value: 'SCHEDULE'},
-        {text: this.$t('commons.trigger_mode.api'), value: 'API'},
-        {text: this.$t('api_test.automation.batch_execute'), value: 'BATCH'},
+        { text: this.$t('commons.trigger_mode.manual'), value: 'MANUAL' },
+        { text: this.$t('commons.trigger_mode.schedule'), value: 'SCHEDULE' },
+        { text: this.$t('commons.trigger_mode.api'), value: 'API' },
+        { text: this.$t('api_test.automation.batch_execute'), value: 'BATCH' },
       ],
       buttons: [
         {
           name: this.$t('api_report.batch_delete'),
           handleClick: this.handleBatchDelete,
-          permissions: ['PROJECT_API_REPORT:READ+DELETE']
-        }
+          permissions: ['PROJECT_API_REPORT:READ+DELETE'],
+        },
       ],
       selectRows: new Set(),
       selectAll: false,
       unSelection: [],
       selectDataCounts: 0,
       screenHeight: 'calc(100vh - 160px)',
-      trashActiveDom: 'left',
+      activeDom: 'left',
       userFilters: [],
-    }
+    };
   },
   watch: {
-    '$route'(to, from) {
+    $route(to, from) {
       if (to.path.startsWith('/api/automation/report')) {
         this.init();
       }
     },
-    trashActiveDom() {
-      this.condition.filters = {report_type: []};
+    activeDom() {
+      this.condition.filters = { report_type: [] };
       this.search();
-    }
+    },
   },
   computed: {
     leftActive() {
-      return this.trashActiveDom === 'left';
+      return this.activeDom === 'left';
     },
     rightActive() {
-      return this.trashActiveDom === 'right';
+      return this.activeDom === 'right';
     },
   },
   methods: {
     getMaintainerOptions() {
-      getMaintainer().then(response => {
-        this.userFilters = response.data.map(u => {
-          return {text: u.name, value: u.id};
+      getMaintainer().then((response) => {
+        this.userFilters = response.data.map((u) => {
+          return { text: u.name, value: u.id };
         });
       });
     },
@@ -265,23 +300,55 @@ export default {
       this.selectAll = false;
       this.unSelection = [];
       this.selectDataCounts = 0;
-
       this.condition.reportType = this.reportType;
       if (this.condition.orders && this.condition.orders.length > 0) {
         let order = this.condition.orders[this.condition.orders.length - 1];
         this.condition.orders = [];
         this.condition.orders.push(order);
       }
-      if (this.trashActiveDom === 'left') {
+
+      //解析并处理跳转的参数
+      this.genRedirectParams(this.condition);
+      if (this.activeDom === 'left') {
         this.reportTypeFilters = this.reportScenarioFilters;
-        this.result = getReportPage(this.currentPage, this.pageSize, this.condition).then(res => {
+        this.result = getReportPage(this.currentPage, this.pageSize, this.condition).then((res) => {
           this.setData(res);
-        })
+        });
       } else {
         this.reportTypeFilters = this.reportCaseFilters;
-        this.result = getApiReportPage(this.currentPage, this.pageSize, this.condition).then(res => {
+        this.result = getApiReportPage(this.currentPage, this.pageSize, this.condition).then((res) => {
           this.setData(res);
-        })
+        });
+      }
+    },
+    genRedirectParams(condition) {
+      let selectDataRange = 'all';
+      let selectDataType = 'all';
+      let routeParamObj = this.$route.params;
+      let redirectVersionId = this.$route.params.versionId;
+      if (redirectVersionId && redirectVersionId !== 'default') {
+        this.condition.versionId = redirectVersionId;
+      }
+      if (routeParamObj) {
+        selectDataRange = routeParamObj.dataSelectRange;
+        selectDataType = routeParamObj.dataType;
+      }
+      if (
+        (this.activeDom === 'left' && selectDataType === 'scenario') ||
+        (this.activeDom === 'right' && selectDataType === 'apiCase')
+      ) {
+        condition.selectDataType = selectDataType;
+        switch (selectDataRange) {
+          case 'scheduleExecutionPassCount':
+            this.condition.selectDataRange = 'scheduleExecutionPass';
+            break;
+          case 'scheduleExecutionFakeErrorCount':
+            this.condition.selectDataRange = 'scheduleExecutionFakeError';
+            break;
+          case 'scheduleExecutionFailedCount':
+            this.condition.selectDataRange = 'scheduleExecutionFailed';
+            break;
+        }
       }
     },
     setData(response) {
@@ -289,26 +356,26 @@ export default {
       this.total = data.itemCount;
       this.tableData = data.listObject;
       this.selectRows.clear();
-      this.unSelection = data.listObject.map(s => s.id);
+      this.unSelection = data.listObject.map((s) => s.id);
     },
     handleView(report) {
       this.reportId = report.id;
       if (report.status === 'RUNNING' || report.status === 'RERUNNING') {
-        this.$warning(this.$t('commons.run_warning'))
+        this.$warning(this.$t('commons.run_warning'));
         return;
       }
       if (report.reportType.indexOf('SCENARIO') !== -1 || report.reportType === 'API_INTEGRATED') {
         this.currentProjectId = report.projectId;
         this.$router.push({
           path: 'report/view/' + report.id,
-          query: {list: true}
+          query: { list: true },
         });
       } else {
         this.resVisible = true;
       }
     },
     handleDelete(report) {
-      this.$alert(this.$t('api_report.delete_confirm') + report.name + "？", '', {
+      this.$alert(this.$t('api_report.delete_confirm') + report.name + '？', '', {
         confirmButtonText: this.$t('commons.confirm'),
         callback: (action) => {
           if (action === 'confirm') {
@@ -317,7 +384,7 @@ export default {
               this.search();
             });
           }
-        }
+        },
       });
     },
     init() {
@@ -334,54 +401,54 @@ export default {
     },
     handleSelect(selection, row) {
       if (this.selectRows.has(row)) {
-        this.$set(row, "showMore", false);
+        this.$set(row, 'showMore', false);
         this.selectRows.delete(row);
       } else {
-        this.$set(row, "showMore", true);
+        this.$set(row, 'showMore', true);
         this.selectRows.add(row);
       }
-      this.selectRowsCount(this.selectRows)
+      this.selectRowsCount(this.selectRows);
     },
     handleSelectAll(selection) {
       if (selection.length > 0) {
-        this.tableData.forEach(item => {
-          this.$set(item, "showMore", true);
+        this.tableData.forEach((item) => {
+          this.$set(item, 'showMore', true);
           this.selectRows.add(item);
         });
       } else {
         this.selectRows.clear();
-        this.tableData.forEach(row => {
-          this.$set(row, "showMore", false);
-        })
+        this.tableData.forEach((row) => {
+          this.$set(row, 'showMore', false);
+        });
       }
-      this.selectRowsCount(this.selectRows)
+      this.selectRowsCount(this.selectRows);
     },
     handleBatchDelete() {
-      this.$alert(this.$t('api_report.delete_batch_confirm') + "？", '', {
+      this.$alert(this.$t('api_report.delete_batch_confirm') + '？', '', {
         confirmButtonText: this.$t('commons.confirm'),
         callback: (action) => {
           if (action === 'confirm') {
-            let ids = Array.from(this.selectRows).map(row => row.id);
+            let ids = Array.from(this.selectRows).map((row) => row.id);
             let sendParam = {};
             sendParam.ids = ids;
             sendParam.selectAllDate = this.isSelectAllDate;
             sendParam.unSelectIds = this.unSelection;
             sendParam = Object.assign(sendParam, this.condition);
-            sendParam.caseType = this.trashActiveDom === 'right' ? 'API' : 'SCENARIO';
+            sendParam.caseType = this.activeDom === 'right' ? 'API' : 'SCENARIO';
             delBatchReport(sendParam).then(() => {
               this.selectRows.clear();
               this.$success(this.$t('commons.delete_success'));
               this.search();
             });
           }
-        }
+        },
       });
     },
     selectRowsCount(selection) {
       let selectedIDs = this.getIds(selection);
-      let allIDs = this.tableData.map(s => s.id);
+      let allIDs = this.tableData.map((s) => s.id);
       this.unSelection = allIDs.filter(function (val) {
-        return selectedIDs.indexOf(val) === -1
+        return selectedIDs.indexOf(val) === -1;
       });
       if (this.isSelectAllDate) {
         this.selectDataCounts = this.total - this.unSelection.length;
@@ -391,15 +458,15 @@ export default {
     },
     isSelectDataAll(dataType) {
       this.isSelectAllDate = dataType;
-      this.selectRowsCount(this.selectRows)
+      this.selectRowsCount(this.selectRows);
       //如果已经全选，不需要再操作了
       if (this.selectRows.size != this.tableData.length) {
         this.$refs.reportListTable.toggleAllSelection(true);
       }
     },
     getIds(rowSets) {
-      let rowArray = Array.from(rowSets)
-      let ids = rowArray.map(s => s.id);
+      let rowArray = Array.from(rowSets);
+      let ids = rowArray.map((s) => s.id);
       return ids;
     },
     openReNameDialog($event) {
@@ -407,13 +474,13 @@ export default {
     },
     rename(data) {
       reportReName(data).then(() => {
-        this.$success(this.$t("organization.integration.successful_operation"));
+        this.$success(this.$t('organization.integration.successful_operation'));
         this.init();
         this.$refs.renameDialog.close();
       });
     },
     changeTab(tabType) {
-      this.trashActiveDom = tabType;
+      this.activeDom = tabType;
       if (tabType === 'right') {
         this.condition.components = REPORT_CASE_CONFIGS;
       } else {
@@ -429,8 +496,8 @@ export default {
   created() {
     this.init();
     this.getMaintainerOptions();
-  }
-}
+  },
+};
 </script>
 
 <style scoped>
@@ -441,7 +508,7 @@ export default {
 .active {
   border: solid 1px #6d317c !important;
   background-color: var(--primary_color) !important;
-  color: #FFFFFF !important;
+  color: #ffffff !important;
 }
 
 .item {

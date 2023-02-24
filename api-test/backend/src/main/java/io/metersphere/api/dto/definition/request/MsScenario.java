@@ -1,8 +1,5 @@
 package io.metersphere.api.dto.definition.request;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.metersphere.api.dto.EnvironmentType;
 import io.metersphere.api.dto.definition.request.controller.MsCriticalSectionController;
 import io.metersphere.api.dto.definition.request.processors.MsJSR223Processor;
@@ -16,22 +13,21 @@ import io.metersphere.base.domain.ApiTestEnvironmentWithBLOBs;
 import io.metersphere.base.mapper.ApiScenarioMapper;
 import io.metersphere.commons.constants.ElementConstants;
 import io.metersphere.commons.constants.MsTestElementConstants;
-import io.metersphere.commons.utils.BeanUtils;
-import io.metersphere.commons.utils.CommonBeanFactory;
-import io.metersphere.commons.utils.FileUtils;
-import io.metersphere.commons.utils.JSON;
-import io.metersphere.commons.utils.JSONUtil;
+import io.metersphere.commons.utils.*;
 import io.metersphere.constants.RunModeConstants;
 import io.metersphere.environment.service.BaseEnvGroupProjectService;
 import io.metersphere.environment.service.BaseEnvironmentService;
 import io.metersphere.plugin.core.MsParameter;
 import io.metersphere.plugin.core.MsTestElement;
+import io.metersphere.service.MsHashTreeService;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.config.Arguments;
 import org.apache.jorphan.collections.HashTree;
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.HashMap;
@@ -54,6 +50,7 @@ public class MsScenario extends MsTestElement {
     private boolean environmentEnable;
     private Boolean variableEnable;
     private static final String BODY_FILE_DIR = FileUtils.BODY_FILE_DIR;
+    private Boolean mixEnable;
 
     public MsScenario() {
     }
@@ -117,20 +114,27 @@ public class MsScenario extends MsTestElement {
         if (config != null && !config.getExcludeScenarioIds().contains(this.getId())) {
             scenarioTree = MsCriticalSectionController.createHashTree(tree, this.getName(), this.isEnable());
         }
+        // 启用当前场景变量优先选择
+        if (isMixEnable() || isAllEnable()) {
+            config.margeVariables(this.variables, config.getTransferVariables());
+        }
         // 环境变量
-        Arguments arguments = ElementUtil.getConfigArguments(this.isEnvironmentEnable() ? newConfig : config, this.getName(), this.getProjectId(), this.getVariables());
-        if (arguments != null && (this.variableEnable == null || this.variableEnable)) {
+        Arguments arguments = ElementUtil.getConfigArguments(this.isEnvironmentEnable() ?
+                newConfig : config, this.getName(), this.getProjectId(), this.getVariables());
+        if (arguments != null && !arguments.getArguments().isEmpty()) {
             Arguments valueSupposeMock = ParameterConfig.valueSupposeMock(arguments);
             // 这里加入自定义变量解决ForEach循环控制器取值问题，循环控制器无法从vars中取值
-            if (this.variableEnable != null && this.variableEnable) {
+            if (BooleanUtils.isTrue(this.variableEnable) || BooleanUtils.isTrue(this.mixEnable)) {
                 scenarioTree.add(ElementUtil.argumentsToUserParameters(valueSupposeMock));
-            } else {
+            } else if (config != null && (this.isAllEnable() || config.isApi())) {
+                valueSupposeMock.setProperty(ElementConstants.COVER, true);
                 scenarioTree.add(valueSupposeMock);
             }
         }
-        if (this.variableEnable == null || this.variableEnable) {
+        if ((this.variableEnable == null && this.mixEnable == null)
+                || BooleanUtils.isTrue(this.variableEnable) || BooleanUtils.isTrue(this.mixEnable)) {
             ElementUtil.addCsvDataSet(scenarioTree, variables, this.isEnvironmentEnable() ? newConfig : config, "shareMode.group");
-            ElementUtil.addCounter(scenarioTree, variables, false);
+            ElementUtil.addCounter(scenarioTree, variables);
             ElementUtil.addRandom(scenarioTree, variables);
             if (CollectionUtils.isNotEmpty(this.headers)) {
                 if (this.isEnvironmentEnable()) {
@@ -159,6 +163,16 @@ public class MsScenario extends MsTestElement {
         }
         // 添加全局后置
         this.setGlobProcessor(this.isEnvironmentEnable() ? newConfig : config, scenarioTree, false);
+    }
+
+    private boolean isMixEnable() {
+        return (mixEnable == null || BooleanUtils.isTrue(mixEnable))
+                && (this.variableEnable == null || BooleanUtils.isFalse(this.variableEnable));
+    }
+
+    private boolean isAllEnable() {
+        return (this.variableEnable == null || BooleanUtils.isFalse(this.variableEnable))
+                && (this.mixEnable == null || BooleanUtils.isFalse(this.mixEnable));
     }
 
     private void setGlobProcessor(ParameterConfig config, HashTree scenarioTree, boolean isPre) {
@@ -190,30 +204,22 @@ public class MsScenario extends MsTestElement {
     private boolean setRefScenario(List<MsTestElement> hashTree) {
         try {
             ApiScenarioMapper apiAutomationService = CommonBeanFactory.getBean(ApiScenarioMapper.class);
-            ObjectMapper mapper = new ObjectMapper();
-            mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
             ApiScenarioWithBLOBs scenario = apiAutomationService.selectByPrimaryKey(this.getId());
             if (scenario != null && StringUtils.isNotEmpty(scenario.getScenarioDefinition())) {
-                JSONObject element = JSONUtil.parseObject(scenario.getScenarioDefinition());
+                JSONObject elementOrg = JSONUtil.parseObject(scenario.getScenarioDefinition());
+                JSONObject element = setRefEnable(this, elementOrg);
                 // 历史数据处理
                 ElementUtil.dataFormatting(element.optJSONArray(ElementConstants.HASH_TREE));
                 this.setName(scenario.getName());
                 this.setProjectId(scenario.getProjectId());
-                LinkedList<MsTestElement> sourceHashTree = mapper.readValue(element.optString(ElementConstants.HASH_TREE), new TypeReference<LinkedList<MsTestElement>>() {
-                });
+                LinkedList<MsTestElement> sourceHashTree = JSONUtil.readValue(element.optString(ElementConstants.HASH_TREE));
                 // 场景变量
                 if (StringUtils.isNotEmpty(element.optString("variables")) && (this.variableEnable == null || this.variableEnable)) {
-                    LinkedList<ScenarioVariable> variables = mapper.readValue(element.optString("variables"),
-                            new TypeReference<LinkedList<ScenarioVariable>>() {
-                            });
-                    this.setVariables(variables);
+                    this.setVariables(JSONUtil.parseArray(element.optString("variables"), ScenarioVariable.class));
                 }
                 // 场景请求头
                 if (StringUtils.isNotEmpty(element.optString("headers")) && (this.variableEnable == null || this.variableEnable)) {
-                    LinkedList<KeyValue> headers = mapper.readValue(element.optString("headers"),
-                            new TypeReference<LinkedList<KeyValue>>() {
-                            });
-                    this.setHeaders(headers);
+                    this.setHeaders(JSONUtil.parseArray(element.optString("headers"), KeyValue.class));
                 }
                 this.setHashTree(sourceHashTree);
                 hashTree.clear();
@@ -224,6 +230,37 @@ public class MsScenario extends MsTestElement {
             ex.printStackTrace();
         }
         return false;
+    }
+
+    public static JSONObject setRefEnable(MsTestElement targetElement, JSONObject orgElement) {
+        if (JSONObject.NULL.equals(orgElement) || targetElement == null) {
+            return orgElement;
+        }
+        if (!orgElement.optBoolean(MsHashTreeService.ENABLE)) {
+            orgElement.put(MsHashTreeService.ENABLE, false);
+        } else {
+            orgElement.put(MsHashTreeService.ENABLE, targetElement.isEnable());
+        }
+        try {
+            if (orgElement.has(MsHashTreeService.HASH_TREE)) {
+                JSONArray orgJSONArray = orgElement.optJSONArray(MsHashTreeService.HASH_TREE);
+                LinkedList<MsTestElement> hashTree = targetElement.getHashTree();
+                if (orgJSONArray != null && CollectionUtils.isNotEmpty(hashTree)) {
+                    orgJSONArray.forEach(obj -> {
+                        JSONObject orgJsonObject = (JSONObject) obj;
+                        hashTree.forEach(targetObj -> {
+                            if (StringUtils.equals(orgJsonObject.optString(MsHashTreeService.RESOURCE_ID), targetObj.getResourceId())) {
+                                setRefEnable(targetObj, orgJsonObject);
+                            }
+                        });
+                    });
+                }
+            }
+        } catch (Exception ex) {
+            LogUtil.error(ex, ex.getMessage());
+            return orgElement;
+        }
+        return orgElement;
     }
 
     private void setNewConfig(Map<String, EnvironmentConfig> envConfig, ParameterConfig newConfig) {

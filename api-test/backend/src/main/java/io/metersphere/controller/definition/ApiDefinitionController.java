@@ -3,8 +3,8 @@ package io.metersphere.controller.definition;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import io.metersphere.api.dto.*;
+import io.metersphere.api.dto.automation.ApiScenarioDTO;
 import io.metersphere.api.dto.automation.ApiScenarioRequest;
-import io.metersphere.api.dto.automation.ReferenceDTO;
 import io.metersphere.api.dto.automation.TcpTreeTableDataStruct;
 import io.metersphere.api.dto.definition.*;
 import io.metersphere.api.dto.definition.request.assertions.document.DocumentElement;
@@ -34,15 +34,12 @@ import io.metersphere.log.annotation.MsAuditLog;
 import io.metersphere.notice.annotation.SendNotice;
 import io.metersphere.request.ResetOrderRequest;
 import io.metersphere.service.definition.ApiDefinitionService;
-import io.metersphere.service.definition.EsbApiParamService;
-import io.metersphere.service.definition.EsbImportService;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
-import javax.servlet.http.HttpServletResponse;
 import java.util.List;
 
 
@@ -52,15 +49,12 @@ public class ApiDefinitionController {
     @Resource
     private ApiDefinitionService apiDefinitionService;
     @Resource
-    private EsbApiParamService esbApiParamService;
-    @Resource
-    private EsbImportService esbImportService;
-    @Resource
     private BaseEnvironmentService apiTestEnvironmentService;
     @Resource
     private ExecThreadPoolExecutor execThreadPoolExecutor;
     @Resource
     private ApiExecuteService apiExecuteService;
+
 
     @PostMapping("/list/{goPage}/{pageSize}")
     @RequiresPermissions("PROJECT_API_DEFINITION:READ")
@@ -71,11 +65,13 @@ public class ApiDefinitionController {
         return PageUtils.setPageInfo(page, apiDefinitionService.list(request));
     }
 
-    @PostMapping("/list/week/{goPage}/{pageSize}")
-    @RequiresPermissions("PROJECT_API_DEFINITION:READ")
-    public Pager<List<ApiDefinitionResult>> weekList(@PathVariable int goPage, @PathVariable int pageSize, @RequestBody ApiDefinitionRequest request) {
+    @PostMapping("/list/week/{projectId}/{versionId}/{goPage}/{pageSize}")
+    public Pager<List<ApiDefinitionResult>> weekList(@PathVariable String projectId, @PathVariable String versionId, @PathVariable int goPage, @PathVariable int pageSize) {
+        if (StringUtils.equalsIgnoreCase(versionId, "default")) {
+            versionId = null;
+        }
         Page<Object> page = PageHelper.startPage(goPage, pageSize, true);
-        return PageUtils.setPageInfo(page, apiDefinitionService.weekList(request));
+        return PageUtils.setPageInfo(page, apiDefinitionService.weekList(projectId, versionId));
     }
 
     @PostMapping("/list/relevance/{goPage}/{pageSize}")
@@ -137,19 +133,17 @@ public class ApiDefinitionController {
         apiDefinitionService.deleteBatch(ids);
     }
 
-    @PostMapping(value = "/updateEsbRequest")
-    public SaveApiDefinitionRequest updateEsbRequest(@RequestBody SaveApiDefinitionRequest request) {
-        if (StringUtils.equals(request.getMethod(), "ESB")) {
-            //ESB的接口类型数据，采用TCP方式去发送。并将方法类型改为TCP。 并修改发送数据
-            request = esbApiParamService.updateEsbRequest(request);
-        }
-        return request;
-    }
-
     @PostMapping("/del-batch")
     @MsAuditLog(module = OperLogModule.API_DEFINITION, type = OperLogConstants.BATCH_DEL, beforeEvent = "#msClass.getLogDetails(#request.ids)", msClass = ApiDefinitionService.class)
     public void deleteBatchByParams(@RequestBody ApiBatchRequest request) {
         apiDefinitionService.deleteByParams(request);
+    }
+
+    @PostMapping("/copy/by/version")
+    @RequiresPermissions(PermissionConstants.PROJECT_API_DEFINITION_READ_EDIT_API)
+    @MsAuditLog(module = OperLogModule.API_DEFINITION, type = OperLogConstants.UPDATE, beforeEvent = "#msClass.getLogDetails(#request.ids)", title = "#request.name", content = "#msClass.getLogDetails(#request.ids)", msClass = ApiDefinitionService.class)
+    public void copyByVersion(@RequestBody BatchDataCopyRequest request) {
+        apiDefinitionService.copyCaseOrMockByVersion(request);
     }
 
     @PostMapping("/move-gc")
@@ -263,9 +257,11 @@ public class ApiDefinitionController {
         apiDefinitionService.deleteSchedule(request);
     }
 
-    @PostMapping("/get-reference")
-    public ReferenceDTO getReference(@RequestBody ApiScenarioRequest request) {
-        return apiDefinitionService.getReference(request);
+    @PostMapping("/get-reference/{goPage}/{pageSize}")
+    public Pager<List<ApiScenarioDTO>> getReference(@PathVariable int goPage, @PathVariable int pageSize, @RequestBody ApiScenarioRequest request) {
+        apiDefinitionService.getReferenceIds(request);
+        Page<Object> page = PageHelper.startPage(goPage, pageSize, true);
+        return PageUtils.setPageInfo(page, apiDefinitionService.getReference(request));
     }
 
     @PostMapping("/batch/edit")
@@ -303,12 +299,6 @@ public class ApiDefinitionController {
     @PostMapping("/preview")
     public String preview(@RequestBody String jsonSchema) {
         return JSONSchemaGenerator.getJson(jsonSchema);
-    }
-
-    @GetMapping("/export-esb-template")
-    @RequiresPermissions(PermissionConstants.PROJECT_API_DEFINITION_READ_EXPORT_API)
-    public void testCaseTemplateExport(HttpServletResponse response) {
-        esbImportService.templateExport(response);
     }
 
     @GetMapping("/mock-environment/{projectId}")

@@ -57,6 +57,8 @@ public class TestPlanMessageService {
             report = testPlanReportService.checkTestPlanReportHasErrorCase(report, testPlanReportContent);
         }
         if (!report.getIsApiCaseExecuting() && !report.getIsPerformanceExecuting() && !report.getIsScenarioExecuting() && !report.getIsUiScenarioExecuting()) {
+            // 异步发送通知需要指定调用其他服务的user
+            HttpHeaderUtils.runAsUser(report.getCreator());
             //更新TestPlan状态为完成
             TestPlanWithBLOBs testPlan = testPlanMapper.selectByPrimaryKey(report.getTestPlanId());
             if (testPlan != null
@@ -76,11 +78,13 @@ public class TestPlanMessageService {
                 }
             } catch (Exception e) {
                 LogUtil.error(e);
+            } finally {
+                HttpHeaderUtils.clearUser();
             }
         }
     }
 
-    public String calcTestPlanStatusWithPassRate(TestPlanWithBLOBs testPlan) {
+    private String calcTestPlanStatusWithPassRate(TestPlanWithBLOBs testPlan) {
         try {
             // 计算通过率
             TestPlanDTOWithMetric testPlanDTOWithMetric = BeanUtils.copyBean(new TestPlanDTOWithMetric(), testPlan);
@@ -114,8 +118,7 @@ public class TestPlanMessageService {
         return TestPlanStatus.Underway.name();
     }
 
-    @Async
-    public void sendMessage(TestPlan testPlan, TestPlanReport testPlanReport, String projectId) {
+    private void sendMessage(TestPlan testPlan, TestPlanReport testPlanReport, String projectId) {
         assert testPlan != null;
         SystemParameterService systemParameterService = CommonBeanFactory.getBean(SystemParameterService.class);
         NoticeSendService noticeSendService = CommonBeanFactory.getBean(NoticeSendService.class);
@@ -292,9 +295,14 @@ public class TestPlanMessageService {
                         result.put("apiCaseFailedCount", v);
                         break;
                     case "default":
+                    case "pending":
+                    case "stopped":
+                    case "timeout":
                         result.put("apiCaseUnExecuteCount", v);
                         break;
                     case "errorreportresult":
+                    case "fakeerror":
+                    case "fake_error":
                         result.put("apiCaseErrorReportCount", v);
                         break;
                     default:
@@ -315,12 +323,18 @@ public class TestPlanMessageService {
                         result.put("apiScenarioSuccessCount", v);
                         break;
                     case "fail":
+                    case "error":
                         result.put("apiScenarioFailedCount", v);
                         break;
                     case "unexecute":
+                    case "pending":
+                    case "stopped":
+                    case "timeout":
                         result.put("apiScenarioUnExecuteCount", v);
                         break;
                     case "errorreportresult":
+                    case "fakeerror":
+                    case "fake_error":
                         result.put("apiScenarioErrorReportCount", v);
                         break;
                     default:
@@ -345,6 +359,7 @@ public class TestPlanMessageService {
                         break;
                     case "unexecute":
                     case "stop":
+                    case "pending":
                         result.put("uiScenarioUnExecuteCount", v);
                         break;
                     default:

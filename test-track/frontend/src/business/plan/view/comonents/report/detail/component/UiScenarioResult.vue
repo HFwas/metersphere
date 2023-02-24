@@ -15,7 +15,7 @@
             <ms-table-column
                 :width="80"
                 :label="$t('commons.id')"
-                prop="customNum">
+                prop="num">
             </ms-table-column>
             <ms-table-column
                 :label="$t('commons.name')"
@@ -59,7 +59,9 @@
                     shareId,
                     isPlanReport: true,
                     isTemplate,
-                    response
+                    response,
+                    showCancelButton: false,
+                    showReportNameButton: false
                  }"/>
         <UiShareReportDetail
           v-else
@@ -166,7 +168,6 @@ export default {
           if (row.reportId && row.lastResult !== "Running" && row.lastResult !== "Waiting") {
             this.showResponse = true;
             this.reportId = row.reportId;
-            console.log(this.isTemplate);
           }
        }
       })

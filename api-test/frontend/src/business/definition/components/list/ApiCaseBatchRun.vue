@@ -4,25 +4,22 @@
     :visible.sync="visible"
     :title="$t('test_track.plan.load_case.batch_exec_cases')"
     @confirm="save">
-    <ms-environment-select
-      :project-id="projectId"
-      @setEnvironment="setEnvironment" ref="environmentSelect"/>
+    <ms-environment-select :project-id="projectId" @setEnvironment="setEnvironment" ref="environmentSelect" />
   </ms-edit-dialog>
-
 </template>
 
 <script>
-import MsEditDialog from "@/business/commons/MsEditDialog";
-import MsEnvironmentSelect from "@/business/definition/components/case/MsEnvironmentSelect";
+import MsEditDialog from '@/business/commons/MsEditDialog';
+import MsEnvironmentSelect from '@/business/definition/components/case/MsEnvironmentSelect';
 export default {
-  name: "ApiCaseBatchRun",
-  components: {MsEnvironmentSelect, MsEditDialog},
+  name: 'ApiCaseBatchRun',
+  components: { MsEnvironmentSelect, MsEditDialog },
   props: ['projectId'],
   data() {
     return {
       visible: false,
-      environment: {}
-    }
+      environment: {},
+    };
   },
   methods: {
     setEnvironment(environment) {
@@ -37,11 +34,9 @@ export default {
     save() {
       this.$emit('batchRun', this.environment);
       this.close();
-    }
-  }
-}
+    },
+  },
+};
 </script>
 
-<style scoped>
-
-</style>
+<style scoped></style>

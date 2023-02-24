@@ -1,8 +1,13 @@
-import {get, post} from "metersphere-frontend/src/plugins/request"
+import { get, post } from 'metersphere-frontend/src/plugins/request';
 
 export function getApiModules(projectId, protocol, currentVersion) {
   let url = '/api/module/list/' + projectId + '/' + protocol + (currentVersion ? '/' + currentVersion : '');
   return get(url);
+}
+
+export function postApiModules(projectId, protocol, currentVersion, param) {
+  let url = '/api/module/list/' + projectId + '/' + protocol;
+  return post(url, param);
 }
 
 export function getApiModuleByProjectIdAndProtocol(projectId, protocol) {
@@ -13,6 +18,11 @@ export function getApiModuleByProjectIdAndProtocol(projectId, protocol) {
 export function getApiModuleByTrash(projectId, protocol, currentVersion) {
   let url = '/api/module/trash/list/' + projectId + '/' + protocol + '/' + (currentVersion ? '/' + currentVersion : '');
   return get(url);
+}
+
+export function postApiModuleByTrash(projectId, protocol, currentVersion, param) {
+  let url = '/api/module/trash/list/' + projectId + '/' + protocol;
+  return post(url, param);
 }
 
 export function getUserDefaultApiType() {
@@ -44,5 +54,3 @@ export function dragModule(param) {
 export function posModule(param) {
   return post('/api/module/pos', param);
 }
-
-

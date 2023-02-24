@@ -1,5 +1,5 @@
-import {fileUpload} from "@/api/base-network";
-import {get, post, request} from 'metersphere-frontend/src/plugins/request'
+import { fileUpload } from '@/api/base-network';
+import { get, post, request } from 'metersphere-frontend/src/plugins/request';
 
 export function getScenarioById(scenarioId) {
   return get('/api/automation/get/' + scenarioId);
@@ -62,16 +62,16 @@ export function getApiScenarios(params) {
   return post('/api/automation/get-scenario-list', params);
 }
 
-export function getReference(params) {
-  return post('/api/automation/getReference', params);
-}
-
 export function genPerformanceTestJmx(params) {
   return post('/api/automation/gen-jmx', params);
 }
 
 export function apiScenarioEnv(params) {
   return post('/api/automation/env', params);
+}
+
+export function apiScenarioEnvMap(params) {
+  return post('/api/automation/env/map', params);
 }
 
 export function getApiScenarioProjectIdByConditions(params) {

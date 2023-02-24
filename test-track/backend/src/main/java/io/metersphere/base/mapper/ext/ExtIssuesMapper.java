@@ -44,4 +44,10 @@ public interface ExtIssuesMapper {
     List<IssuesDao> getIssueCustomFields(List<String> ids);
 
     List<IssuesDao> getPlatformIssueByIds(@Param("ids") List<String> ids, @Param("projectId") String projectId);
+
+    Long getThisWeekIssueCount(@Param("ids") List<String> ids, @Param("projectId") String projectId);
+
+    List<String> getTestPlanThisWeekIssue(String projectId);
+
+    List<String> getTestPlanIssue(String projectId);
 }

@@ -2,72 +2,71 @@
   <div class="header-title" v-loading="loading">
     <div>
       <div>{{ $t('organization.integration.select_defect_platform') }}</div>
-      <el-radio-group v-model="platform" style="margin-top: 10px" @change="change">
-        <el-radio label="Tapd">
+      <el-radio-group v-model="platform" style="margin-top: 10px">
+        <span v-for="config in platformConfigs" :key="config.key">
+           <el-radio :label="config.label" class="platform-radio">
+            <img class="platform" :src="getPlatformImageUrl(config)" :alt="config.label"/>
+          </el-radio>
+        </span>
+        <el-radio label="Tapd" class="platform-radio">
           <img class="platform" src="/assets/tapd.png" alt="Tapd"/>
         </el-radio>
-        <el-radio label="Jira">
-          <img class="platform" src="/assets/jira.png" alt="Jira"/>
-        </el-radio>
-        <el-radio label="Zentao">
-          <img class="zentao_platform" src="/assets/zentao.jpg" alt="Zentao"/>
-        </el-radio>
-        <el-radio label="AzureDevops" v-xpack>
+        <el-radio label="AzureDevops" class="platform-radio" v-xpack>
           <img class="platform" src="/assets/AzureDevops.png" alt="AzureDevops"/>
         </el-radio>
       </el-radio-group>
     </div>
 
     <tapd-setting v-if="tapdEnable" ref="tapdSetting"/>
-    <jira-setting v-if="jiraEnable" ref="jiraSetting"/>
-    <zentao-setting v-if="zentaoEnable" ref="zentaoSetting"/>
     <azuredevops-setting v-if="azuredevopsEnable" ref="azureDevopsSetting"/>
+
+    <div v-for="config in platformConfigs" :key="config.key">
+      <platform-config
+        :config="config"
+        v-if="config.key === platform"
+      />
+    </div>
   </div>
 </template>
 
 <script>
 import TapdSetting from '@/business/workspace/integration/TapdSetting';
-import JiraSetting from '@/business/workspace/integration/JiraSetting';
-import ZentaoSetting from '@/business/workspace/integration/ZentaoSetting';
 import AzuredevopsSetting from '@/business/workspace/integration/AzureDevopsSetting';
-import {AZURE_DEVOPS, JIRA, TAPD, ZEN_TAO} from "metersphere-frontend/src/utils/constants";
+import {AZURE_DEVOPS, TAPD} from "metersphere-frontend/src/utils/constants";
+import PlatformConfig from "@/business/workspace/integration/PlatformConfig";
+import {generatePlatformResourceUrl, getIntegrationInfo} from "@/api/platform-plugin";
 
 export default {
   name: "BugManagement",
-  components: {TapdSetting, JiraSetting, ZentaoSetting, AzuredevopsSetting},
+  components: {PlatformConfig, TapdSetting, AzuredevopsSetting},
   data() {
     return {
-      tapdEnable: true,
-      jiraEnable: false,
-      zentaoEnable: false,
-      azuredevopsEnable: false,
       loading: false,
-      platform: TAPD
+      platformConfigs: [],
+      platform: TAPD,
+    }
+  },
+  activated() {
+    this.platformConfigs = [];
+
+    getIntegrationInfo()
+      .then((r) => {
+        this.platformConfigs = r.data;
+      });
+
+    this.platform = TAPD;
+  },
+  computed: {
+    tapdEnable() {
+      return this.platform === TAPD;
+    },
+    azuredevopsEnable() {
+      return this.platform === AZURE_DEVOPS;
     }
   },
   methods: {
-    change(platform) {
-      if (platform === TAPD) {
-        this.tapdEnable = true;
-        this.jiraEnable = false;
-        this.zentaoEnable = false;
-        this.azuredevopsEnable = false;
-      } else if (platform === JIRA) {
-        this.tapdEnable = false;
-        this.jiraEnable = true;
-        this.zentaoEnable = false;
-        this.azuredevopsEnable = false;
-      } else if (platform === ZEN_TAO) {
-        this.tapdEnable = false;
-        this.jiraEnable = false;
-        this.zentaoEnable = true;
-        this.azuredevopsEnable = false;
-      } else if (platform === AZURE_DEVOPS) {
-        this.tapdEnable = false;
-        this.jiraEnable = false;
-        this.zentaoEnable = false;
-        this.azuredevopsEnable = true;
-      }
+    getPlatformImageUrl(config) {
+      return generatePlatformResourceUrl(config.id, config.image);
     }
   }
 }
@@ -83,8 +82,7 @@ export default {
   vertical-align: middle
 }
 
-.zentao_platform {
-  height: 100px;
-  vertical-align: middle
+.platform-radio {
+  margin-left: 20px;
 }
 </style>

@@ -12,6 +12,7 @@ import io.metersphere.plan.request.api.ApiScenarioRequest;
 import io.metersphere.plan.service.TestPlanService;
 import io.metersphere.plan.utils.TestPlanStatusCalculator;
 import io.metersphere.utils.DiscoveryUtil;
+import org.apache.commons.collections.CollectionUtils;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -38,7 +39,11 @@ public class PlanTestPlanScenarioCaseService extends ApiTestService {
             calculatePlanReport(report, planReportCaseDTOS);
             //记录接口用例的运行环境信息
             List<String> idList = planReportCaseDTOS.stream().map(PlanReportCaseDTO::getId).collect(Collectors.toList());
-            report.setProjectEnvMap(getPlanProjectEnvMap(idList));
+            try {
+                report.setProjectEnvMap(getPlanProjectEnvMap(idList));
+            } catch (Exception e) {
+                LogUtil.error(e);
+            }
         }
     }
 
@@ -138,16 +143,16 @@ public class PlanTestPlanScenarioCaseService extends ApiTestService {
         return microService.getForData(serviceName, BASE_UEL + "/get/env/" + planId, Map.class);
     }
 
+    public List<String> getApiScenarioProjectIds(String planId) {
+        return microService.getForData(serviceName, BASE_UEL + "/get/project/ids/" + planId, List.class);
+    }
+
     public ApiPlanReportDTO getApiReport(ApiPlanReportRequest request) {
         return microService.postForData(serviceName, BASE_UEL + "/plan/report", request, ApiPlanReportDTO.class);
     }
 
     public ApiPlanReportDTO getApiExecuteReport(ApiPlanReportRequest request) {
         return microService.postForData(serviceName, BASE_UEL + "/plan/execute/report", request, ApiPlanReportDTO.class);
-    }
-
-    public TestPlanApiReportInfoDTO genApiReportInfoForSchedule(String planId, RunModeConfigDTO runModeConfigDTO) {
-        return microService.postForData(serviceName, BASE_UEL + "/plan/report/schedule/info/" + planId, runModeConfigDTO, TestPlanApiReportInfoDTO.class);
     }
 
     public Boolean isCaseExecuting(String planId) {
@@ -171,6 +176,9 @@ public class PlanTestPlanScenarioCaseService extends ApiTestService {
     }
 
     public List<TestPlanFailureScenarioDTO> buildResponse(List<TestPlanFailureScenarioDTO> scenarioCases) {
+        if (CollectionUtils.isEmpty(scenarioCases)) {
+            return null;
+        }
         return microService.postForDataArray(serviceName, BASE_UEL + "/build/response", scenarioCases, TestPlanFailureScenarioDTO.class);
     }
 

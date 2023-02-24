@@ -1,75 +1,76 @@
 <template>
   <span v-if="showHide">
-  <el-upload
-    action="#"
-    class="ms-upload-header"
-    list-type="picture-card"
-    :file-list="parameter.files"
-    ref="upload">
-    <div class="upload-default" @click.stop>
-      <el-popover
-        placement="right"
-        trigger="hover">
-        <div>
-          <el-upload
-            action="#"
-            class="ms-body-upload"
-            :http-request="upload"
-            :beforeUpload="uploadValidate"
-            ref="uploadLocal">
-            <el-button type="text" :disabled="isReadOnly"
-                       v-if="!isReadOnly"> {{ $t('permission.project_file.local_upload') }}</el-button>
-            <span slot="file"/>
-          </el-upload>
-        </div>
-        <el-button type="text" @click="associationFile" v-if="!isReadOnly"
-                   :disabled="isReadOnly">{{ $t('permission.project_file.associated_files') }}</el-button>
-        <i class="el-icon-plus" slot="reference"/>
-      </el-popover>
-    </div>
-    <div class="upload-item" slot="file" slot-scope="{file}">
-      <span>{{ file.file && file.file.name ? file.file.name : file.name }}</span>
+    <el-upload
+      action="#"
+      class="ms-upload-header"
+      list-type="picture-card"
+      :disabled="disabled"
+      :file-list="parameter.files"
+      ref="upload">
+      <div class="upload-default" @click.stop>
+        <i class="el-icon-plus" v-show="disabled" slot="reference" />
+        <el-popover placement="right" v-show="!disabled" trigger="hover">
+          <div>
+            <el-upload
+              action="#"
+              class="ms-body-upload"
+              :http-request="upload"
+              :beforeUpload="uploadValidate"
+              ref="uploadLocal">
+              <el-button type="text" :disabled="isReadOnly" v-if="!isReadOnly">
+                {{ $t('permission.project_file.local_upload') }}</el-button
+              >
+              <span slot="file" />
+            </el-upload>
+          </div>
+          <el-button type="text" @click="associationFile" v-if="!isReadOnly" :disabled="isReadOnly">{{
+            $t('permission.project_file.associated_files')
+          }}</el-button>
+          <i class="el-icon-plus" slot="reference" />
+        </el-popover>
+      </div>
+      <div class="upload-item" slot="file" slot-scope="{ file }">
+        <span>{{ file.file && file.file.name ? file.file.name : file.name }}</span>
         <span v-if="file.storage === 'FILE_REF'" class="el-upload-list__item-actions">
-            <span v-if="!disabled" class="ms-list__item-delete" @click="handleRemove(file)">
-                <i class="el-icon-unlock"/>
-                <span style="font-size: 13px;">
-                  {{ file.isExist ? $t('permission.project_file.file_delete_tip') : '' }}
-                </span>
+          <span v-if="!disabled" class="ms-list__item-delete" @click="handleRemove(file)">
+            <i class="el-icon-unlock" />
+            <span style="font-size: 13px">
+              {{ file.isExist ? $t('permission.project_file.file_delete_tip') : '' }}
             </span>
+          </span>
         </span>
-      <span class="el-upload-list__item-actions" v-else>
+        <span class="el-upload-list__item-actions" v-else>
           <span v-if="!disabled" class="ms-list__item-delete" @click="handleUpload(file)">
-           <el-tooltip :content="$t('permission.project_file.save_to_file_manage')" placement="top">
-            <i class="el-icon-upload" style="font-size: 23px"/>
-           </el-tooltip>
+            <el-tooltip :content="$t('permission.project_file.save_to_file_manage')" placement="top">
+              <i class="el-icon-upload" style="font-size: 23px" />
+            </el-tooltip>
           </span>
           <span v-if="!disabled" class="ms-list__item-delete" @click="handleRemove(file)">
-            <i class="el-icon-delete"/>
+            <i class="el-icon-delete" />
           </span>
-       </span>
-    </div>
-  </el-upload>
-    <ms-file-batch-move ref="module" @setModuleId="setModuleId"/>
-    <ms-file-metadata-list ref="metadataList" @checkRows="checkRows"/>
+        </span>
+      </div>
+    </el-upload>
+    <ms-file-batch-move ref="module" @setModuleId="setModuleId" />
+    <ms-file-metadata-list ref="metadataList" @checkRows="checkRows" />
   </span>
 </template>
 
 <script>
-import {dumpFile, fileExists} from "metersphere-frontend/src/api/file-metadata";
-import MsFileBatchMove from "@/business/commons/FileBatchMove";
-import MsFileMetadataList from "@/business/commons/QuoteFileList";
-import {getCurrentProjectID} from "metersphere-frontend/src/utils/token";
-import {getUUID} from "metersphere-frontend/src/utils";
+import { dumpFile, fileExists } from 'metersphere-frontend/src/api/file-metadata';
+import MsFileBatchMove from '@/business/commons/FileBatchMove';
+import MsFileMetadataList from '@/business/commons/QuoteFileList';
+import { getCurrentProjectID } from 'metersphere-frontend/src/utils/token';
+import { getUUID } from 'metersphere-frontend/src/utils';
 
 export default {
-  name: "MsApiBodyFileUpload",
+  name: 'MsApiBodyFileUpload',
   components: {
     MsFileBatchMove,
-    MsFileMetadataList
+    MsFileMetadataList,
   },
   data() {
     return {
-      disabled: false,
       file: {},
       showHide: true,
     };
@@ -78,25 +79,29 @@ export default {
     parameter: Object,
     id: String,
     default() {
-      return {}
+      return {};
     },
     isReadOnly: {
       type: Boolean,
-      default: false
+      default: false,
+    },
+    disabled: {
+      type: Boolean,
+      default: false,
     },
   },
   methods: {
     exist() {
       let fileIds = [];
-      this.parameter.files.forEach(file => {
+      this.parameter.files.forEach((file) => {
         if (file.storage === 'FILE_REF' && file.fileId) {
           fileIds.push(file.fileId);
         }
       });
       if (fileIds.length > 0) {
-        this.result = fileExists(fileIds).then(response => {
+        this.result = fileExists(fileIds).then((response) => {
           let resultIds = response.data;
-          this.parameter.files.forEach(file => {
+          this.parameter.files.forEach((file) => {
             if (file.storage === 'FILE_REF' && resultIds.indexOf(file.fileId) === -1) {
               file.isExist = true;
             }
@@ -109,7 +114,7 @@ export default {
       this.showHide = false;
       this.$nextTick(() => {
         this.showHide = true;
-      })
+      });
     },
     setModuleId(moduleId) {
       let files = [];
@@ -121,31 +126,32 @@ export default {
         resourceId: this.id,
         moduleId: moduleId,
         projectId: getCurrentProjectID(),
-        fileName: this.file.name
+        fileName: this.file.name,
       };
       dumpFile(null, files, request).then((response) => {
-        this.$success(this.$t("organization.integration.successful_operation"));
+        this.$success(this.$t('organization.integration.successful_operation'));
       });
     },
     checkRows(rows) {
-      rows.forEach(item => {
+      rows.forEach((item) => {
         let file = {
           name: item.name,
           id: getUUID(),
           fileId: item.id,
-          storage: "FILE_REF",
+          storage: 'FILE_REF',
           projectId: item.projectId,
-          fileType: item.type
+          fileType: item.type,
         };
         this.parameter.files.push(file);
-      })
+      });
     },
     handleRemove(file) {
       if (file && this.parameter.files) {
         for (let i = 0; i < this.parameter.files.length; i++) {
           let fileName = file.file ? file.file.name : file.name;
-          let paramFileName = this.parameter.files[i].file ?
-            this.parameter.files[i].file.name : this.parameter.files[i].name;
+          let paramFileName = this.parameter.files[i].file
+            ? this.parameter.files[i].file.name
+            : this.parameter.files[i].name;
           if (fileName === paramFileName) {
             this.parameter.files.splice(i, 1);
             break;
@@ -170,15 +176,15 @@ export default {
     },
     associationFile() {
       this.$refs.metadataList.open();
-    }
+    },
   },
   created() {
     if (!this.parameter.files) {
       this.parameter.files = [];
     }
     this.exist();
-  }
-}
+  },
+};
 </script>
 <style>
 .el-popover {
@@ -186,7 +192,6 @@ export default {
 }
 </style>
 <style scoped>
-
 .el-upload {
   background-color: black;
 }
@@ -218,7 +223,7 @@ export default {
 
 .ms-upload-header {
   min-height: 30px;
-  border: 1px solid #EBEEF5;
+  border: 1px solid #ebeef5;
   padding: 2px;
   border-radius: 4px;
 }
@@ -229,7 +234,6 @@ export default {
   border: 0px;
   padding: 0px;
   border-radius: 0px;
-
 }
 
 .upload-item {

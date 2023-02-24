@@ -9,9 +9,7 @@
       highlight-current-row>
       <el-table-column v-for="(title, index) in table.titles" :key="index" :label="title" min-width="150px">
         <template v-slot:default="scope">
-          <el-popover
-            placement="top"
-            trigger="click">
+          <el-popover placement="top" trigger="click">
             <el-container>
               <div>{{ scope.row[title] }}</div>
             </el-container>
@@ -25,21 +23,21 @@
 
 <script>
 export default {
-  name: "MsSqlResultTable",
+  name: 'MsSqlResultTable',
   data() {
     return {
       tables: [],
-      titles: []
-    }
+      titles: [],
+    };
   },
   props: {
-    body: String
+    body: String,
   },
   created() {
     if (!this.body) {
       return;
     }
-    let rowArray = this.body.split("\n");
+    let rowArray = this.body.split('\n');
     // 过多会有性能问题
     if (rowArray.length > 100) {
       rowArray = rowArray.slice(0, 100);
@@ -51,7 +49,7 @@ export default {
       let titles;
       let result = [];
       for (let i = 0; i < rowArray.length; i++) {
-        let colArray = rowArray[i].split("\t");
+        let colArray = rowArray[i].split('\t');
         if (i === 0) {
           titles = colArray;
         } else {
@@ -66,7 +64,7 @@ export default {
           } else {
             let item = {};
             for (let j = 0; j < colArray.length; j++) {
-              item[titles[j]] = (colArray[j] ? colArray[j] : "");
+              item[titles[j]] = colArray[j] ? colArray[j] : '';
             }
             // 性能考虑每个表格取值不超过一百
             if (result.length < 100) {
@@ -77,15 +75,14 @@ export default {
       }
       this.tables.splice(0, 0, {
         titles: titles,
-        tableData: result
+        tableData: result,
       });
-    }
-  }
-}
+    },
+  },
+};
 </script>
 
 <style scoped>
-
 .el-table {
   margin-bottom: 20px;
 }
@@ -102,5 +99,4 @@ export default {
   overflow: auto;
   max-height: 500px;
 }
-
 </style>

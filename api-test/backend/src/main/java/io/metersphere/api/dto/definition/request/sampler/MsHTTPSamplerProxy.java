@@ -1,8 +1,5 @@
 package io.metersphere.api.dto.definition.request.sampler;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.DeserializationFeature;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.metersphere.api.dto.definition.request.ElementUtil;
 import io.metersphere.api.dto.definition.request.ParameterConfig;
 import io.metersphere.api.dto.definition.request.assertions.MsAssertions;
@@ -18,6 +15,7 @@ import io.metersphere.api.dto.scenario.environment.CommonConfig;
 import io.metersphere.api.dto.scenario.environment.EnvironmentConfig;
 import io.metersphere.api.parse.api.JMeterScriptUtil;
 import io.metersphere.base.domain.ApiTestCaseWithBLOBs;
+import io.metersphere.commons.constants.CommonConstants;
 import io.metersphere.commons.constants.ElementConstants;
 import io.metersphere.commons.constants.MsTestElementConstants;
 import io.metersphere.commons.exception.MSException;
@@ -75,6 +73,7 @@ public class MsHTTPSamplerProxy extends MsTestElement {
     private List<KeyValue> rest;
     private String url;
     private boolean followRedirects;
+    private boolean autoRedirects;
     private boolean doMultipartPost;
     private String useEnvironment;
     private List<KeyValue> arguments;
@@ -82,6 +81,9 @@ public class MsHTTPSamplerProxy extends MsTestElement {
     private Boolean isRefEnvironment;
     private String alias;
     private boolean customizeReq;
+    private final static String DEF_TIME_OUT = "60000";
+    //客户端实现
+    private String implementation;
 
     @Override
     public void toHashTree(HashTree tree, List<MsTestElement> hashTree, MsParameter msParameter) {
@@ -121,6 +123,8 @@ public class MsHTTPSamplerProxy extends MsTestElement {
         sampler.setMethod(this.getMethod());
         sampler.setContentEncoding(StandardCharsets.UTF_8.name());
         sampler.setFollowRedirects(this.isFollowRedirects());
+        sampler.setAutoRedirects(this.isAutoRedirects());
+        sampler.setImplementation(this.getImplementation());
         sampler.setUseKeepAlive(true);
         sampler.setDoMultipart(this.isDoMultipartPost());
         if (config.getConfig() == null) {
@@ -134,8 +138,8 @@ public class MsHTTPSamplerProxy extends MsTestElement {
         }
         config.compatible(this);
         this.initConnectAndResponseTimeout(config);
-        sampler.setConnectTimeout(this.getConnectTimeout() == null ? "60000" : this.getConnectTimeout());
-        sampler.setResponseTimeout(this.getResponseTimeout() == null ? "60000" : this.getResponseTimeout());
+        sampler.setConnectTimeout(this.getConnectTimeout() == null ? DEF_TIME_OUT : this.getConnectTimeout());
+        sampler.setResponseTimeout(this.getResponseTimeout() == null ? DEF_TIME_OUT : this.getResponseTimeout());
         HttpConfig httpConfig = getHttpConfig(config);
         setSamplerPath(config, httpConfig, sampler);
         // 请求体处理
@@ -243,22 +247,19 @@ public class MsHTTPSamplerProxy extends MsTestElement {
 
     private boolean setRefElement() {
         try {
-            ObjectMapper mapper = new ObjectMapper();
-            mapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
             MsHTTPSamplerProxy proxy = null;
-            if (StringUtils.equals(this.getRefType(), "CASE")) {
+            if (StringUtils.equals(this.getRefType(), CommonConstants.CASE)) {
                 ApiTestCaseWithBLOBs bloBs = CommonBeanFactory.getBean(ApiTestCaseService.class).get(this.getId());
                 if (bloBs != null) {
                     this.setProjectId(bloBs.getProjectId());
                     JSONObject element = JSONUtil.parseObject(bloBs.getRequest());
                     ElementUtil.dataFormatting(element);
-                    proxy = mapper.readValue(element.toString(), new TypeReference<MsHTTPSamplerProxy>() {
-                    });
+                    proxy = JSONUtil.parseObject(element.toString(), MsHTTPSamplerProxy.class);
                     this.setName(bloBs.getName());
                 }
             }
             if (proxy != null) {
-                if (StringUtils.equals(this.getRefType(), "CASE")) {
+                if (StringUtils.equals(this.getRefType(), CommonConstants.CASE)) {
                     ElementUtil.mergeHashTree(this, proxy.getHashTree());
                 } else {
                     this.setHashTree(proxy.getHashTree());
@@ -285,12 +286,12 @@ public class MsHTTPSamplerProxy extends MsTestElement {
             }
             CommonConfig commonConfig = config.getConfig().get(this.getProjectId()).getCommonConfig();
             if (commonConfig != null) {
-                if (this.getConnectTimeout() == null || StringUtils.equals(this.getConnectTimeout(), "60000")) {
+                if (this.getConnectTimeout() == null || StringUtils.equals(this.getConnectTimeout(), DEF_TIME_OUT)) {
                     if (commonConfig.getRequestTimeout() != 0) {
                         this.setConnectTimeout(String.valueOf(commonConfig.getRequestTimeout()));
                     }
                 }
-                if (this.getResponseTimeout() == null || StringUtils.equals(this.getResponseTimeout(), "60000")) {
+                if (this.getResponseTimeout() == null || StringUtils.equals(this.getResponseTimeout(), DEF_TIME_OUT)) {
                     if (commonConfig.getResponseTimeout() != 0) {
                         this.setResponseTimeout(String.valueOf(commonConfig.getResponseTimeout()));
                     }
@@ -427,9 +428,6 @@ public class MsHTTPSamplerProxy extends MsTestElement {
                 }
             } else {
                 String url = this.getUrl();
-                if (StringUtils.isNotEmpty(this.getPort()) && this.getPort().startsWith("${")) {
-                    url = url.replace(this.getPort(), "10990");
-                }
                 if (StringUtils.isEmpty(url)) {
                     MSException.throwException("请重新选择环境");
                 }
@@ -553,7 +551,7 @@ public class MsHTTPSamplerProxy extends MsTestElement {
                 try {
                     String value = keyValue.getValue() != null && keyValue.getValue().startsWith("@") ?
                             ScriptEngineUtils.buildFunctionCallString(keyValue.getValue()) : keyValue.getValue();
-                    value = keyValue.isUrlEncode() ? "${__urlencode(" + value + ")}" : value;
+                    value = keyValue.isUrlEncode() ? StringUtils.join("${__urlencode(", value, ")}") : value;
                     keyValueMap.put(keyValue.getName(), value);
                 } catch (Exception e) {
                     LogUtil.error(e);
@@ -584,11 +582,11 @@ public class MsHTTPSamplerProxy extends MsTestElement {
             stringBuffer.append("?");
         }
         this.getArguments().stream().filter(KeyValue::isEnable).filter(KeyValue::isValid).forEach(keyValue -> {
-            stringBuffer.append(keyValue.getName());
+            stringBuffer.append(keyValue.isUrlEncode() ? StringUtils.join("${__urlencode(", keyValue.getName(), ")}") : keyValue.getName());
             if (keyValue.getValue() != null) {
                 try {
                     String value = keyValue.getValue().startsWith("@") ? ScriptEngineUtils.buildFunctionCallString(keyValue.getValue()) : keyValue.getValue();
-                    value = keyValue.isUrlEncode() ? "${__urlencode(" + value + ")}" : value;
+                    value = keyValue.isUrlEncode() ? StringUtils.join("${__urlencode(", value, ")}") : value;
                     if (StringUtils.isNotEmpty(value) && value.contains(StringUtils.CR)) {
                         value = value.replaceAll(StringUtils.CR, StringUtils.EMPTY);
                     }

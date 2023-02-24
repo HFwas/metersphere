@@ -24,6 +24,7 @@ export const ROLE_ORG_ADMIN = 'org_admin';
 export const ROLE_TEST_MANAGER = 'test_manager';
 export const ROLE_TEST_USER = 'test_user';
 export const ROLE_TEST_VIEWER = 'test_viewer';
+export const SUPER_GROUP = 'super_group';
 
 export const ORGANIZATION_ID = 'organization_id';
 export const WORKSPACE_ID = 'workspace_id';
@@ -41,7 +42,6 @@ export const ZH_TW = 'zh_TW';
 export const EN_US = 'en_US';
 
 export const TAPD = 'Tapd';
-export const JIRA = 'Jira';
 export const ZEN_TAO = 'Zentao';
 export const LOCAL = 'Local';
 export const AZURE_DEVOPS = 'AzureDevops';

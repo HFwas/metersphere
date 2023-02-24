@@ -60,33 +60,39 @@
             <ms-table-column
               prop="userName"
               :field="item"
+              :filters="userFilters"
               :fields-width="fieldsWidth"
               :label="$t('report.user_name')"
               show-overflow-tooltip>
             </ms-table-column>
             <ms-table-column
               prop="maxUsers"
+              sortable
               :field="item"
               :fields-width="fieldsWidth"
-              min-width="65"
+              min-width="100"
               :label="$t('report.max_users')">
             </ms-table-column>
             <ms-table-column
               min-width="100"
               :field="item"
+              sortable
               :fields-width="fieldsWidth"
               prop="avgResponseTime"
               :label="$t('report.response_time')">
             </ms-table-column>
             <ms-table-column
+              min-width="100"
               prop="tps"
+              sortable
               :field="item"
               :fields-width="fieldsWidth"
               label="TPS">
             </ms-table-column>
             <ms-table-column
-              min-width="100"
+              min-width="120"
               :field="item"
+              sortable
               :fields-width="fieldsWidth"
               show-overflow-tooltip
               prop="testStartTime"
@@ -96,26 +102,28 @@
               </template>
             </ms-table-column>
             <ms-table-column
-              min-width="100"
+              min-width="120"
               show-overflow-tooltip
               :field="item"
+              sortable
               :fields-width="fieldsWidth"
               prop="testEndTime"
               :label="$t('report.test_end_time')">
               <template v-slot:default="scope">
                 <span v-if="scope.row.status === 'Completed'">{{ scope.row.testEndTime | datetimeFormat }}</span>
+                <span v-else>-</span>
               </template>
             </ms-table-column>
             <ms-table-column
-              min-width="90"
+              min-width="120"
               prop="testDuration"
               :field="item"
+              sortable
               :fields-width="fieldsWidth"
               :label="$t('report.test_execute_time')">
               <template v-slot:default="scope">
-                <span v-if="scope.row.status === 'Completed'">
-                  {{ scope.row.minutes }}{{ $t('schedule.cron.minutes') }}
-                  {{ scope.row.seconds }}{{ $t('schedule.cron.seconds') }}
+                <span>
+                 {{ $t('performance_test.report.test_duration', [scope.row.hours, scope.row.minutes, scope.row.seconds]) }}
                 </span>
               </template>
             </ms-table-column>
@@ -183,6 +191,7 @@ import MsTable from "metersphere-frontend/src/components/table/MsTable";
 import {deleteReport, deleteReportBatch, getOverview, getReportTime, renameReport, searchReports} from "@/api/report";
 import {getProjectVersions, isProjectVersionEnable} from "metersphere-frontend/src/api/version";
 import {hasPermission} from "metersphere-frontend/src/utils/permission";
+import {getProjectUsers} from "metersphere-frontend/src/api/user";
 
 export default {
   name: "PerformanceTestReportList",
@@ -203,6 +212,7 @@ export default {
   },
   created() {
     this.testId = this.$route.path.split('/')[3];
+    this.getMaintainerOptions();
     this.initTableData();
     this.getVersionOptions();
     this.checkVersionEnable();
@@ -272,6 +282,7 @@ export default {
       versionEnable: false,
       fields: getCustomTableHeader('PERFORMANCE_REPORT_TABLE'),
       fieldsWidth: getCustomTableWidth('PERFORMANCE_REPORT_TABLE'),
+      userFilters: [],
     };
   },
   watch: {
@@ -285,11 +296,22 @@ export default {
     }
   },
   methods: {
+    getMaintainerOptions() {
+      let workspaceId = getCurrentWorkspaceId();
+      getProjectUsers()
+        .then(response => {
+          this.userFilters = response.data.map(u => {
+            return {text: u.name, value: u.id};
+          });
+        });
+    },
     handleTimeInfo(report) {
       if (report.testStartTime) {
         let duration = report.testDuration;
-        let minutes = Math.floor(duration / 60);
+        let hours = Math.floor(duration / 60 / 60);
+        let minutes = Math.floor(duration / 60 % 60);
         let seconds = duration % 60;
+        this.$set(report, 'hours', hours);
         this.$set(report, 'minutes', minutes);
         this.$set(report, 'seconds', seconds);
       }
@@ -299,10 +321,12 @@ export default {
             let data = res.data.data;
             if (data) {
               let duration = data.duration;
-              let minutes = Math.floor(duration / 60);
+              let hours = Math.floor(duration / 60 / 60);
+              let minutes = Math.floor(duration / 60 % 60);
               let seconds = duration % 60;
               this.$set(report, 'testStartTime', data.startTime);
               this.$set(report, 'testEndTime', data.endTime);
+              this.$set(report, 'hours', hours);
               this.$set(report, 'minutes', minutes);
               this.$set(report, 'seconds', seconds);
             }
@@ -312,6 +336,9 @@ export default {
       }
     },
     handleOverview(report) {
+      this.$set(report, 'maxUsers', parseInt(report.maxUsers));
+      this.$set(report, 'avgResponseTime', parseFloat(report.avgResponseTime));
+      this.$set(report, 'tps', parseFloat(report.tps));
       if (report.status === 'Completed' && !report.maxUsers) {
         this.loading = getOverview(report.id)
           .then(response => {
@@ -472,7 +499,7 @@ export default {
           this.initTableData();
           this.$refs.renameDialog.close();
         });
-    }
+    },
   }
 };
 </script>

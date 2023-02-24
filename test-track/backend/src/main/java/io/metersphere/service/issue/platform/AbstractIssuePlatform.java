@@ -6,24 +6,20 @@ import io.metersphere.base.mapper.IssuesMapper;
 import io.metersphere.base.mapper.TestCaseIssuesMapper;
 import io.metersphere.base.mapper.ext.ExtIssuesMapper;
 import io.metersphere.commons.constants.CustomFieldType;
-import io.metersphere.commons.constants.IssueRefType;
 import io.metersphere.commons.constants.IssuesStatus;
 import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.utils.*;
 import io.metersphere.dto.CustomFieldItemDTO;
-import io.metersphere.xpack.track.dto.IssueSyncRequest;
-import io.metersphere.xpack.track.dto.IssueTemplateDao;
-import io.metersphere.xpack.track.dto.PlatformStatusDTO;
 import io.metersphere.dto.UserDTO;
 import io.metersphere.request.IntegrationRequest;
-import io.metersphere.xpack.track.dto.EditTestCaseRequest;
-import io.metersphere.xpack.track.dto.request.IssuesRequest;
-import io.metersphere.xpack.track.dto.request.IssuesUpdateRequest;
 import io.metersphere.service.*;
-import io.metersphere.xpack.track.issue.IssuesPlatform;
 import io.metersphere.service.issue.domain.ProjectIssueConfig;
 import io.metersphere.service.wapper.TrackProjectService;
 import io.metersphere.service.wapper.UserService;
+import io.metersphere.xpack.track.dto.*;
+import io.metersphere.xpack.track.dto.request.IssuesRequest;
+import io.metersphere.xpack.track.dto.request.IssuesUpdateRequest;
+import io.metersphere.xpack.track.issue.IssuesPlatform;
 import org.apache.commons.lang3.StringUtils;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -35,6 +31,7 @@ import org.springframework.util.MultiValueMap;
 
 import java.io.File;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Function;
@@ -67,6 +64,8 @@ public abstract class AbstractIssuePlatform implements IssuesPlatform {
     protected AttachmentService attachmentService;
     protected AttachmentModuleRelationMapper attachmentModuleRelationMapper;
     protected BaseProjectService baseProjectService;
+
+    public static final String PROXY_PATH = "/resource/md/get/path?platform=%s&workspaceId=%s&path=%s";
 
     public String getKey() {
         return key;
@@ -115,6 +114,10 @@ public abstract class AbstractIssuePlatform implements IssuesPlatform {
 
         ServiceIntegration integration = baseIntegrationService.get(request);
         return integration.getConfiguration();
+    }
+
+    protected String getProxyPath(String path) {
+        return String.format(PROXY_PATH, this.key, this.workspaceId, URLEncoder.encode(path, StandardCharsets.UTF_8));
     }
 
     protected HttpHeaders auth(String apiUser, String password) {
@@ -167,30 +170,7 @@ public abstract class AbstractIssuePlatform implements IssuesPlatform {
     }
 
     protected void handleTestCaseIssues(IssuesUpdateRequest issuesRequest) {
-        String issuesId = issuesRequest.getId();
-        List<String> deleteCaseIds = issuesRequest.getDeleteResourceIds();
-
-        if (!CollectionUtils.isEmpty(deleteCaseIds)) {
-            TestCaseIssuesExample example = new TestCaseIssuesExample();
-            example.createCriteria().andResourceIdIn(deleteCaseIds);
-            // 测试计划的用例 deleteCaseIds 是空的， 不会进到这里
-            example.or(example.createCriteria().andRefIdIn(deleteCaseIds));
-            testCaseIssuesMapper.deleteByExample(example);
-        }
-
-        List<String> addCaseIds = issuesRequest.getAddResourceIds();
-        TestCaseIssueService testCaseIssueService = CommonBeanFactory.getBean(TestCaseIssueService.class);
-
-        if (!CollectionUtils.isEmpty(addCaseIds)) {
-            if (issuesRequest.getIsPlanEdit()) {
-                addCaseIds.forEach(caseId -> {
-                    testCaseIssueService.add(issuesId, caseId, issuesRequest.getRefId(), IssueRefType.PLAN_FUNCTIONAL.name());
-                    testCaseIssueService.updateIssuesCount(caseId);
-                });
-            } else {
-                addCaseIds.forEach(caseId -> testCaseIssueService.add(issuesId, caseId, null, IssueRefType.FUNCTIONAL.name()));
-            }
-        }
+        issuesService.handleTestCaseIssues(issuesRequest);
     }
 
     protected void insertIssuesWithoutContext(String id, IssuesUpdateRequest issuesRequest) {
@@ -261,7 +241,12 @@ public abstract class AbstractIssuePlatform implements IssuesPlatform {
             if (endpoint.endsWith("/")) {
                 endpoint = endpoint.substring(0, endpoint.length() - 1);
             }
-            path = " <img src=\"" + endpoint + path + "\"/>";
+            String format = " <img src=\"%s\"/>";
+            if (path.trim().startsWith("http")) {
+                path = String.format(format, path);
+            } else {
+                path = String.format(format, endpoint + path);
+            }
             result = matcher.replaceFirst(path);
             matcher = pattern.matcher(result);
         }
@@ -359,7 +344,7 @@ public abstract class AbstractIssuePlatform implements IssuesPlatform {
         while (matcher.find()) {
             try {
                 String path = matcher.group(2);
-                if (!path.contains("/resource/md/get/url")) {
+                if (!path.contains("/resource/md/get/url") && !path.contains("/resource/md/get/path")) {
                     if (path.contains("/resource/md/get/")) { // 兼容旧数据
                         String name = path.substring(path.indexOf("/resource/md/get/") + 17);
                         files.add(new File(FileUtils.MD_IMAGE_DIR + "/" + name));
@@ -387,15 +372,17 @@ public abstract class AbstractIssuePlatform implements IssuesPlatform {
 
     protected void addCustomFields(IssuesUpdateRequest issuesRequest, MultiValueMap<String, Object> paramMap) {
         List<CustomFieldItemDTO> customFields = issuesRequest.getRequestFields();
-        customFields.forEach(item -> {
-            if (StringUtils.isNotBlank(item.getCustomData())) {
-                if (item.getValue() instanceof String) {
-                    paramMap.add(item.getCustomData(), ((String) item.getValue()).trim());
-                } else {
-                    paramMap.add(item.getCustomData(), item.getValue());
+        if (!CollectionUtils.isEmpty(customFields)) {
+            customFields.forEach(item -> {
+                if (StringUtils.isNotBlank(item.getCustomData())) {
+                    if (item.getValue() instanceof String) {
+                        paramMap.add(item.getCustomData(), ((String) item.getValue()).trim());
+                    } else {
+                        paramMap.add(item.getCustomData(), item.getValue());
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 
     protected Object getSyncJsonParamValue(Object value) {
@@ -654,4 +641,8 @@ public abstract class AbstractIssuePlatform implements IssuesPlatform {
         return null;
     }
 
+    @Override
+    public List<IssuesDao> getIssue(IssuesRequest request) {
+        return null;
+    }
 }

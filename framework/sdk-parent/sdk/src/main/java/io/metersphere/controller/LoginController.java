@@ -2,6 +2,7 @@ package io.metersphere.controller;
 
 import io.metersphere.commons.constants.OperLogConstants;
 import io.metersphere.commons.constants.OperLogModule;
+import io.metersphere.commons.constants.SessionConstants;
 import io.metersphere.commons.constants.UserSource;
 import io.metersphere.commons.user.SessionUser;
 import io.metersphere.commons.utils.RsaKey;
@@ -23,10 +24,11 @@ import org.apache.shiro.SecurityUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.i18n.LocaleContextHolder;
 import org.springframework.http.ResponseEntity;
+import org.springframework.session.data.redis.RedisIndexedSessionRepository;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
-import javax.servlet.http.HttpSession;
+import javax.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
 
@@ -44,11 +46,14 @@ public class LoginController {
     private String serviceId;
     @Value("${server.port}")
     private Integer port;
+    @Resource
+    private RedisIndexedSessionRepository redisIndexedSessionRepository;
+
 
     @GetMapping(value = "/is-login")
-    public ResultHolder isLogin(HttpSession session) throws Exception {
+    public ResultHolder isLogin(@RequestHeader(name = SessionConstants.HEADER_TOKEN, required = false) String sessionId) throws Exception {
         RsaKey rsaKey = RsaUtil.getRsaKey();
-        Object user = session.getAttribute("user");
+        Object user = redisIndexedSessionRepository.getSessionRedisOperations().opsForHash().get("spring:session:sessions:" + sessionId, "sessionAttr:user");
         if (user != null) {
             UserDTO userDTO = baseUserService.getUserDTO((String) MethodUtils.invokeMethod(user, "getId"));
             if (StringUtils.isBlank(userDTO.getLanguage())) {
@@ -90,10 +95,9 @@ public class LoginController {
 
     @GetMapping(value = "/signout")
     @MsAuditLog(module = OperLogModule.AUTH_TITLE, beforeEvent = "#msClass.getUserId(id)", type = OperLogConstants.LOGIN, title = "登出", msClass = SessionUtils.class)
-    public ResultHolder logout() throws Exception {
-        ssoLogoutService.logout(SecurityUtils.getSubject().getSession());
+    public void logout(HttpServletResponse response) throws Exception {
+        ssoLogoutService.logout(SessionUtils.getSessionId(), response);
         SecurityUtils.getSubject().logout();
-        return ResultHolder.success(StringUtils.EMPTY);
     }
 
     /*Get default language*/

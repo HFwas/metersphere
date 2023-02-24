@@ -1,5 +1,6 @@
 package io.metersphere.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import io.metersphere.base.domain.*;
@@ -13,8 +14,10 @@ import io.metersphere.log.annotation.MsAuditLog;
 import io.metersphere.notice.annotation.SendNotice;
 import io.metersphere.plan.dto.TestCaseReportStatusResultDTO;
 import io.metersphere.plan.dto.TestPlanDTO;
+import io.metersphere.plan.dto.TestPlanExtReportDTO;
 import io.metersphere.plan.dto.TestPlanSimpleReportDTO;
 import io.metersphere.plan.request.AddTestPlanRequest;
+import io.metersphere.plan.request.BatchOperateRequest;
 import io.metersphere.plan.request.QueryTestPlanRequest;
 import io.metersphere.plan.request.ScheduleInfoRequest;
 import io.metersphere.plan.request.api.TestPlanRunRequest;
@@ -169,6 +172,13 @@ public class TestPlanController {
         return testPlanService.deleteTestPlan(testPlanId);
     }
 
+    @PostMapping("/delete/batch")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_PLAN_READ_BATCH_DELETE)
+    @MsAuditLog(module = OperLogModule.TRACK_TEST_PLAN, type = OperLogConstants.BATCH_DEL, project = "#request.projectId", beforeEvent = "#msClass.getDeleteBatchLogDetails(#request)", msClass = TestPlanService.class)
+    public void deleteTestPlanBatch(@RequestBody BatchOperateRequest request) {
+        testPlanService.deleteTestPlanBatch(request);
+    }
+
     @PostMapping("/relevance")
     @MsAuditLog(module = OperLogModule.TRACK_TEST_PLAN, type = OperLogConstants.ASSOCIATE_CASE, content = "#msClass.getLogDetails(#request)", msClass = TestPlanService.class)
     public void testPlanRelevance(@RequestBody PlanCaseRelevanceRequest request) {
@@ -217,6 +227,11 @@ public class TestPlanController {
         return testPlanService.getPlanCaseEnv(plan.getId());
     }
 
+    @PostMapping("/case/relevance/project/ids")
+    public List<String> getRelevanceProjectIds(@RequestBody TestPlan plan) {
+        return testPlanService.getRelevanceProjectIds(plan.getId());
+    }
+
 
     @PostMapping("/edit/run/config")
     public void updateRunModeConfig(@RequestBody TestPlanRunRequest testplanRunRequest) {
@@ -242,7 +257,7 @@ public class TestPlanController {
     }
 
     @GetMapping("/report/export/{planId}/{lang}")
-    public void exportHtmlReport(@PathVariable String planId, @PathVariable(required = false) String lang, HttpServletResponse response) throws UnsupportedEncodingException {
+    public void exportHtmlReport(@PathVariable String planId, @PathVariable(required = false) String lang, HttpServletResponse response) throws UnsupportedEncodingException, JsonProcessingException {
         testPlanService.exportPlanReport(planId, lang, response);
     }
 
@@ -252,7 +267,7 @@ public class TestPlanController {
     }
 
     @GetMapping("/report/db/export/{reportId}/{lang}")
-    public void exportHtmlDbReport(@PathVariable String reportId, @PathVariable(required = false) String lang, HttpServletResponse response) throws UnsupportedEncodingException {
+    public void exportHtmlDbReport(@PathVariable String reportId, @PathVariable(required = false) String lang, HttpServletResponse response) throws UnsupportedEncodingException, JsonProcessingException {
         testPlanService.exportPlanDbReport(reportId, lang, response);
     }
 
@@ -288,9 +303,14 @@ public class TestPlanController {
         return schedule;
     }
 
+    /***
+     * 只检查是否有API，性能用例
+     * @param id
+     * @return
+     */
     @GetMapping("/have/exec/case/{id}")
     public boolean haveExecCase(@PathVariable String id) {
-        return testPlanService.haveExecCase(id);
+        return testPlanService.haveExecCase(id, true);
     }
 
     /**
@@ -359,5 +379,15 @@ public class TestPlanController {
     @GetMapping(value = "/status/reset/{planId}")
     public void resetStatus(@PathVariable String planId) {
         testPlanService.resetStatus(planId);
+    }
+
+    @GetMapping("/ext/report/{reportId}")
+    public TestPlanExtReportDTO getExtReport(@PathVariable String reportId) throws JsonProcessingException {
+        return testPlanService.getExtInfoByReportId(reportId);
+    }
+
+    @GetMapping("/ext/plan/{planId}")
+    public TestPlanExtReportDTO getExtPlan(@PathVariable String planId) throws JsonProcessingException {
+        return testPlanService.getExtInfoByPlanId(planId);
     }
 }

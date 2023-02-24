@@ -1,58 +1,67 @@
 <template xmlns:el-col="http://www.w3.org/1999/html">
   <!-- 操作按钮 -->
-  <div style="background-color: white;">
+  <div style="background-color: white">
     <el-row>
       <el-col>
         <!--操作按钮-->
-        <div style="float: right;margin-right: 20px;margin-top: 20px" class="ms-opt-btn">
+        <div class="ms-opt-btn">
           <el-tooltip :content="$t('commons.follow')" placement="bottom" effect="dark" v-if="!showFollow">
-            <i class="el-icon-star-off"
-               style="color: var(--primary_color); font-size: 25px; margin-right: 5px; position: relative; top: 5px; cursor: pointer "
-               @click="saveFollow"/>
+            <i
+              class="el-icon-star-off"
+              style="
+                color: var(--primary_color);
+                font-size: 25px;
+                margin-right: 5px;
+                position: relative;
+                top: 5px;
+                cursor: pointer;
+              "
+              @click="saveFollow" />
           </el-tooltip>
           <el-tooltip :content="$t('commons.cancel')" placement="bottom" effect="dark" v-if="showFollow">
-            <i class="el-icon-star-on"
-               style="color: var(--primary_color); font-size: 28px; margin-right: 5px; position: relative; top: 5px; cursor: pointer "
-               @click="saveFollow"/>
+            <i
+              class="el-icon-star-on"
+              style="
+                color: var(--primary_color);
+                font-size: 28px;
+                margin-right: 5px;
+                position: relative;
+                top: 5px;
+                cursor: pointer;
+              "
+              @click="saveFollow" />
           </el-tooltip>
           <el-link type="primary" style="margin-right: 5px" @click="openHis" v-if="basisData.id">
             {{ $t('operating_log.change_history') }}
           </el-link>
           <!--  版本历史 -->
-          <mx-version-history v-xpack
-                              ref="versionHistory"
-                              :version-data="versionData"
-                              :current-id="basisData.id"
-                              @compare="compare" @checkout="checkout" @create="create" @del="del"/>
+          <mx-version-history
+            v-xpack
+            ref="versionHistory"
+            :version-data="versionData"
+            :current-id="basisData.id"
+            :has-latest="hasLatest"
+            @compare="compare"
+            @checkout="checkout"
+            @create="create"
+            @setLatest="setLatest"
+            @del="del" />
           <el-button type="primary" size="small" @click="saveApi" title="ctrl + s">{{ $t('commons.save') }}</el-button>
         </div>
       </el-col>
     </el-row>
 
     <!-- 请求参数 -->
-    <div v-if="apiProtocol=='TCP'">
-      <p class="tip">{{ $t('api_test.definition.request.req_param') }} </p>
-      <ms-tcp-format-parameters :show-pre-script="true" :show-script="false" :request="request"
-                                ref="tcpFormatParameter"/>
-    </div>
-    <div v-else-if="apiProtocol=='ESB'">
-      <p class="tip">{{ $t('api_test.definition.request.req_param') }} </p>
-      <mx-esb-definition v-xpack :show-pre-script="true" :show-script="false"
-                         :request="request"
-                         ref="esbDefinition"/>
-      <p class="tip">{{ $t('api_test.definition.request.res_param') }}</p>
-      <mx-esb-definition-response v-xpack :is-api-component="true" :show-options-button="true"
-                                  :request="request"/>
-    </div>
-    <api-other-info :api="basisData" ref="apiOtherInfo"/>
+    <p class="tip">{{ $t('api_test.definition.request.req_param') }}</p>
+    <ms-tcp-format-parameters
+      :show-pre-script="true"
+      :show-script="false"
+      :request="request"
+      ref="tcpFormatParameter" />
+    <api-other-info :api="basisData" ref="apiOtherInfo" />
 
-    <ms-change-history ref="changeHistory"/>
-    <el-dialog
-      :fullscreen="true"
-      :visible.sync="dialogVisible"
-      :destroy-on-close="true"
-      width="100%"
-    >
+    <ms-change-history ref="changeHistory" />
+    <el-dialog :fullscreen="true" :visible.sync="dialogVisible" :destroy-on-close="true" width="100%">
       <t-c-p-api-version-diff
         v-if="dialogVisible"
         :old-data="basisData"
@@ -65,16 +74,14 @@
         :mock-info="mockInfo"
         :api-protocol="apiProtocol"
         :old-api-protocol="newApiProtocol"
-        :method-types="methodTypes"
-      ></t-c-p-api-version-diff>
+        :method-types="methodTypes"></t-c-p-api-version-diff>
     </el-dialog>
 
     <el-dialog
       :title="$t('commons.sync_other_info')"
       :visible.sync="createNewVersionVisible"
       :show-close="false"
-      width="30%"
-    >
+      width="30%">
       <div>
         <el-checkbox v-model="basisData.newVersionRemark">{{ $t('commons.remark') }}</el-checkbox>
         <el-checkbox v-model="basisData.newVersionDeps">{{ $t('commons.relationship.name') }}</el-checkbox>
@@ -83,44 +90,42 @@
       </div>
 
       <template v-slot:footer>
-        <ms-dialog-footer
-          @cancel="cancelCreateNewVersion"
-          :title="$t('commons.edit_info')"
-          @confirm="saveApi">
+        <ms-dialog-footer @cancel="cancelCreateNewVersion" :title="$t('commons.edit_info')" @confirm="saveApi">
         </ms-dialog-footer>
       </template>
     </el-dialog>
   </div>
-
 </template>
 
 <script>
-import {createMockConfig, getTcpMockInfo} from "@/api/api-mock";
+import { createMockConfig, getTcpMockInfo } from '@/api/api-mock';
 import {
   definitionFollow,
   delDefinitionByRefId,
   getDefinitionById,
   getDefinitionByIdAndRefId,
-  getDefinitionVersions
-} from "@/api/definition";
-import MsTcpBasicApi from "./TCPBasicApi";
-import MsTcpFormatParameters from "../request/tcp/TcpFormatParameters";
-import MsChangeHistory from "@/business/history/ApiHistory";
-import {getCurrentProjectID, getCurrentUser} from "metersphere-frontend/src/utils/token";
-import {hasLicense} from "metersphere-frontend/src/utils/permission";
-import ApiOtherInfo from "@/business/definition/components/complete/ApiOtherInfo";
-import TCPApiVersionDiff from "./version/TCPApiVersionDiff";
-import {createComponent} from ".././jmeter/components";
-import {TYPE_TO_C} from "@/business/automation/scenario/Setting";
-import MsDialogFooter from "metersphere-frontend/src/components/MsDialogFooter";
-import {useApiStore} from "@/store";
-import {apiTestCaseCount} from "@/api/api-test-case";
+  getDefinitionVersions,
+  updateDefinitionFollows,
+} from '@/api/definition';
+import MsTcpBasicApi from './TCPBasicApi';
+import MsTcpFormatParameters from '../request/tcp/TcpFormatParameters';
+import MsChangeHistory from '@/business/history/ApiHistory';
+import { getCurrentProjectID, getCurrentUser } from 'metersphere-frontend/src/utils/token';
+import { hasLicense } from 'metersphere-frontend/src/utils/permission';
+import ApiOtherInfo from '@/business/definition/components/complete/ApiOtherInfo';
+import TCPApiVersionDiff from './version/TCPApiVersionDiff';
+import { createComponent } from '.././jmeter/components';
+import { TYPE_TO_C } from '@/business/automation/scenario/Setting';
+import MsDialogFooter from 'metersphere-frontend/src/components/MsDialogFooter';
+import { useApiStore } from '@/store';
+import { apiTestCaseCount } from '@/api/api-test-case';
+import { getDefaultVersion, setLatestVersionById } from 'metersphere-frontend/src/api/version';
 
 const store = useApiStore();
-const {Body} = require("@/business/definition/model/ApiTestModel");
-store
+const { Body } = require('@/business/definition/model/ApiTestModel');
+store;
 export default {
-  name: "MsAddCompleteTcpApi",
+  name: 'MsAddCompleteTcpApi',
   components: {
     MsDialogFooter,
     ApiOtherInfo,
@@ -128,9 +133,7 @@ export default {
     MsTcpFormatParameters,
     MsChangeHistory,
     TCPApiVersionDiff,
-    MxEsbDefinition: () => import("@/business/definition/components/esb/MxEsbDefinition"),
-    MxVersionHistory: () => import("metersphere-frontend/src/components/version/MxVersionHistory"),
-    MxEsbDefinitionResponse: () => import("@/business/definition/components/esb/MxEsbDefinitionResponse")
+    MxVersionHistory: () => import('metersphere-frontend/src/components/version/MxVersionHistory'),
   },
   props: {
     request: {},
@@ -138,21 +141,21 @@ export default {
     moduleOptions: Array,
     isReadOnly: {
       type: Boolean,
-      default: false
+      default: false,
     },
     syncTabs: Array,
   },
   data() {
     return {
       validated: false,
-      apiProtocol: "TCP",
-      mockInfo: "",
+      apiProtocol: 'TCP',
+      mockInfo: '',
       showFollow: false,
       methodTypes: [
         {
-          'key': "TCP",
-          'value': this.$t('api_test.request.tcp.general_format'),
-        }
+          key: 'TCP',
+          value: this.$t('api_test.request.tcp.general_format'),
+        },
       ],
       versionData: [],
       dialogVisible: false,
@@ -160,8 +163,10 @@ export default {
       newData: {},
       newRequest: {},
       newResponse: {},
-      newApiProtocol: "TCP",
+      newApiProtocol: 'TCP',
       createNewVersionVisible: false,
+      latestVersionId: '',
+      hasLatest: false,
     };
   },
   created: function () {
@@ -169,18 +174,10 @@ export default {
       this.basisData.method = this.basisData.protocol;
     }
     this.apiProtocol = this.basisData.method;
-    if (this.apiProtocol == null || this.apiProtocol == "") {
-      this.apiProtocol = "TCP";
+    if (this.apiProtocol == null || this.apiProtocol == '') {
+      this.apiProtocol = 'TCP';
     }
-    if (hasLicense()) {
-      if (this.methodTypes.length == 1) {
-        let esbMethodType = {};
-        esbMethodType.key = "ESB";
-        esbMethodType.value = "ESB";
-        this.methodTypes.push(esbMethodType);
-      }
-    }
-    definitionFollow(this.basisData.id).then(response => {
+    definitionFollow(this.basisData.id).then((response) => {
       this.basisData.follows = response.data;
       for (let i = 0; i < response.data.length; i++) {
         if (response.data[i] === getCurrentUser().id) {
@@ -191,17 +188,17 @@ export default {
     });
     this.getMockInfo();
     if (hasLicense()) {
-      this.getVersionHistory();
+      this.getDefaultVersion();
     }
   },
   watch: {
     syncTabs() {
       if (this.basisData && this.syncTabs && this.syncTabs.includes(this.basisData.id)) {
         // 标示接口在其他地方更新过，当前页面需要同步
-        getDefinitionById(this.basisData.id).then(response => {
+        getDefinitionById(this.basisData.id).then((response) => {
           if (response.data) {
             let request = JSON.parse(response.data.request);
-            let index = this.syncTabs.findIndex(item => {
+            let index = this.syncTabs.findIndex((item) => {
               if (item === this.basisData.id) {
                 return true;
               }
@@ -216,12 +213,12 @@ export default {
       handler(v) {
         this.changeApiProtocol(v);
       },
-      deep: true
-    }
+      deep: true,
+    },
   },
   methods: {
     openHis() {
-      this.$refs.changeHistory.open(this.basisData.id, ["接口定义", "接口定義", "Api definition", "API_DEFINITION"]);
+      this.$refs.changeHistory.open(this.basisData.id, ['接口定义', '接口定義', 'Api definition', 'API_DEFINITION']);
     },
     callback() {
       this.validated = true;
@@ -230,25 +227,9 @@ export default {
       if (this.basisData.tags instanceof Array) {
         this.basisData.tags = JSON.stringify(this.basisData.tags);
       }
-      if (this.basisData.method === 'ESB') {
-        let validataResult = this.$refs.esbDefinition.validateEsbDataStruct(this.request.esbDataStruct);
-        if (!validataResult) {
-          return;
-        }
-        if (this.request.esbDataStruct != null) {
-          this.esbDataStruct = JSON.stringify(this.request.esbDataStruct);
-          this.basisData.esbDataStruct = this.esbDataStruct;
-        }
-        if (this.request.backEsbDataStruct != null) {
-          this.basisData.backEsbDataStruct = JSON.stringify(this.request.backEsbDataStruct);
-        }
-        if (this.request.backScript != null) {
-          this.basisData.backScript = JSON.stringify(this.request.backScript);
-        }
-      } else {
-        if (this.$refs.tcpFormatParameter) {
-          this.$refs.tcpFormatParameter.validateXmlDataStruct();
-        }
+
+      if (this.$refs.tcpFormatParameter) {
+        this.$refs.tcpFormatParameter.validateXmlDataStruct();
       }
       this.$emit('saveApi', this.basisData);
       if (this.$refs.versionHistory) {
@@ -262,38 +243,22 @@ export default {
         if (this.basisData.tags instanceof Array) {
           this.basisData.tags = JSON.stringify(this.basisData.tags);
         }
-        if (this.basisData.method === 'ESB') {
-          let validataResult = this.$refs.esbDefinition.validateEsbDataStruct(this.request.esbDataStruct);
-          if (!validataResult) {
-            return;
-          }
-          if (this.request.esbDataStruct != null) {
-            this.esbDataStruct = JSON.stringify(this.request.esbDataStruct);
-            this.basisData.esbDataStruct = this.esbDataStruct;
-          }
-          if (this.request.backEsbDataStruct != null) {
-            this.basisData.backEsbDataStruct = JSON.stringify(this.request.backEsbDataStruct);
-          }
-          if (this.request.backScript != null) {
-            this.basisData.backScript = JSON.stringify(this.request.backScript);
-          }
-        } else {
-          if (this.$refs.tcpFormatParameter) {
-            this.$refs.tcpFormatParameter.validateXmlDataStruct();
-          }
+
+        if (this.$refs.tcpFormatParameter) {
+          this.$refs.tcpFormatParameter.validateXmlDataStruct();
         }
         this.$emit('runTest', this.basisData);
       }
     },
     createRootModelInTree() {
-      this.$emit("createRootModelInTree");
+      this.$emit('createRootModelInTree');
     },
     changeApiProtocol(protocol) {
       this.apiProtocol = protocol;
     },
     getMockInfo() {
       let projectId = getCurrentProjectID();
-      getTcpMockInfo(projectId).then(response => {
+      getTcpMockInfo(projectId).then((response) => {
         this.mockInfo = response.data;
       });
     },
@@ -331,19 +296,34 @@ export default {
         }
       }
     },
+    getDefaultVersion() {
+      getDefaultVersion(getCurrentProjectID()).then((response) => {
+        this.latestVersionId = response.data;
+        this.getVersionHistory();
+      });
+    },
+
     getVersionHistory() {
-      getDefinitionVersions(this.basisData.id).then(response => {
+      getDefinitionVersions(this.basisData.id).then((response) => {
         if (this.basisData.isCopy) {
-          this.versionData = response.data.filter(v => v.versionId === this.basisData.versionId);
+          this.versionData = response.data.filter((v) => v.versionId === this.basisData.versionId);
         } else {
           this.versionData = response.data;
+        }
+        let latestVersionData = response.data.filter((v) => v.versionId === this.latestVersionId);
+        if (latestVersionData.length > 0) {
+          this.hasLatest = false;
+        } else {
+          this.hasLatest = true;
         }
       });
     },
     compare(row) {
-      this.basisData.createTime = this.$refs.versionHistory.versionOptions.filter(v => v.id === this.basisData.versionId)[0].createTime;
-      getDefinitionByIdAndRefId(row.id, this.basisData.refId).then(response => {
-        getDefinitionById(response.data.id).then(res => {
+      this.basisData.createTime = this.$refs.versionHistory.versionOptions.filter(
+        (v) => v.id === this.basisData.versionId
+      )[0].createTime;
+      getDefinitionByIdAndRefId(row.id, this.basisData.refId).then((response) => {
+        getDefinitionById(response.data.id).then((res) => {
           if (res.data) {
             this.newData = res.data;
             this.newData.createTime = row.createTime;
@@ -351,24 +331,28 @@ export default {
               this.newData.method = this.newData.protocol;
             }
             this.newApiProtocol = this.basisData.method;
-            if (this.newApiProtocol == null || this.newApiProtocol === "") {
-              this.newApiProtocol = "TCP";
+            if (this.newApiProtocol == null || this.newApiProtocol === '') {
+              this.newApiProtocol = 'TCP';
             }
             this.dealWithTag(res.data);
-            this.setRequest(res.data)
+            this.setRequest(res.data);
             if (!this.setRequest(res.data)) {
-              this.newRequest = createComponent("TCPSampler");
+              this.newRequest = createComponent('TCPSampler');
               this.dialogVisible = true;
             }
-            this.formatApi(res.data)
+            this.formatApi(res.data);
           }
         });
       });
-
     },
     setRequest(api) {
       if (api.request) {
-        if (Object.prototype.toString.call(api.request).match(/\[object (\w+)\]/)[1].toLowerCase() === 'object') {
+        if (
+          Object.prototype.toString
+            .call(api.request)
+            .match(/\[object (\w+)\]/)[1]
+            .toLowerCase() === 'object'
+        ) {
           this.newRequest = api.request;
         } else {
           this.newRequest = JSON.parse(api.request);
@@ -383,25 +367,35 @@ export default {
     },
     dealWithTag(api) {
       if (api.tags) {
-        if (Object.prototype.toString.call(api.tags) === "[object String]") {
+        if (Object.prototype.toString.call(api.tags) === '[object String]') {
           api.tags = JSON.parse(api.tags);
         }
       }
       if (this.basisData.tags) {
-        if (Object.prototype.toString.call(this.basisData.tags) === "[object String]") {
+        if (Object.prototype.toString.call(this.basisData.tags) === '[object String]') {
           this.basisData.tags = JSON.parse(this.basisData.tags);
         }
       }
     },
     formatApi(api) {
       if (api.response != null && api.response !== 'null' && api.response) {
-        if (Object.prototype.toString.call(api.response).match(/\[object (\w+)\]/)[1].toLowerCase() === 'object') {
+        if (
+          Object.prototype.toString
+            .call(api.response)
+            .match(/\[object (\w+)\]/)[1]
+            .toLowerCase() === 'object'
+        ) {
           this.newResponse = api.response;
         } else {
           this.newResponse = JSON.parse(api.response);
         }
       } else {
-        this.newResponse = {headers: [], body: new Body(), statusCode: [], type: "HTTP"};
+        this.newResponse = {
+          headers: [],
+          body: new Body(),
+          statusCode: [],
+          type: 'HTTP',
+        };
       }
       if (!this.newRequest.hashTree) {
         this.newRequest.hashTree = [];
@@ -434,10 +428,15 @@ export default {
           if (!stepArray[i].clazzName) {
             stepArray[i].clazzName = TYPE_TO_C.get(stepArray[i].type);
           }
-          if (stepArray[i].type === "Assertions" && !stepArray[i].document) {
+          if (stepArray[i].type === 'Assertions' && !stepArray[i].document) {
             stepArray[i].document = {
-              type: "JSON",
-              data: {xmlFollowAPI: false, jsonFollowAPI: false, json: [], xml: []}
+              type: 'JSON',
+              data: {
+                xmlFollowAPI: false,
+                jsonFollowAPI: false,
+                json: [],
+                xml: [],
+              },
             };
           }
           if (stepArray[i].hashTree && stepArray[i].hashTree.length > 0) {
@@ -451,17 +450,17 @@ export default {
       this.getVersionHistory();
     },
     checkout(row) {
-      let api = this.versionData.filter(v => v.versionId === row.id)[0];
+      let api = this.versionData.filter((v) => v.versionId === row.id)[0];
       if (api.tags && api.tags.length > 0) {
         api.tags = JSON.parse(api.tags);
       }
-      this.$emit("checkout", api);
+      this.$emit('checkout', api);
     },
     create(row) {
       // 创建新版本
       this.basisData.versionId = row.id;
       this.basisData.versionName = row.name;
-      apiTestCaseCount({id: this.basisData.id}).then(response => {
+      apiTestCaseCount({ id: this.basisData.id }).then((response) => {
         if (response.data > 0) {
           this.basisData.caseTotal = response.data;
         }
@@ -469,11 +468,18 @@ export default {
         this.$set(this.basisData, 'newVersionDeps', this.$refs.apiOtherInfo.relationshipCount > 0);
         this.$set(this.basisData, 'newVersionCase', this.basisData.caseTotal > 0);
 
-        createMockConfig({projectId: this.projectId, apiId: this.basisData.id}).then(response => {
+        createMockConfig({
+          projectId: getCurrentProjectID(),
+          apiId: this.basisData.id,
+        }).then((response) => {
           this.$set(this.basisData, 'newVersionMock', response.data.mockExpectConfigList.length > 0);
 
-          if (this.$refs.apiOtherInfo.relationshipCount > 0 || this.basisData.remark ||
-            this.basisData.newVersionCase || this.basisData.newVersionMock) {
+          if (
+            this.$refs.apiOtherInfo.relationshipCount > 0 ||
+            this.basisData.remark ||
+            this.basisData.newVersionCase ||
+            this.basisData.newVersionMock
+          ) {
             this.createNewVersionVisible = true;
           } else {
             this.saveApi();
@@ -485,7 +491,7 @@ export default {
       });
     },
     del(row) {
-      this.$alert(this.$t('api_test.definition.request.delete_confirm') + ' ' + row.name + " ？", '', {
+      this.$alert(this.$t('api_test.definition.request.delete_confirm') + ' ' + row.name + ' ？', '', {
         confirmButtonText: this.$t('commons.confirm'),
         callback: (action) => {
           if (action === 'confirm') {
@@ -494,9 +500,21 @@ export default {
               this.getVersionHistory();
             });
           }
-        }
+        },
       });
-    }
+    },
+    setLatest(row) {
+      let param = {
+        projectId: getCurrentProjectID(),
+        type: 'API',
+        versionId: row.id,
+        resourceId: this.basisData.id,
+      };
+      setLatestVersionById(param).then(() => {
+        this.$success(this.$t('commons.modify_success'));
+        this.checkout(row);
+      });
+    },
   },
 };
 </script>
@@ -508,8 +526,8 @@ export default {
 
 .ms-opt-btn {
   position: fixed;
-  right: 50px;
+  right: 10px !important;
   z-index: 120;
-  top: 107px;
+  top: 85px;
 }
 </style>

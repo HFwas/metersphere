@@ -1,63 +1,65 @@
 <template>
   <div>
-    <div style="margin-left: 20px;">
-      <el-select v-model="envGroupId" :placeholder="$t('workspace.env_group.select')"
-                 style="margin-top: 8px;width: 200px;" size="small">
-        <el-option v-for="(group, index) in groups" :key="index"
-                   :label="group.name"
-                   :value="group.id"/>
+    <div style="margin-left: 20px">
+      <el-select
+        v-model="envGroupId"
+        :placeholder="$t('workspace.env_group.select')"
+        style="margin-top: 8px; width: 200px"
+        size="small">
+        <el-option v-for="(group, index) in groups" :key="index" :label="group.name" :value="group.id" />
       </el-select>
-      <span style="margin-left: 8px;">{{ $t('workspace.env_group.name') }}</span>
+      <span style="margin-left: 8px">{{ $t('workspace.env_group.name') }}</span>
       <i class="el-icon-view icon-view-btn" @click="viewGroup"></i>
     </div>
     <el-button type="primary" @click="handleConfirm" size="small" :style="btnStyle" class="env-confirm">
       {{ $t('workspace.env_group.confirm') }}
     </el-button>
-    <el-dialog :visible="visible" append-to-body :title="$t('workspace.env_group.name')" @close="visible = false"
-               style="height: 800px;">
+    <el-dialog
+      :visible="visible"
+      append-to-body
+      :title="$t('workspace.env_group.name')"
+      @close="visible = false"
+      style="height: 800px">
       <template>
-        <environment-group style="overflow-y: auto;"
-                           :screen-height="'350px'"
-                           :read-only="true"
-        ></environment-group>
+        <environment-group style="overflow-y: auto" :screen-height="'350px'" :read-only="true"></environment-group>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script>
-import EnvironmentGroup from "@/business/commons/EnvironmentGroupList";
-import {environmentGetALl, getEnvironmentMapByGroupId} from "metersphere-frontend/src/api/environment";
+import EnvironmentGroup from '@/business/commons/EnvironmentGroupList';
+import { environmentGetALL, getEnvironmentMapByGroupId } from 'metersphere-frontend/src/api/environment';
 
 export default {
-  name: "EnvGroup",
-  components: {EnvironmentGroup},
+  name: 'EnvGroup',
+  components: { EnvironmentGroup },
   data() {
     return {
       groups: [],
       envGroupId: this.groupId,
-      visible: false
-    }
+      visible: false,
+    };
   },
   props: {
     groupId: {
       type: String,
       default() {
-        return "";
-      }
+        return '';
+      },
     },
     projectIds: Set,
     btnStyle: {
       type: Object,
       default() {
-        return {width: "360px"}
-      }
-    }
+        return { width: '360px' };
+      },
+    },
   },
   watch: {
     groupId(val) {
       this.envGroupId = val;
-    }
+    },
   },
   created() {
     this.init();
@@ -67,10 +69,10 @@ export default {
       this.envGroupId = this.groupId;
     },
     init() {
-      environmentGetALl().then(res => {
+      environmentGetALL().then((res) => {
         let data = res.data;
         this.groups = data ? data : [];
-      })
+      });
     },
     viewGroup() {
       this.visible = true;
@@ -78,7 +80,7 @@ export default {
     async handleConfirm() {
       const sign = await this.checkEnv();
       if (sign) {
-        this.$emit("setEnvGroup", this.envGroupId);
+        this.$emit('setEnvGroup', this.envGroupId);
         this.$emit('close');
       }
     },
@@ -89,7 +91,7 @@ export default {
           resolve(false);
           return false;
         }
-        getEnvironmentMapByGroupId(this.envGroupId).then(res => {
+        getEnvironmentMapByGroupId(this.envGroupId).then((res) => {
           let data = res.data;
           if (!data) {
             this.$warning(this.$t('workspace.env_group.lack_env'));
@@ -106,10 +108,10 @@ export default {
           }
           resolve(true);
         });
-      })
-    }
-  }
-}
+      });
+    },
+  },
+};
 </script>
 
 <style scoped>

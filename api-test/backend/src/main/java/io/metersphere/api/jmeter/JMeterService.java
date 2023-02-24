@@ -1,6 +1,8 @@
 package io.metersphere.api.jmeter;
 
 
+import io.metersphere.api.dto.definition.request.ElementUtil;
+import io.metersphere.api.dto.definition.request.MsTestPlan;
 import io.metersphere.api.exec.engine.EngineFactory;
 import io.metersphere.api.exec.queue.ExecThreadPoolExecutor;
 import io.metersphere.api.jmeter.utils.ServerConfig;
@@ -8,17 +10,21 @@ import io.metersphere.api.jmeter.utils.SmoothWeighted;
 import io.metersphere.base.domain.TestResource;
 import io.metersphere.commons.config.KafkaConfig;
 import io.metersphere.commons.constants.ApiRunMode;
+import io.metersphere.commons.constants.ExtendedParameter;
+import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.utils.*;
 import io.metersphere.config.JmeterProperties;
 import io.metersphere.constants.BackendListenerConstants;
 import io.metersphere.constants.RunModeConstants;
 import io.metersphere.dto.JmeterRunRequestDTO;
 import io.metersphere.dto.NodeDTO;
+import io.metersphere.dto.RunModeConfigDTO;
 import io.metersphere.engine.Engine;
 import io.metersphere.jmeter.JMeterBase;
 import io.metersphere.jmeter.LocalRunner;
 import io.metersphere.service.RemakeReportService;
 import io.metersphere.utils.LoggerUtil;
+import io.metersphere.xpack.api.service.ApiPoolDebugService;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -42,17 +48,22 @@ import java.util.List;
 @Service
 public class JMeterService {
     public static final String BASE_URL = "http://%s:%d";
+    public static final String POOL = "POOL";
+
     @Resource
     private JmeterProperties jmeterProperties;
     @Resource
     private RestTemplate restTemplate;
     @Resource
     private RedisTemplate<String, Object> redisTemplate;
+    @Resource
+    private RemakeReportService remakeReportService;
+    @Resource
+    private ExecThreadPoolExecutor execThreadPoolExecutor;
 
     @PostConstruct
     private void init() {
         String JMETER_HOME = getJmeterHome();
-
         String JMETER_PROPERTIES = JMETER_HOME + "/bin/jmeter.properties";
         JMeterUtils.loadJMeterProperties(JMETER_PROPERTIES);
         JMeterUtils.setJMeterHome(JMETER_HOME);
@@ -79,12 +90,13 @@ public class JMeterService {
      * @param testId
      * @param testPlan
      */
-    private void addDebugListener(String testId, HashTree testPlan) {
+    private void addDebugListener(String testId, HashTree testPlan, String runMode) {
         MsDebugListener resultCollector = new MsDebugListener();
         resultCollector.setName(testId);
         resultCollector.setProperty(TestElement.TEST_CLASS, MsDebugListener.class.getName());
         resultCollector.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("ViewResultsFullVisualizer"));
         resultCollector.setEnabled(true);
+        resultCollector.setRunMode(runMode);
 
         // 添加DEBUG标示
         HashTree test = ArrayUtils.isNotEmpty(testPlan.getArray()) ? testPlan.getTree(testPlan.getArray()[0]) : null;
@@ -112,15 +124,15 @@ public class JMeterService {
         }
 
         if (MapUtils.isNotEmpty(request.getExtendedParameters())
-                && request.getExtendedParameters().containsKey("SYN_RES")
-                && (Boolean) request.getExtendedParameters().get("SYN_RES")) {
+                && request.getExtendedParameters().containsKey(ExtendedParameter.SYNC_STATUS)
+                && (Boolean) request.getExtendedParameters().get(ExtendedParameter.SYNC_STATUS)) {
             LoggerUtil.debug("为请求 [ " + request.getReportId() + " ] 添加Debug Listener");
-            addDebugListener(request.getReportId(), request.getHashTree());
+            addDebugListener(request.getReportId(), request.getHashTree(), request.getRunMode());
         }
 
         if (request.isDebug()) {
             LoggerUtil.debug("为请求 [ " + request.getReportId() + " ] 添加Debug Listener");
-            addDebugListener(request.getReportId(), request.getHashTree());
+            addDebugListener(request.getReportId(), request.getHashTree(), request.getRunMode());
         } else {
             LoggerUtil.debug("为请求 [ " + request.getReportId() + " ] 添加同步接收结果 Listener");
             JMeterBase.addBackendListener(request, request.getHashTree(), MsApiBackendListener.class.getCanonicalName());
@@ -136,16 +148,51 @@ public class JMeterService {
         // 如果是K8S调用
         if (request.getPool().isK8s()) {
             try {
+                // 缓存调试脚本
+                if (request.getHashTree() != null) {
+                    ElementUtil.coverArguments(request.getHashTree());
+                    String key = StringUtils.join(request.getReportId(), "-", request.getTestId());
+                    redisTemplate.opsForValue().set(key, new MsTestPlan().getJmx(request.getHashTree()));
+                }
                 LoggerUtil.info("开始发送请求[ " + request.getTestId() + " ] 到K8S节点执行", request.getReportId());
                 final Engine engine = EngineFactory.createApiEngine(request);
                 engine.start();
             } catch (Exception e) {
-                RemakeReportService apiScenarioReportService = CommonBeanFactory.getBean(RemakeReportService.class);
-                apiScenarioReportService.testEnded(request, e.getMessage());
+                remakeReportService.testEnded(request, e.getMessage());
+                String key = StringUtils.join(request.getReportId(), "-", request.getTestId());
+                redisTemplate.delete(key);
                 LoggerUtil.error("调用K8S执行请求[ " + request.getTestId() + " ]失败：", request.getReportId(), e);
             }
+        } else if ((MapUtils.isNotEmpty(request.getExtendedParameters())
+                && request.getExtendedParameters().containsKey(ExtendedParameter.SYNC_STATUS)
+                && (Boolean) request.getExtendedParameters().get(ExtendedParameter.SYNC_STATUS))
+                || request.isDebug()) {
+            this.nodeDebug(request);
         } else {
             this.send(request);
+        }
+    }
+
+    private synchronized void nodeDebug(JmeterRunRequestDTO request) {
+        try {
+            ApiPoolDebugService apiPoolDebugService = CommonBeanFactory.getBean(ApiPoolDebugService.class);
+            if (apiPoolDebugService != null) {
+                List<TestResource> resources = GenerateHashTreeUtil.setPoolResource(request.getPoolId());
+                if (request.getHashTree() != null) {
+                    ElementUtil.coverArguments(request.getHashTree());
+                    String key = StringUtils.join(request.getReportId(), "-", request.getTestId());
+                    redisTemplate.opsForValue().set(key, new MsTestPlan().getJmx(request.getHashTree()));
+                    request.setHashTree(null);
+                }
+                apiPoolDebugService.run(request, resources);
+            }
+        } catch (Exception e) {
+            LoggerUtil.error(e);
+            remakeReportService.remake(request);
+            String key = StringUtils.join(request.getReportId(), "-", request.getTestId());
+            redisTemplate.delete(key);
+            LoggerUtil.error("发送请求[ " + request.getTestId() + " ] 执行失败,进行数据回滚：", request.getReportId(), e);
+            MSException.throwException("调用资源池执行失败，请检查资源池是否配置正常");
         }
     }
 
@@ -161,7 +208,6 @@ public class JMeterService {
             }
             if (config == null) {
                 LoggerUtil.info("未获取到资源池，请检查配置【系统设置-系统-测试资源池】", request.getReportId());
-                RemakeReportService remakeReportService = CommonBeanFactory.getBean(RemakeReportService.class);
                 remakeReportService.remake(request);
                 return;
             }
@@ -170,13 +216,11 @@ public class JMeterService {
             LoggerUtil.info("开始发送请求【 " + request.getTestId() + " 】到 " + config.getUrl() + " 节点执行", request.getReportId());
             ResponseEntity<String> result = restTemplate.postForEntity(config.getUrl(), request, String.class);
             if (result == null || !StringUtils.equals("SUCCESS", result.getBody())) {
-                RemakeReportService remakeReportService = CommonBeanFactory.getBean(RemakeReportService.class);
                 remakeReportService.remake(request);
                 LoggerUtil.error("发送请求[ " + request.getTestId() + " ] 到" + config.getUrl() + " 节点执行失败", request.getReportId());
                 LoggerUtil.info(result.getBody());
             }
         } catch (Exception e) {
-            RemakeReportService remakeReportService = CommonBeanFactory.getBean(RemakeReportService.class);
             remakeReportService.remake(request);
             LoggerUtil.error("发送请求[ " + request.getTestId() + " ] 执行失败,进行数据回滚：", request.getReportId(), e);
         }
@@ -187,9 +231,10 @@ public class JMeterService {
         if (request.getPool().isPool() && StringUtils.isNotBlank(request.getRunMode())) {
             this.runNode(request);
         } else if (request.getHashTree() != null) {
+            ElementUtil.coverArguments(request.getHashTree());
             //解析hashTree，是否含有文件库文件
             HashTreeUtil.initRepositoryFiles(request);
-            CommonBeanFactory.getBean(ExecThreadPoolExecutor.class).addTask(request);
+            execThreadPoolExecutor.addTask(request);
         }
     }
 
@@ -219,6 +264,13 @@ public class JMeterService {
             return isRunning;
         } catch (Exception e) {
             return false;
+        }
+    }
+
+    public void verifyPool(String projectId, RunModeConfigDTO runModeConfigDTO) {
+        ApiPoolDebugService debugService = CommonBeanFactory.getBean(ApiPoolDebugService.class);
+        if (debugService != null) {
+            debugService.verifyPool(projectId, runModeConfigDTO);
         }
     }
 }

@@ -189,7 +189,7 @@
     <select id="list" resultMap="BaseResultMap">
         select api_scenario.id, api_scenario.project_id, api_scenario.tags, api_scenario.user_id, api_scenario.num,
         api_scenario.custom_num, api_scenario.version, api_scenario.environment_type, api_scenario.environment_group_id,
-        api_scenario.version_id, api_scenario.ref_id, project_version.name as version_name,
+        api_scenario.version_id, api_scenario.ref_id,api_scenario.latest, project_version.name as version_name,
         <if test="request.selectEnvironment == true">
             api_scenario.environment_json as env,
         </if>
@@ -289,8 +289,8 @@
             <if test="request.executeStatus == 'fakeError' and request.selectDataType != 'schedule' ">
                 and api_scenario.last_result = 'FAKE_ERROR'
             </if>
-            <if test="request.executeStatus == 'notSuccess' and request.selectDataType != 'schedule' ">
-                and api_scenario.last_result IN ('ERROR','FAKE_ERROR')
+            <if test="request.executeStatus == 'executedCount' and request.selectDataType != 'schedule' ">
+                and api_scenario.last_result IN ('SUCCESS','ERROR','FAKE_ERROR')
             </if>
             <if test="request.executeStatus == 'executeFailed' and request.selectDataType == 'schedule' ">
                 AND api_scenario.id IN
@@ -305,10 +305,25 @@
                 (SELECT source_id FROM scenario_execution_info WHERE trigger_mode = 'SCHEDULE' AND result =
                 'FAKE_ERROR')
             </if>
-            <if test="request.executeStatus == 'notSuccess' and request.selectDataType == 'schedule' ">
+            <if test="request.executeStatus == 'executedCount' and request.selectDataType == 'schedule' ">
                 AND api_scenario.id IN
                 (SELECT source_id FROM scenario_execution_info WHERE trigger_mode = 'SCHEDULE' AND result IN
-                ('FAKE_ERROR','ERROR'))
+                ('SUCCESS','FAKE_ERROR','ERROR'))
+            </if>
+
+            <if test="request.selectDataRange == 'scheduleRunning' ">
+                AND api_scenario.id IN
+                (
+                SELECT resource_id FROM `schedule`
+                WHERE `group` = 'API_SCENARIO_TEST'AND enable IS TRUE
+                )
+            </if>
+            <if test="request.selectDataRange == 'scheduleNotRun' ">
+                AND api_scenario.id IN
+                (
+                SELECT resource_id FROM `schedule`
+                WHERE `group` = 'API_SCENARIO_TEST'AND enable IS FALSE
+                )
             </if>
             <if test="request.notInTestPlan">
                 and api_scenario.id not in (
@@ -445,18 +460,41 @@
         ORDER BY FIND_IN_SET(id, ${order})
     </select>
 
-    <select id="selectReference" resultType="io.metersphere.base.domain.ApiScenario">
-        select * from api_scenario
+    <select id="selectReference" resultType="io.metersphere.api.dto.automation.ApiScenarioDTO">
+        select a.id, a.name , a.num,p.name AS projectName, a.update_time, a.create_time,
+        w.name AS workspaceName, p.workspace_id AS workspaceId, p.id AS projectId from api_scenario a
+        LEFT JOIN project p ON a.project_id = p.id
+        LEFT JOIN `workspace` w ON  p.workspace_id = w.id
         <where>
-            <if test="request.workspaceId != null">
-                AND project.workspace_id = #{request.workspaceId}
+         a.status != 'Trash'
+            <if test="request.ids != null and request.ids.size() > 0">
+                and a.id in
+                <foreach collection="request.ids" item="id" separator="," open="(" close=")">
+                    #{id}
+                </foreach>
             </if>
-            <if test="request.moduleId != null">
-                AND api_scenario_module_id = #{request.moduleId}
+            <if test="request.filters != null and request.filters.size() > 0">
+                <foreach collection="request.filters.entrySet()" index="key" item="values">
+                    <if test="values != null and values.size() > 0">
+                        <choose>
+                            <when test="key=='project_id'">
+                             and a.project_id in
+                                <foreach collection="values" item="value" separator="," open="(" close=")">
+                                    #{value}
+                                </foreach>
+                            </when>
+                            <when test="key=='workspace_id'">
+                                and p.workspace_id in
+                                <foreach collection="values" item="value" separator="," open="(" close=")">
+                                    #{value}
+                                </foreach>
+                            </when>
+                        </choose>
+                    </if>
+                </foreach>
             </if>
-            and status != 'Trash'
-            and scenario_definition like CONCAT('%', #{request.id},'%') and id != #{request.id}
         </where>
+        <include refid="io.metersphere.base.mapper.ext.ExtBaseMapper.orders"/>
     </select>
     <update id="removeToGcByExample" parameterType="io.metersphere.base.domain.ApiScenarioExample">
         update api_scenario
@@ -499,14 +537,26 @@
     <select id="countByProjectID" resultType="java.lang.Long">
         SELECT COUNT(DISTINCT ref_id) AS countNumber
         FROM api_scenario
-        WHERE project_id = #{0}
-          AND status != 'Trash' AND latest = 1
+        WHERE project_id = #{projectId}
+          AND status != 'Trash'
+        <if test="versionId != null">
+            AND version_id = #{versionId}
+        </if>
+        <if test="versionId == null">
+            AND latest = 1
+        </if>
     </select>
     <select id="countByProjectIDAndCreatInThisWeek" resultType="java.lang.Long">
         SELECT count(id) AS countNumber
         FROM api_scenario
         WHERE project_id = #{projectId}
-          AND status != 'Trash' and latest = 1
+          AND status != 'Trash'
+        <if test="versionId != null">
+            AND version_id = #{versionId}
+        </if>
+        <if test="versionId == null">
+            AND latest = 1
+        </if>
         AND create_time BETWEEN #{firstDayTimestamp}
           AND #{lastDayTimestamp}
     </select>
@@ -514,8 +564,14 @@
     <select id="countRunResultByProjectID" resultType="io.metersphere.api.dto.datacount.ApiDataCountResult">
         SELECT count(id) AS countNumber, if(last_result is null, "notRun", last_result) AS groupField
         FROM api_scenario
-        WHERE project_id = #{0}
-          AND status != 'Trash' and latest = 1
+        WHERE project_id = #{projectId}
+          AND status != 'Trash'
+        <if test="versionId != null">
+            AND version_id = #{versionId}
+        </if>
+        <if test="versionId == null">
+            AND latest = 1
+        </if>
         GROUP BY groupField
     </select>
 
@@ -716,8 +772,8 @@
             <if test="request.executeStatus == 'fakeError'">
                 and api_scenario.last_result = 'FAKE_ERROR'
             </if>
-            <if test="request.executeStatus == 'notSuccess'">
-                and api_scenario.last_result IN ('ERROR','FAKE_ERROR')
+            <if test="request.executeStatus == 'executedCount'">
+                and api_scenario.last_result IN ('SUCCESS','ERROR','FAKE_ERROR')
             </if>
             <if test="request.notInTestPlan == true ">
                 and api_scenario.id not in (
@@ -744,7 +800,7 @@
                  LEFT JOIN project_version
                            on project_version.project_id = api_scenario.project_id and project_version.id = version_id
                  LEFT JOIN project on api_scenario.project_id = project.id
-        WHERE api_scenario.id = #{id} and api_scenario.status != 'Trash';
+        WHERE api_scenario.id = #{id}
     </select>
 
     <sql id="queryVersionCondition">
@@ -798,6 +854,14 @@
         ON api_scenario.id = t.id
             SET api_scenario.latest = TRUE
         WHERE ref_id = #{refId,jdbcType=VARCHAR}
+    </update>
+
+    <update id="updateVersionModule">
+        UPDATE api_scenario
+        SET api_scenario_module_id = #{moduleId},
+            module_path            = #{modulePath}
+        WHERE ref_id = #{refId}
+          AND version_id != #{versionId}
     </update>
 
     <select id="selectRefIdsForVersionChange" resultType="java.lang.String">
@@ -855,6 +919,15 @@
         WHERE project_id = #{projectId}
           AND status = #{status}
           AND latest IS TRUE
+    </select>
+
+    <select id="selectBaseInfoByCondition" resultType="io.metersphere.base.domain.ApiScenario">
+        select api_scenario.id, api_scenario.api_scenario_module_id
+        from api_scenario
+        <include refid="queryWhereCondition"/>
+        AND api_scenario.project_id = #{projectId}
+        AND api_scenario.status = #{status}
+        AND api_scenario.latest IS TRUE
     </select>
 
     <select id="countByRequest" resultType="io.metersphere.api.dto.ApiCountChartResult">
@@ -930,6 +1003,7 @@
         FROM
         api_scenario atc
         LEFT JOIN test_case_test tct ON atc.id = tct.test_id
+        and tct.test_case_id = #{request.testCaseId}
         WHERE
         (atc.status is null or atc.status != 'Trash')
         <if test="request.projectId != null and request.projectId!=''">
@@ -1037,4 +1111,17 @@
         </where>
         and api_scenario.status!='Trash'
     </select>
+
+    <select id="selectScenarioIdInExecutionInfoByProjectIdIsNull" resultType="java.lang.String">
+        SELECT DISTINCT source_id
+        FROM scenario_execution_info
+        WHERE project_id IS NULL
+    </select>
+
+    <select id="countSourceIdByProjectIdIsNull" resultType="java.lang.Long">
+        SELECT COUNT(DISTINCT source_id)
+        FROM scenario_execution_info
+        WHERE project_id IS NULL
+    </select>
+
 </mapper>

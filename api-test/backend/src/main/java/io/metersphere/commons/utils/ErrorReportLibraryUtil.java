@@ -144,12 +144,17 @@ public class ErrorReportLibraryUtil {
                 });
             }
 
-            if (MapUtils.isNotEmpty(errorReportAssertionMap)) {
+            if (CollectionUtils.isNotEmpty(result.errorCodeList)) {
                 if ((higherThanError && !resultIsSuccess) || (higherThanSuccess && resultIsSuccess)) {
                     result.requestStatus = ApiReportStatus.FAKE_ERROR.name();
                 }
             }
         }
+        LogUtil.info(" FAKE_ERROR result:  config-higherThanError:" + higherThanError
+                + ", config-higherThanSuccess:" + higherThanSuccess
+                + ", resultIsSuccess: " + resultIsSuccess
+                + ", isFakeError: " + ((higherThanError && !resultIsSuccess) || (higherThanSuccess && resultIsSuccess))
+                + "; status:" + result.requestStatus);
         return result;
     }
 

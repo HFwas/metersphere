@@ -7,7 +7,7 @@ import io.metersphere.commons.utils.CommonBeanFactory;
 import io.metersphere.commons.utils.JSON;
 import io.metersphere.commons.utils.LogUtil;
 import io.metersphere.dto.JmeterRunRequestDTO;
-import io.metersphere.engine.request.StartTestRequest;
+import io.metersphere.request.StartTestRequest;
 import io.metersphere.i18n.Translator;
 import io.metersphere.xpack.resourcepool.engine.provider.ClientCredential;
 import io.metersphere.xpack.resourcepool.engine.provider.KubernetesProvider;
@@ -92,6 +92,7 @@ public class KubernetesTestEngine extends AbstractEngine {
             kubernetesProvider.deployJmeter(request, clientCredential);
         } catch (Exception e) {
             LogUtil.error(e);
+            MSException.throwException("kubernetes deploy jmeter error please check the yaml file");
         }
     }
 

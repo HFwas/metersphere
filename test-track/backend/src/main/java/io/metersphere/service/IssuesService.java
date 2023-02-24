@@ -1,49 +1,66 @@
 package io.metersphere.service;
 
+import com.alibaba.excel.EasyExcelFactory;
+import com.alibaba.excel.util.DateUtils;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import io.metersphere.base.domain.*;
 import io.metersphere.base.mapper.*;
+import io.metersphere.base.mapper.ext.ExtIssueCommentMapper;
 import io.metersphere.base.mapper.ext.ExtIssuesMapper;
-import io.metersphere.commons.constants.FileAssociationType;
-import io.metersphere.commons.constants.IssueRefType;
-import io.metersphere.commons.constants.IssuesManagePlatform;
-import io.metersphere.commons.constants.IssuesStatus;
+import io.metersphere.commons.constants.*;
 import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.utils.*;
-import io.metersphere.plan.service.TestPlanTestCaseService;
-import io.metersphere.utils.DistinctKeyUtil;
-import io.metersphere.xpack.track.dto.AttachmentSyncType;
-import io.metersphere.xpack.track.dto.*;
 import io.metersphere.constants.AttachmentType;
+import io.metersphere.constants.IssueStatus;
 import io.metersphere.constants.SystemCustomField;
-import io.metersphere.dto.CustomFieldDao;
+import io.metersphere.dto.*;
+import io.metersphere.excel.constants.IssueExportHeadField;
+import io.metersphere.excel.domain.ExcelErrData;
+import io.metersphere.excel.domain.ExcelResponse;
+import io.metersphere.excel.domain.IssueExcelData;
+import io.metersphere.excel.domain.IssueExcelDataFactory;
+import io.metersphere.excel.handler.IssueTemplateHeadWriteHandler;
+import io.metersphere.excel.listener.IssueExcelListener;
+import io.metersphere.excel.utils.EasyExcelExporter;
 import io.metersphere.i18n.Translator;
 import io.metersphere.log.utils.ReflexObjectUtil;
 import io.metersphere.log.vo.DetailColumn;
 import io.metersphere.log.vo.OperatingLogDetails;
 import io.metersphere.log.vo.track.TestPlanReference;
-import io.metersphere.dto.*;
 import io.metersphere.plan.dto.PlanReportIssueDTO;
 import io.metersphere.plan.dto.TestCaseReportStatusResultDTO;
 import io.metersphere.plan.dto.TestPlanSimpleReportDTO;
 import io.metersphere.plan.service.TestPlanService;
+import io.metersphere.plan.service.TestPlanTestCaseService;
 import io.metersphere.plan.utils.TestPlanStatusCalculator;
+import io.metersphere.platform.api.Platform;
+import io.metersphere.platform.domain.PlatformAttachment;
+import io.metersphere.platform.domain.*;
 import io.metersphere.request.IntegrationRequest;
-import io.metersphere.request.issues.JiraIssueTypeRequest;
+import io.metersphere.request.issues.IssueExportRequest;
+import io.metersphere.request.issues.IssueImportRequest;
 import io.metersphere.request.issues.PlatformIssueTypeRequest;
 import io.metersphere.request.testcase.AuthUserIssueRequest;
 import io.metersphere.request.testcase.IssuesCountRequest;
-import io.metersphere.service.issue.domain.jira.JiraIssueType;
-import io.metersphere.service.issue.domain.zentao.ZentaoBuild;
-import io.metersphere.request.attachment.AttachmentRequest;
-import io.metersphere.xpack.track.dto.request.IssuesRequest;
-import io.metersphere.xpack.track.dto.request.IssuesUpdateRequest;
-import io.metersphere.service.issue.platform.*;
+import io.metersphere.service.issue.platform.AbstractIssuePlatform;
+import io.metersphere.service.issue.platform.IssueFactory;
+import io.metersphere.service.issue.platform.TapdPlatform;
 import io.metersphere.service.remote.project.TrackCustomFieldTemplateService;
 import io.metersphere.service.remote.project.TrackIssueTemplateService;
 import io.metersphere.service.wapper.TrackProjectService;
+import io.metersphere.service.wapper.UserService;
+import io.metersphere.utils.DistinctKeyUtil;
+import io.metersphere.xpack.track.dto.AttachmentRequest;
+import io.metersphere.xpack.track.dto.PlatformStatusDTO;
+import io.metersphere.xpack.track.dto.PlatformUser;
+import io.metersphere.xpack.track.dto.*;
+import io.metersphere.xpack.track.dto.request.IssuesRequest;
+import io.metersphere.xpack.track.dto.request.IssuesUpdateRequest;
 import io.metersphere.xpack.track.issue.IssuesPlatform;
+import io.metersphere.xpack.track.service.XpackIssueService;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.BooleanUtils;
@@ -59,7 +76,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
 import java.io.File;
+import java.io.IOException;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
@@ -73,6 +92,8 @@ public class IssuesService {
     private BaseIntegrationService baseIntegrationService;
     @Resource
     private TrackProjectService trackProjectService;
+    @Resource
+    private BaseUserService baseUserService;
     @Resource
     private BaseProjectService baseProjectService;
     @Resource
@@ -108,8 +129,6 @@ public class IssuesService {
     @Resource
     StringRedisTemplate stringRedisTemplate;
     @Resource
-    IssueFileMapper issueFileMapper;
-    @Resource
     private AttachmentService attachmentService;
     @Resource
     private ProjectMapper projectMapper;
@@ -117,6 +136,14 @@ public class IssuesService {
     SqlSessionFactory sqlSessionFactory;
     @Resource
     private FileMetadataMapper fileMetadataMapper;
+    @Resource
+    private ExtIssueCommentMapper extIssueCommentMapper;
+    @Resource
+    private PlatformPluginService platformPluginService;
+    @Resource
+    private UserService userService;
+    @Resource
+    private BasePluginService basePluginService;
 
     private static final String SYNC_THIRD_PARTY_ISSUES_KEY = "ISSUE:SYNC";
 
@@ -129,19 +156,57 @@ public class IssuesService {
 
 
     public IssuesWithBLOBs addIssues(IssuesUpdateRequest issuesRequest, List<MultipartFile> files) {
-        List<IssuesPlatform> platformList = getAddPlatforms(issuesRequest);
+        Project project = baseProjectService.getProjectById(issuesRequest.getProjectId());
         IssuesWithBLOBs issues = null;
-        for (IssuesPlatform platform : platformList) {
-            issues = platform.addIssue(issuesRequest);
+        if (PlatformPluginService.isPluginPlatform(project.getPlatform())) {
+            PlatformIssuesUpdateRequest platformIssuesUpdateRequest =
+                    JSON.parseObject(JSON.toJSONString(issuesRequest), PlatformIssuesUpdateRequest.class);
+            List<PlatformCustomFieldItemDTO> customFieldItemDTOS =
+                    JSON.parseArray(JSON.toJSONString(issuesRequest.getRequestFields()), PlatformCustomFieldItemDTO.class);
+            platformIssuesUpdateRequest.setCustomFieldList(customFieldItemDTOS); // todo 全部插件化后去掉
+            platformIssuesUpdateRequest.setUserPlatformUserConfig(userService.getCurrentPlatformInfoStr(SessionUtils.getCurrentWorkspaceId()));
+            platformIssuesUpdateRequest.setProjectConfig(PlatformPluginService.getCompatibleProjectConfig(project));
+
+            issues = platformPluginService.getPlatform(project.getPlatform())
+                    .addIssue(platformIssuesUpdateRequest);
+
+            issues.setPlatform(project.getPlatform());
+            insertIssues(issues);
+            issuesRequest.setId(issues.getId());
+            issuesRequest.setPlatformId(issues.getPlatformId());
+            // 用例与第三方缺陷平台中的缺陷关联
+            handleTestCaseIssues(issuesRequest);
+
+            // 如果是复制新增, 同步MS附件到Jira
+            if (StringUtils.isNotEmpty(issuesRequest.getCopyIssueId())) {
+                AttachmentRequest attachmentRequest = new AttachmentRequest();
+                attachmentRequest.setBelongId(issuesRequest.getCopyIssueId());
+                attachmentRequest.setBelongType(AttachmentType.ISSUE.type());
+                List<String> attachmentIds = attachmentService.getAttachmentIdsByParam(attachmentRequest);
+                if (CollectionUtils.isNotEmpty(attachmentIds)) {
+                    for (String attachmentId : attachmentIds) {
+                        FileAttachmentMetadata fileAttachmentMetadata = attachmentService.getFileAttachmentMetadataByFileId(attachmentId);
+                        File file = new File(fileAttachmentMetadata.getFilePath() + "/" + fileAttachmentMetadata.getName());
+                        attachmentService.syncIssuesAttachment(issues, file, AttachmentSyncType.UPLOAD);
+                    }
+                }
+            }
+        } else {
+            List<IssuesPlatform> platformList = getAddPlatforms(issuesRequest);
+            for (IssuesPlatform platform : platformList) {
+                issues = platform.addIssue(issuesRequest);
+            }
         }
+
         if (issuesRequest.getIsPlanEdit()) {
             issuesRequest.getAddResourceIds().forEach(l -> {
                 testCaseIssueService.updateIssuesCount(l);
             });
         }
-        saveFollows(issuesRequest.getId(), issuesRequest.getFollows());
-        customFieldIssuesService.addFields(issuesRequest.getId(), issuesRequest.getAddFields());
-        customFieldIssuesService.editFields(issuesRequest.getId(), issuesRequest.getEditFields());
+        String issuesId = issues.getId();
+        saveFollows(issuesId, issuesRequest.getFollows());
+        customFieldIssuesService.addFields(issuesId, issuesRequest.getAddFields());
+        customFieldIssuesService.editFields(issuesId, issuesRequest.getEditFields());
         if (StringUtils.isNotEmpty(issuesRequest.getCopyIssueId())) {
             final String platformId = issues.getPlatformId();
             // 复制新增, 同步缺陷的MS附件
@@ -201,11 +266,16 @@ public class IssuesService {
                     fileAttachmentMetadataBatchMapper.insert(fileAttachmentMetadata);
                     // 下载文件管理文件, 同步到第三方平台
                     File refFile = attachmentService.downloadMetadataFile(filemetaId, fileMetadata.getName());
-                    IssuesRequest addIssueRequest = new IssuesRequest();
-                    addIssueRequest.setWorkspaceId(SessionUtils.getCurrentWorkspaceId());
-                    addIssueRequest.setProjectId(SessionUtils.getCurrentProjectId());
-                    Objects.requireNonNull(IssueFactory.createPlatform(platform, addIssueRequest))
-                            .syncIssuesAttachment(issuesRequest, refFile, AttachmentSyncType.UPLOAD);
+                    if (PlatformPluginService.isPluginPlatform(platform)) {
+                        issuesRequest.setPlatform(platform);
+                        attachmentService.syncIssuesAttachment(issuesRequest, refFile, AttachmentSyncType.UPLOAD);
+                    } else {
+                        IssuesRequest addIssueRequest = new IssuesRequest();
+                        addIssueRequest.setWorkspaceId(SessionUtils.getCurrentWorkspaceId());
+                        addIssueRequest.setProjectId(SessionUtils.getCurrentProjectId());
+                        Objects.requireNonNull(IssueFactory.createPlatform(platform, addIssueRequest))
+                                .syncIssuesAttachment(issuesRequest, refFile, AttachmentSyncType.UPLOAD);
+                    }
                     FileUtils.deleteFile(FileUtils.ATTACHMENT_TMP_DIR + File.separator + fileMetadata.getName());
                 });
                 sqlSession.flushStatements();
@@ -217,11 +287,97 @@ public class IssuesService {
         return getIssue(issues.getId());
     }
 
+    protected IssuesWithBLOBs insertIssues(IssuesWithBLOBs issues) {
+        if (StringUtils.isBlank(issues.getId())) {
+            issues.setId(UUID.randomUUID().toString());
+        }
+        issues.setCreateTime(System.currentTimeMillis());
+        if (issues.getUpdateTime() == null) {
+            issues.setUpdateTime(System.currentTimeMillis());
+        }
+        issues.setNum(getNextNum(issues.getProjectId()));
+        issues.setCreator(SessionUtils.getUserId());
+        issuesMapper.insert(issues);
+        return issues;
+    }
+
+    protected int getNextNum(String projectId) {
+        Issues issue = extIssuesMapper.getNextNum(projectId);
+        if (issue == null || issue.getNum() == null) {
+            return 100001;
+        } else {
+            return Optional.of(issue.getNum() + 1).orElse(100001);
+        }
+    }
+
+    public void handleTestCaseIssues(IssuesUpdateRequest issuesRequest) {
+        String issuesId = issuesRequest.getId();
+        List<String> deleteCaseIds = issuesRequest.getDeleteResourceIds();
+
+        if (!org.springframework.util.CollectionUtils.isEmpty(deleteCaseIds)) {
+            TestCaseIssuesExample example = new TestCaseIssuesExample();
+            example.createCriteria()
+                    .andResourceIdIn(deleteCaseIds)
+                    .andIssuesIdEqualTo(issuesId);
+            // 测试计划的用例 deleteCaseIds 是空的， 不会进到这里
+            example.or(
+                    example.createCriteria()
+                            .andRefIdIn(deleteCaseIds)
+                            .andIssuesIdEqualTo(issuesId)
+            );
+            testCaseIssuesMapper.deleteByExample(example);
+        }
+
+        List<String> addCaseIds = issuesRequest.getAddResourceIds();
+
+        if (!org.springframework.util.CollectionUtils.isEmpty(addCaseIds)) {
+            if (issuesRequest.getIsPlanEdit()) {
+                addCaseIds.forEach(caseId -> {
+                    testCaseIssueService.add(issuesId, caseId, issuesRequest.getRefId(), IssueRefType.PLAN_FUNCTIONAL.name());
+                    testCaseIssueService.updateIssuesCount(caseId);
+                });
+            } else {
+                addCaseIds.forEach(caseId -> testCaseIssueService.add(issuesId, caseId, null, IssueRefType.FUNCTIONAL.name()));
+            }
+        }
+    }
+
     public IssuesWithBLOBs updateIssues(IssuesUpdateRequest issuesRequest) {
-        List<IssuesPlatform> platformList = getUpdatePlatforms(issuesRequest);
-        platformList.forEach(platform -> {
-            platform.updateIssue(issuesRequest);
-        });
+        PlatformIssuesUpdateRequest platformIssuesUpdateRequest = JSON.parseObject(JSON.toJSONString(issuesRequest), PlatformIssuesUpdateRequest.class);
+        Project project = baseProjectService.getProjectById(issuesRequest.getProjectId());
+        if (PlatformPluginService.isPluginPlatform(project.getPlatform())) {
+
+            Platform platform = platformPluginService.getPlatform(project.getPlatform());
+
+            if (platform.isAttachmentUploadSupport()) {
+                AttachmentRequest attachmentRequest = new AttachmentRequest();
+                attachmentRequest.setBelongId(issuesRequest.getId());
+                attachmentRequest.setBelongType(AttachmentType.ISSUE.type());
+                List<FileAttachmentMetadata> fileAttachmentMetadata = attachmentService.listMetadata(attachmentRequest);
+                Set<String> msAttachmentNames = fileAttachmentMetadata.stream()
+                        .map(FileAttachmentMetadata::getName)
+                        .collect(Collectors.toSet());
+                // 获得缺陷MS附件名称
+                platformIssuesUpdateRequest.setMsAttachmentNames(msAttachmentNames);
+            }
+
+            List<PlatformCustomFieldItemDTO> customFieldItemDTOS = JSON.parseArray(JSON.toJSONString(issuesRequest.getRequestFields()), PlatformCustomFieldItemDTO.class);
+            platformIssuesUpdateRequest.setCustomFieldList(customFieldItemDTOS); // todo 全部插件化后去掉
+            platformIssuesUpdateRequest.setUserPlatformUserConfig(userService.getCurrentPlatformInfoStr(SessionUtils.getCurrentWorkspaceId()));
+            platformIssuesUpdateRequest.setProjectConfig(PlatformPluginService.getCompatibleProjectConfig(project));
+            IssuesWithBLOBs issue = platformPluginService.getPlatform(project.getPlatform())
+                    .updateIssue(platformIssuesUpdateRequest);
+
+            issue.setUpdateTime(System.currentTimeMillis());
+            issuesMapper.updateByPrimaryKeySelective(issue);
+            handleTestCaseIssues(issuesRequest);
+        } else {
+            List<IssuesPlatform> platformList = getUpdatePlatforms(issuesRequest);
+            platformList.forEach(platform -> {
+                platform.updateIssue(issuesRequest);
+            });
+        }
+
         customFieldIssuesService.editFields(issuesRequest.getId(), issuesRequest.getEditFields());
         customFieldIssuesService.addFields(issuesRequest.getId(), issuesRequest.getAddFields());
 
@@ -331,10 +487,6 @@ public class IssuesService {
             List<String> tapdUsers = tapdPlatform.getTapdUsers(issuesWithBLOBs.getProjectId(), issuesWithBLOBs.getPlatformId());
             issuesWithBLOBs.setTapdUsers(tapdUsers);
         }
-        if (StringUtils.equals(issuesWithBLOBs.getPlatform(), IssuesManagePlatform.Zentao.name())) {
-            ZentaoPlatform zentaoPlatform = (ZentaoPlatform) IssueFactory.createPlatform(IssuesManagePlatform.Zentao.name(), issuesRequest);
-            zentaoPlatform.getZentaoAssignedAndBuilds(issuesWithBLOBs);
-        }
         buildCustomField(issuesWithBLOBs);
         return issuesWithBLOBs;
     }
@@ -347,8 +499,6 @@ public class IssuesService {
     public List<String> getPlatforms(Project project) {
         String workspaceId = project.getWorkspaceId();
         boolean tapd = isIntegratedPlatform(workspaceId, IssuesManagePlatform.Tapd.toString());
-        boolean jira = isIntegratedPlatform(workspaceId, IssuesManagePlatform.Jira.toString());
-        boolean zentao = isIntegratedPlatform(workspaceId, IssuesManagePlatform.Zentao.toString());
         boolean azure = isIntegratedPlatform(workspaceId, IssuesManagePlatform.AzureDevops.toString());
 
         List<String> platforms = new ArrayList<>();
@@ -359,20 +509,6 @@ public class IssuesService {
                 platforms.add(IssuesManagePlatform.Tapd.name());
             }
 
-        }
-
-        if (jira) {
-            String jiraKey = project.getJiraKey();
-            if (StringUtils.isNotBlank(jiraKey) && StringUtils.equals(project.getPlatform(), IssuesManagePlatform.Jira.toString())) {
-                platforms.add(IssuesManagePlatform.Jira.name());
-            }
-        }
-
-        if (zentao) {
-            String zentaoId = project.getZentaoId();
-            if (StringUtils.isNotBlank(zentaoId) && StringUtils.equals(project.getPlatform(), IssuesManagePlatform.Zentao.toString())) {
-                platforms.add(IssuesManagePlatform.Zentao.name());
-            }
         }
 
         if (azure) {
@@ -465,8 +601,15 @@ public class IssuesService {
         Project project = baseProjectService.getProjectById(projectId);
         IssuesRequest issuesRequest = new IssuesRequest();
         issuesRequest.setWorkspaceId(project.getWorkspaceId());
-        IssuesPlatform platform = IssueFactory.createPlatform(issuesWithBLOBs.getPlatform(), issuesRequest);
-        platform.deleteIssue(id);
+        if (PlatformPluginService.isPluginPlatform(issuesWithBLOBs.getPlatform())) {
+            platformPluginService.getPlatform(issuesWithBLOBs.getPlatform())
+                    .deleteIssue(issuesWithBLOBs.getPlatformId());
+            deleteIssue(id);
+        } else {
+            IssuesPlatform platform = IssueFactory.createPlatform(issuesWithBLOBs.getPlatform(), issuesRequest);
+            platform.deleteIssue(id);
+        }
+
         // 删除缺陷对应的附件
         AttachmentRequest request = new AttachmentRequest();
         request.setBelongId(id);
@@ -474,16 +617,22 @@ public class IssuesService {
         attachmentService.deleteAttachment(request);
     }
 
-    public List<ZentaoBuild> getZentaoBuilds(IssuesRequest request) {
-        try {
-            ZentaoPlatform platform = (ZentaoPlatform) IssueFactory.createPlatform(IssuesManagePlatform.Zentao.name(), request);
-            return platform.getBuilds();
-        } catch (Exception e) {
-            LogUtil.error("get zentao builds fail.");
-            LogUtil.error(e.getMessage(), e);
-            MSException.throwException(Translator.get("zentao_get_project_builds_fail"));
+    public void batchDelete(IssuesUpdateRequest request) {
+        if (request.getBatchDeleteAll()) {
+            IssuesRequest issuesRequest = new IssuesRequest();
+            issuesRequest.setWorkspaceId(SessionUtils.getCurrentWorkspaceId());
+            issuesRequest.setProjectId(SessionUtils.getCurrentProjectId());
+            List<IssuesDao> issuesDaos = listByWorkspaceId(issuesRequest);
+            if (CollectionUtils.isNotEmpty(issuesDaos)) {
+                issuesDaos.forEach(issuesDao -> {
+                    delete(issuesDao.getId());
+                });
+            }
+        } else {
+            if (CollectionUtils.isNotEmpty(request.getBatchDeleteIds())) {
+                request.getBatchDeleteIds().forEach(id -> delete(id));
+            }
         }
-        return null;
     }
 
     public List<IssuesDao> list(IssuesRequest request) {
@@ -491,7 +640,7 @@ public class IssuesService {
         request.getOrders().forEach(order -> {
             if (StringUtils.isNotEmpty(order.getName()) && order.getName().startsWith("custom")) {
                 request.setIsCustomSorted(true);
-                request.setCustomFieldId(order.getName().substring(order.getName().indexOf("-") + 1));
+                request.setCustomFieldId(order.getName().replace("custom_", StringUtils.EMPTY));
                 order.setPrefix("cfi");
                 order.setName("value");
             }
@@ -521,8 +670,6 @@ public class IssuesService {
             item.setCaseCount(caseIdSet.size());
         });
         buildCustomField(issues);
-        //处理MD图片链接内容
-        handleJiraIssueMdUrl(request.getWorkspaceId(), request.getProjectId(), issues);
         return issues;
     }
 
@@ -550,30 +697,63 @@ public class IssuesService {
         data.setFields(fields);
     }
 
-    private void handleJiraIssueMdUrl(String workPlaceId, String projectId, List<IssuesDao> issues) {
-        issues.forEach(issue -> {
-            if (StringUtils.isNotEmpty(issue.getDescription()) && issue.getDescription().contains("platform=Jira&")) {
-                issue.setDescription(replaceJiraMdUrlParam(issue.getDescription(), workPlaceId, projectId));
-            }
-            if (StringUtils.isNotEmpty(issue.getCustomFields()) && issue.getCustomFields().contains("platform=Jira&")) {
-                issue.setCustomFields(replaceJiraMdUrlParam(issue.getCustomFields(), workPlaceId, projectId));
-            }
-            if (CollectionUtils.isNotEmpty(issue.getFields())) {
-                issue.getFields().forEach(field -> {
-                    if (StringUtils.isNotEmpty(field.getTextValue()) && field.getTextValue().contains("platform=Jira&")) {
-                        field.setTextValue(replaceJiraMdUrlParam(field.getTextValue(), workPlaceId, projectId));
+    private void buildCustomField(List<IssuesDao> data, Boolean isThirdTemplate, List<CustomFieldDao> customFields) {
+        if (CollectionUtils.isEmpty(data)) {
+            return;
+        }
+
+        Map<String, List<CustomFieldDao>> fieldMap =
+                customFieldIssuesService.getMapByResourceIds(data.stream().map(IssuesDao::getId).collect(Collectors.toList()));
+        try {
+            Map<String, CustomField> fieldMaps = customFields.stream().collect(Collectors.toMap(CustomFieldDao::getId, field -> (CustomField) field));
+            for (Map.Entry<String, List<CustomFieldDao>> entry : fieldMap.entrySet()) {
+                for (CustomFieldDao fieldDao : entry.getValue()) {
+                    CustomField customField = fieldMaps.get(fieldDao.getId());
+                    if (customField != null) {
+                        fieldDao.setName(customField.getName());
+                        if (StringUtils.equalsAnyIgnoreCase(customField.getType(), CustomFieldType.RICH_TEXT.getValue(), CustomFieldType.TEXTAREA.getValue())) {
+                            fieldDao.setValue(fieldDao.getTextValue());
+                        }
+                        if (StringUtils.equalsAnyIgnoreCase(customField.getType(), CustomFieldType.DATE.getValue()) && StringUtils.isNotEmpty(fieldDao.getValue()) && !StringUtils.equals(fieldDao.getValue(), "null")) {
+                            Date date = DateUtils.parseDate(fieldDao.getValue().replaceAll("\"", StringUtils.EMPTY), "yyyy-MM-dd");
+                            String format = DateUtils.format(date, "yyyy/MM/dd");
+                            fieldDao.setValue("\"" + format + "\"");
+                        }
+                        if (StringUtils.equalsAnyIgnoreCase(customField.getType(), CustomFieldType.DATETIME.getValue()) && StringUtils.isNotEmpty(fieldDao.getValue()) && !StringUtils.equals(fieldDao.getValue(), "null")) {
+                            Date date = null;
+                            if (fieldDao.getValue().contains("T") && fieldDao.getValue().length() == 18) {
+                                date = DateUtils.parseDate(fieldDao.getValue().replaceAll("\"", StringUtils.EMPTY), "yyyy-MM-dd'T'HH:mm");
+                            } else if (fieldDao.getValue().contains("T") && fieldDao.getValue().length() == 21) {
+                                date = DateUtils.parseDate(fieldDao.getValue().replaceAll("\"", StringUtils.EMPTY), "yyyy-MM-dd'T'HH:mm:ss");
+                            } else if (fieldDao.getValue().contains("T") && fieldDao.getValue().length() > 21) {
+                                date = DateUtils.parseDate(fieldDao.getValue().replaceAll("\"", StringUtils.EMPTY).substring(0, 19), "yyyy-MM-dd'T'HH:mm:ss");
+                            } else {
+                                date = DateUtils.parseDate(fieldDao.getValue().replaceAll("\"", StringUtils.EMPTY));
+                            }
+                            String format = DateUtils.format(date, "yyyy/MM/dd HH:mm:ss");
+                            fieldDao.setValue("\"" + format + "\"");
+                        }
+                        if (StringUtils.equalsAnyIgnoreCase(customField.getType(), CustomFieldType.SELECT.getValue(),
+                                CustomFieldType.MULTIPLE_SELECT.getValue(), CustomFieldType.CHECKBOX.getValue(), CustomFieldType.RADIO.getValue())
+                                && !StringUtils.equalsAnyIgnoreCase(customField.getName(), SystemCustomField.ISSUE_STATUS)) {
+                            fieldDao.setValue(parseOptionValue(customField.getOptions(), fieldDao.getValue()));
+                        }
                     }
-                    if (StringUtils.isNotEmpty(field.getValue()) && field.getValue().contains("platform=Jira&")) {
-                        field.setValue(replaceJiraMdUrlParam(field.getValue(), workPlaceId, projectId));
-                    }
-                });
+                }
             }
-        });
+
+            data.forEach(i -> i.setFields(fieldMap.get(i.getId())));
+        } catch (Exception e) {
+            MSException.throwException(e.getMessage());
+        }
+
     }
 
-    private String replaceJiraMdUrlParam(String url, String workspaceId, String projectId) {
-        return url.replaceAll("platform=Jira&",
-                "platform=Jira&project_id=" + projectId + "&workspace_id=" + workspaceId + "&");
+    private Map<String, List<IssueCommentDTO>> getCommentMap(List<IssuesDao> issues) {
+        List<String> issueIds = issues.stream().map(IssuesDao::getId).collect(Collectors.toList());
+        List<IssueCommentDTO> comments = extIssueCommentMapper.getCommentsByIssueIds(issueIds);
+        Map<String, List<IssueCommentDTO>> commentMap = comments.stream().collect(Collectors.groupingBy(IssueCommentDTO::getIssueId));
+        return commentMap;
     }
 
     private Map<String, String> getPlanMap(List<IssuesDao> issues) {
@@ -653,20 +833,11 @@ public class IssuesService {
         return issueMap;
     }
 
-    public Map<String, IssuesPlatform> getPlatformMap(IssuesRequest request) {
-        Project project = baseProjectService.getProjectById(request.getProjectId());
-        List<String> platforms = getPlatforms(project);
-        platforms.add(IssuesManagePlatform.Local.toString());
-        return IssueFactory.createPlatformsForMap(platforms, request);
-    }
-
     public void syncThirdPartyIssues() {
         List<String> projectIds = trackProjectService.getThirdPartProjectIds();
         projectIds.forEach(id -> {
             try {
-                IssueSyncRequest request = new IssueSyncRequest();
-                request.setProjectId(id);
-                syncThirdPartyIssues(request);
+                syncThirdPartyIssues(id);
             } catch (Exception e) {
                 LogUtil.error(e.getMessage(), e);
             }
@@ -709,43 +880,246 @@ public class IssuesService {
         stringRedisTemplate.delete(SYNC_THIRD_PARTY_ISSUES_KEY + ":" + projectId);
     }
 
-    public boolean syncThirdPartyIssues(IssueSyncRequest syncRequest) {
-        if (StringUtils.isNotBlank(syncRequest.getProjectId())) {
-            String syncValue = getSyncKey(syncRequest.getProjectId());
+    public boolean syncThirdPartyIssues(String projectId) {
+        if (StringUtils.isNotBlank(projectId)) {
+            String syncValue = getSyncKey(projectId);
             if (StringUtils.isNotEmpty(syncValue)) {
                 return false;
             }
 
-            setSyncKey(syncRequest.getProjectId());
+            setSyncKey(projectId);
 
-            Project project = baseProjectService.getProjectById(syncRequest.getProjectId());
-            List<IssuesDao> issues = extIssuesMapper.getIssueForSync(syncRequest.getProjectId(), project.getPlatform());
-            if (syncRequest.getCreateTime() != null) {
-                issues = filterSyncIssuesByCreated(issues, syncRequest);
-            }
+            Project project = baseProjectService.getProjectById(projectId);
+            List<IssuesDao> issues = extIssuesMapper.getIssueForSync(projectId, project.getPlatform());
 
             if (CollectionUtils.isEmpty(issues)) {
+                deleteSyncKey(projectId);
                 return true;
             }
 
             IssuesRequest issuesRequest = new IssuesRequest();
-            issuesRequest.setProjectId(syncRequest.getProjectId());
+            issuesRequest.setProjectId(projectId);
             issuesRequest.setWorkspaceId(project.getWorkspaceId());
 
             try {
-                if (!trackProjectService.isThirdPartTemplate(project)) {
-                    String defaultCustomFields = getDefaultCustomFields(syncRequest.getProjectId());
-                    issuesRequest.setDefaultCustomFields(defaultCustomFields);
+                issuesRequest.setDefaultCustomFields(getDefaultCustomField(project));
+                if (PlatformPluginService.isPluginPlatform(project.getPlatform())) {
+                    // 分批处理
+                    SubListUtil.dealForSubList(issues, 500, (subIssue) ->
+                            syncPluginThirdPartyIssues(subIssue, project, issuesRequest.getDefaultCustomFields()));
+                } else {
+                    IssuesPlatform platform = IssueFactory.createPlatform(project.getPlatform(), issuesRequest);
+                    syncThirdPartyIssues(platform::syncIssues, project, issues);
                 }
-                IssuesPlatform platform = IssueFactory.createPlatform(project.getPlatform(), issuesRequest);
-                syncThirdPartyIssues(platform::syncIssues, project, issues);
             } catch (Exception e) {
                 throw e;
             } finally {
-                deleteSyncKey(syncRequest.getProjectId());
+                deleteSyncKey(projectId);
             }
         }
         return true;
+    }
+
+    private String getDefaultCustomField(Project project) {
+        if (isThirdPartTemplate(project)) {
+            return null;
+        }
+        return getDefaultCustomFields(project.getId());
+    }
+
+    public void syncPluginThirdPartyIssues(List<IssuesDao> issues, Project project, String defaultCustomFields) {
+        List<PlatformIssuesDTO> platformIssues = JSON.parseArray(JSON.toJSONString(issues), PlatformIssuesDTO.class);
+        platformIssues.stream().forEach(item -> {
+            // 给缺陷添加自定义字段
+            List<PlatformCustomFieldItemDTO> platformCustomFieldList = extIssuesMapper.getIssueCustomField(item.getId()).stream()
+                    .map(field -> {
+                        PlatformCustomFieldItemDTO platformCustomFieldItemDTO = new PlatformCustomFieldItemDTO();
+                        BeanUtils.copyBean(platformCustomFieldItemDTO, field);
+                        return platformCustomFieldItemDTO;
+                    })
+                    .collect(Collectors.toList());
+            item.setCustomFieldList(platformCustomFieldList);
+        });
+        SyncIssuesRequest request = new SyncIssuesRequest();
+        request.setIssues(platformIssues);
+        request.setDefaultCustomFields(defaultCustomFields);
+        request.setProjectConfig(PlatformPluginService.getCompatibleProjectConfig(project));
+        Platform platform = platformPluginService.getPlatform(project.getPlatform(), project.getWorkspaceId());
+
+        // 获取需要变更的缺陷
+        SyncIssuesResult syncIssuesResult = platform.syncIssues(request);
+        List<IssuesWithBLOBs> updateIssues = syncIssuesResult.getUpdateIssues();
+
+        SqlSession sqlSession = sqlSessionFactory.openSession(ExecutorType.BATCH);
+        try {
+            IssuesMapper issueBatchMapper = sqlSession.getMapper(IssuesMapper.class);
+            AttachmentModuleRelationMapper batchAttachmentModuleRelationMapper = sqlSession.getMapper(AttachmentModuleRelationMapper.class);
+
+            // 批量更新
+            updateIssues.forEach(issueBatchMapper::updateByPrimaryKeySelective);
+
+            // 批量删除
+            syncIssuesResult.getDeleteIssuesIds()
+                    .stream()
+                    .forEach(issueBatchMapper::deleteByPrimaryKey);
+
+            try {
+                // 同步附件
+                syncPluginIssueAttachment(platform, syncIssuesResult.getAttachmentMap(), batchAttachmentModuleRelationMapper);
+            } catch (Exception e) {
+                LogUtil.error(e);
+            }
+
+            HashMap<String, List<CustomFieldResourceDTO>> customFieldMap = new HashMap<>();
+            updateIssues.forEach(item -> {
+                List<CustomFieldResourceDTO> customFieldResource = baseCustomFieldService.getCustomFieldResourceDTO(item.getCustomFields());
+                customFieldMap.put(item.getId(), customFieldResource);
+            });
+
+            // 修改自定义字段
+            customFieldIssuesService.batchEditFields(customFieldMap);
+
+            sqlSession.commit();
+        } catch (Exception e) {
+            MSException.throwException(e);
+        } finally {
+            SqlSessionUtils.closeSqlSession(sqlSession, sqlSessionFactory);
+        }
+    }
+
+    /**
+     * xpack 反射调用，勿删
+     */
+    public void syncPluginIssueAttachment(Project project, Map<String, List<PlatformAttachment>> attachmentMap) {
+        SqlSessionFactory sqlSessionFactory = CommonBeanFactory.getBean(SqlSessionFactory.class);
+        SqlSession sqlSession = sqlSessionFactory.openSession(ExecutorType.BATCH);
+        try {
+            AttachmentModuleRelationMapper batchAttachmentModuleRelationMapper = sqlSession.getMapper(AttachmentModuleRelationMapper.class);
+            Platform platform = platformPluginService.getPlatform(project.getPlatform(), project.getWorkspaceId());
+            syncPluginIssueAttachment(platform, attachmentMap, batchAttachmentModuleRelationMapper);
+            sqlSession.commit();
+        } catch (Exception e) {
+            LogUtil.error(e);
+        } finally {
+            SqlSessionUtils.closeSqlSession(sqlSession, sqlSessionFactory);
+        }
+    }
+
+    private void syncPluginIssueAttachment(Platform platform, Map<String, List<PlatformAttachment>> attachmentMap,
+                                           AttachmentModuleRelationMapper batchAttachmentModuleRelationMapper) {
+        if (MapUtils.isNotEmpty(attachmentMap)) {
+            for (String issueId : attachmentMap.keySet()) {
+                // 查询我们平台的附件
+                Set<String> jiraAttachmentSet = new HashSet<>();
+                List<FileAttachmentMetadata> allMsAttachments = getIssueFileAttachmentMetadata(issueId);
+                Set<String> attachmentsNameSet = allMsAttachments.stream()
+                        .map(FileAttachmentMetadata::getName)
+                        .collect(Collectors.toSet());
+
+                List<PlatformAttachment> syncAttachments = attachmentMap.get(issueId);
+                for (PlatformAttachment syncAttachment : syncAttachments) {
+                    String fileName = syncAttachment.getFileName();
+                    String fileKey = syncAttachment.getFileKey();
+                    if (!attachmentsNameSet.contains(fileName)) {
+                        jiraAttachmentSet.add(fileName);
+                        saveAttachmentModuleRelation(platform, issueId, fileName, fileKey, batchAttachmentModuleRelationMapper);
+                    }
+                }
+
+                // 删除Jira中不存在的附件
+                deleteSyncAttachment(batchAttachmentModuleRelationMapper, jiraAttachmentSet, allMsAttachments);
+            }
+        }
+    }
+
+    private void syncAllPluginIssueAttachment(Project project, IssueSyncRequest syncIssuesResult) {
+        SqlSession sqlSession = sqlSessionFactory.openSession(ExecutorType.BATCH);
+        try {
+            AttachmentModuleRelationMapper batchAttachmentModuleRelationMapper = sqlSession.getMapper(AttachmentModuleRelationMapper.class);
+            Platform platform = platformPluginService.getPlatform(project.getPlatform(), project.getWorkspaceId());
+            Map<String, List<io.metersphere.xpack.track.dto.PlatformAttachment>> attachmentMap = syncIssuesResult.getAttachmentMap();
+            if (MapUtils.isNotEmpty(attachmentMap)) {
+                for (String issueId : attachmentMap.keySet()) {
+                    // 查询我们平台的附件
+                    Set<String> jiraAttachmentSet = new HashSet<>();
+                    List<FileAttachmentMetadata> allMsAttachments = getIssueFileAttachmentMetadata(issueId);
+                    Set<String> attachmentsNameSet = allMsAttachments.stream()
+                            .map(FileAttachmentMetadata::getName)
+                            .collect(Collectors.toSet());
+
+                    List<io.metersphere.xpack.track.dto.PlatformAttachment> syncAttachments = attachmentMap.get(issueId);
+                    for (io.metersphere.xpack.track.dto.PlatformAttachment syncAttachment : syncAttachments) {
+                        String fileName = syncAttachment.getFileName();
+                        String fileKey = syncAttachment.getFileKey();
+                        if (!attachmentsNameSet.contains(fileName)) {
+                            jiraAttachmentSet.add(fileName);
+                            saveAttachmentModuleRelation(platform, issueId, fileName, fileKey, batchAttachmentModuleRelationMapper);
+                        }
+
+                    }
+
+                    // 删除Jira中不存在的附件
+                    deleteSyncAttachment(batchAttachmentModuleRelationMapper, jiraAttachmentSet, allMsAttachments);
+                }
+            }
+        } catch (Exception e) {
+            LogUtil.error(e);
+        } finally {
+            SqlSessionUtils.closeSqlSession(sqlSession, sqlSessionFactory);
+        }
+    }
+
+    private void deleteSyncAttachment(AttachmentModuleRelationMapper batchAttachmentModuleRelationMapper,
+                                      Set<String> jiraAttachmentSet,
+                                      List<FileAttachmentMetadata> allMsAttachments) {
+       try {
+           // 删除Jira中不存在的附件
+           if (CollectionUtils.isNotEmpty(allMsAttachments)) {
+               List<FileAttachmentMetadata> deleteMsAttachments = allMsAttachments.stream()
+                       .filter(msAttachment -> !jiraAttachmentSet.contains(msAttachment.getName()))
+                       .collect(Collectors.toList());
+               deleteMsAttachments.forEach(fileAttachmentMetadata -> {
+                   List<String> ids = List.of(fileAttachmentMetadata.getId());
+                   AttachmentModuleRelationExample example = new AttachmentModuleRelationExample();
+                   example.createCriteria().andAttachmentIdIn(ids).andRelationTypeEqualTo(AttachmentType.ISSUE.type());
+                   // 删除MS附件及关联数据
+                   attachmentService.deleteAttachmentByIds(ids);
+                   attachmentService.deleteFileAttachmentByIds(ids);
+                   batchAttachmentModuleRelationMapper.deleteByExample(example);
+               });
+           }
+       } catch (Exception e) {
+           LogUtil.error(e);
+       }
+    }
+
+    private void saveAttachmentModuleRelation(Platform platform, String issueId,
+                                              String fileName, String fileKey,
+                                              AttachmentModuleRelationMapper batchAttachmentModuleRelationMapper) {
+        try {
+            byte[] content = platform.getAttachmentContent(fileKey);
+            if (content == null) {
+                return;
+            }
+            FileAttachmentMetadata fileAttachmentMetadata = attachmentService
+                    .saveAttachmentByBytes(content, AttachmentType.ISSUE.type(), issueId, fileName);
+            AttachmentModuleRelation attachmentModuleRelation = new AttachmentModuleRelation();
+            attachmentModuleRelation.setAttachmentId(fileAttachmentMetadata.getId());
+            attachmentModuleRelation.setRelationId(issueId);
+            attachmentModuleRelation.setRelationType(AttachmentType.ISSUE.type());
+            batchAttachmentModuleRelationMapper.insert(attachmentModuleRelation);
+        } catch (Exception e) {
+            LogUtil.error(e);
+        }
+
+    }
+
+    private List<FileAttachmentMetadata> getIssueFileAttachmentMetadata(String issueId) {
+        AttachmentRequest attachmentRequest = new AttachmentRequest();
+        attachmentRequest.setBelongType(AttachmentType.ISSUE.type());
+        attachmentRequest.setBelongId(issueId);
+        List<FileAttachmentMetadata> allMsAttachments = attachmentService.listMetadata(attachmentRequest);
+        return allMsAttachments;
     }
 
 
@@ -758,6 +1132,8 @@ public class IssuesService {
     public String getDefaultCustomFields(String projectId) {
         IssueTemplateDao template = trackIssueTemplateService.getTemplate(projectId);
         List<CustomFieldDao> customFields = trackCustomFieldTemplateService.getCustomFieldByTemplateId(template.getId());
+        List<CustomFieldDao> pluginCustomFields = getPluginCustomFields(projectId);
+        customFields.addAll(pluginCustomFields);
         return getCustomFieldsValuesString(customFields);
     }
 
@@ -870,6 +1246,7 @@ public class IssuesService {
 
     /**
      * 获取缺陷状态的自定义字段替换
+     *
      * @param planIssues
      * @param planId
      */
@@ -966,38 +1343,58 @@ public class IssuesService {
         return issuesMapper.selectByExampleWithBLOBs(example);
     }
 
-    public List<IssuesDao> getPlatformIssueByIds(List<String> platformIds, String projectId) {
-        // todo 是否保留
-        List<IssuesDao> issues = extIssuesMapper.getPlatformIssueByIds(platformIds, projectId);
-        if (CollectionUtils.isEmpty(issues)) {
-            return issues;
-        }
-        List<String> issueIds = issues.stream().map(IssuesDao::getId).collect(Collectors.toList());
-        List<IssuesDao> issuesList = extIssuesMapper.getIssueCustomFields(issueIds);
-        Map<String, List<CustomFieldItemDTO>> map = new HashMap<>();
-        issuesList.forEach(f -> {
-            CustomFieldItemDTO dto = new CustomFieldItemDTO();
-            dto.setId(f.getFieldId());
-            dto.setName(f.getFieldName());
-            dto.setType(f.getFieldType());
-            dto.setValue(f.getFieldValue());
-            dto.setCustomData(f.getCustomData());
-            List<CustomFieldItemDTO> list = Optional.ofNullable(map.get(f.getId())).orElse(new ArrayList<>());
-            map.put(f.getId(), list);
-            list.add(dto);
-        });
-        issues.forEach(i -> i.setCustomFieldList(map.getOrDefault(i.getId(), new ArrayList<>())));
-        return issues;
-    }
-
-
     public IssueTemplateDao getThirdPartTemplate(String projectId) {
+        IssueTemplateDao issueTemplateDao = new IssueTemplateDao();
         if (StringUtils.isNotBlank(projectId)) {
             Project project = baseProjectService.getProjectById(projectId);
-            return IssueFactory.createPlatform(IssuesManagePlatform.Jira.toString(), getDefaultIssueRequest(projectId, project.getWorkspaceId()))
-                    .getThirdPartTemplate();
+            List<PlatformCustomFieldItemDTO> thirdPartCustomField = platformPluginService.getPlatform(project.getPlatform(), project.getWorkspaceId())
+                    .getThirdPartCustomField(PlatformPluginService.getCompatibleProjectConfig(project));
+            List<CustomFieldDao> customFieldDaoList = JSON.parseArray(JSON.toJSONString(thirdPartCustomField), CustomFieldDao.class);
+            issueTemplateDao.setCustomFields(customFieldDaoList);
+            issueTemplateDao.setPlatform(project.getPlatform());
         }
-        return new IssueTemplateDao();
+        return issueTemplateDao;
+    }
+
+    public List<CustomFieldDao> getPluginCustomFields(String projectId) {
+        List<CustomFieldDao> fields = new ArrayList<>();
+        if (StringUtils.isNotBlank(projectId)) {
+            Project project = baseProjectService.getProjectById(projectId);
+            PluginWithBLOBs plugin = basePluginService.getByScripId(project.getPlatform());
+            if (plugin == null) {
+                return fields;
+            }
+            Map metaData = JSON.parseMap(plugin.getFormScript());
+            Object issueConfig = metaData.get("issueConfig");
+            List<ThirdPartIssueField> thirdPartIssueFields = null;
+            if (issueConfig != null) {
+                String formItems = JSON.toJSONString(((Map) issueConfig).get("formItems"));
+                thirdPartIssueFields = JSON.parseArray(formItems, ThirdPartIssueField.class);
+            }
+            if (CollectionUtils.isEmpty(thirdPartIssueFields)) {
+                return fields;
+            }
+
+            char filedKey = 'K';
+            for (ThirdPartIssueField item : thirdPartIssueFields) {
+                CustomFieldDao customField = new CustomFieldDao();
+                BeanUtils.copyBean(customField, item);
+                customField.setKey(String.valueOf(filedKey++));
+                customField.setId(item.getName());
+                customField.setCustomData(item.getName());
+                customField.setName(item.getLabel());
+                if (StringUtils.isNotBlank(item.getOptionMethod())) {
+                    Platform platform = platformPluginService.getPlatform(project.getPlatform());
+                    GetOptionRequest request = new GetOptionRequest();
+                    request.setOptionMethod(item.getOptionMethod());
+                    request.setProjectConfig(PlatformPluginService.getCompatibleProjectConfig(project));
+                    customField.setOptions(JSON.toJSONString(platform.getFormOptions(request)));
+                }
+
+                fields.add(customField);
+            }
+        }
+        return fields;
     }
 
     public IssuesRequest getDefaultIssueRequest(String projectId, String workspaceId) {
@@ -1007,24 +1404,20 @@ public class IssuesService {
         return issuesRequest;
     }
 
-    public List<JiraIssueType> getIssueTypes(JiraIssueTypeRequest request) {
-        IssuesRequest issuesRequest = getDefaultIssueRequest(request.getProjectId(), request.getWorkspaceId());
-        JiraPlatform platform = (JiraPlatform) IssueFactory.createPlatform(IssuesManagePlatform.Jira.toString(), issuesRequest);
-        if (StringUtils.isNotBlank(request.getJiraKey())) {
-            return platform.getIssueTypes(request.getJiraKey());
-        } else {
-            return new ArrayList<>();
-        }
-    }
-
-    public List<DemandDTO> getDemandList(String projectId) {
+    public List getDemandList(String projectId) {
         Project project = baseProjectService.getProjectById(projectId);
         String workspaceId = project.getWorkspaceId();
-        IssuesRequest issueRequest = new IssuesRequest();
-        issueRequest.setWorkspaceId(workspaceId);
-        issueRequest.setProjectId(projectId);
-        IssuesPlatform platform = IssueFactory.createPlatform(project.getPlatform(), issueRequest);
-        return platform.getDemandList(projectId);
+
+        if (PlatformPluginService.isPluginPlatform(project.getPlatform())) {
+            return platformPluginService.getPlatform(project.getPlatform())
+                    .getDemands(PlatformPluginService.getCompatibleProjectConfig(project));
+        } else {
+            IssuesRequest issueRequest = new IssuesRequest();
+            issueRequest.setWorkspaceId(workspaceId);
+            issueRequest.setProjectId(projectId);
+            IssuesPlatform platform = IssueFactory.createPlatform(project.getPlatform(), issueRequest);
+            return platform.getDemandList(projectId);
+        }
     }
 
     public List<IssuesDao> listByWorkspaceId(IssuesRequest request) {
@@ -1032,51 +1425,73 @@ public class IssuesService {
         return extIssuesMapper.getIssues(request);
     }
 
-    public List<PlatformStatusDTO> getPlatformTransitions(PlatformIssueTypeRequest request) {
+    public List<PlatformStatusDTO> getPlatformStatus(PlatformIssueTypeRequest request) {
         List<PlatformStatusDTO> platformStatusDTOS = new ArrayList<>();
-
-        if (!StringUtils.isBlank(request.getPlatformKey())) {
-            Project project = baseProjectService.getProjectById(request.getProjectId());
+        Project project = baseProjectService.getProjectById(request.getProjectId());
+        String platform = project.getPlatform();
+        if (StringUtils.equals(platform, IssuesManagePlatform.Local.name())) {
+            return null;
+        }
+        String projectConfig = PlatformPluginService.getCompatibleProjectConfig(project);
+        if (PlatformPluginService.isPluginPlatform(platform)) {
+            return platformPluginService.getPlatform(platform)
+                    .getStatusList(projectConfig)
+                    .stream().map(item -> {
+                        // 全部插件化后简化
+                        PlatformStatusDTO platformStatusDTO = new PlatformStatusDTO();
+                        platformStatusDTO.setLabel(item.getLabel());
+                        platformStatusDTO.setValue(item.getValue());
+                        return platformStatusDTO;
+                    })
+                    .collect(Collectors.toList());
+        } else {
             List<String> platforms = getPlatforms(project);
             if (CollectionUtils.isEmpty(platforms)) {
                 return platformStatusDTOS;
             }
 
             IssuesRequest issuesRequest = getDefaultIssueRequest(request.getProjectId(), request.getWorkspaceId());
-            Map<String, IssuesPlatform> platformMap = IssueFactory.createPlatformsForMap(platforms, issuesRequest);
-            try {
-                if (platformMap.size() > 1) {
-                    MSException.throwException(Translator.get("project_reference_multiple_plateform"));
+            return IssueFactory.createPlatform(platform, issuesRequest).getTransitions(request.getPlatformKey());
+        }
+    }
+
+    public List<PlatformStatusDTO> getPlatformTransitions(PlatformIssueTypeRequest request) {
+        List<PlatformStatusDTO> platformStatusDTOS = new ArrayList<>();
+
+        if (!StringUtils.isBlank(request.getPlatformKey())) {
+            Project project = baseProjectService.getProjectById(request.getProjectId());
+            String projectConfig = PlatformPluginService.getCompatibleProjectConfig(project);
+            String platform = project.getPlatform();
+            if (PlatformPluginService.isPluginPlatform(platform)) {
+                return platformPluginService.getPlatform(platform)
+                        .getTransitions(projectConfig, request.getPlatformKey())
+                        .stream().map(item -> {
+                            // 全部插件化后简化
+                            PlatformStatusDTO platformStatusDTO = new PlatformStatusDTO();
+                            platformStatusDTO.setLabel(item.getLabel());
+                            platformStatusDTO.setValue(item.getValue());
+                            return platformStatusDTO;
+                        })
+                        .collect(Collectors.toList());
+            } else {
+                List<String> platforms = getPlatforms(project);
+                if (CollectionUtils.isEmpty(platforms)) {
+                    return platformStatusDTOS;
                 }
-                Optional<IssuesPlatform> platformOptional = platformMap.values().stream().findFirst();
-                if (platformOptional.isPresent()) {
-                    platformStatusDTOS = platformOptional.get().getTransitions(request.getPlatformKey());
-                }
-            } catch (Exception e) {
-                LogUtil.error(e);
+
+                IssuesRequest issuesRequest = getDefaultIssueRequest(request.getProjectId(), request.getWorkspaceId());
+                return IssueFactory.createPlatform(platform, issuesRequest).getTransitions(request.getPlatformKey());
             }
         }
-
         return platformStatusDTOS;
     }
 
-    public void deleteIssueAttachments(String issueId) {
-        attachmentService.deleteAttachment(AttachmentType.ISSUE.type(), issueId);
-        IssueFileExample example = new IssueFileExample();
-        example.createCriteria().andIssueIdEqualTo(issueId);
-        List<IssueFile> issueFiles = issueFileMapper.selectByExample(example);
-        if (issueFiles.size() == 0) {
-            return;
-        }
-        List<String> ids = issueFiles.stream().map(IssueFile::getFileId).collect(Collectors.toList());
-        attachmentService.deleteFileAttachmentByIds(ids);
-        issueFileMapper.deleteByExample(example);
-    }
-
     public boolean isThirdPartTemplate(Project project) {
-        return project.getThirdPartTemplate() != null && project.getThirdPartTemplate() && project.getPlatform().equals(IssuesManagePlatform.Jira.name());
+        return project.getThirdPartTemplate() != null
+                && project.getThirdPartTemplate()
+                && PlatformPluginService.isPluginPlatform(project.getPlatform())
+                && platformPluginService.isThirdPartTemplateSupport(project.getPlatform());
     }
-
 
     public void checkThirdProjectExist(Project project) {
         IssuesRequest issuesRequest = new IssuesRequest();
@@ -1088,13 +1503,208 @@ public class IssuesService {
         if (StringUtils.equalsIgnoreCase(project.getPlatform(), IssuesManagePlatform.Tapd.name())) {
             TapdPlatform tapd = new TapdPlatform(issuesRequest);
             this.doCheckThirdProjectExist(tapd, project.getTapdId());
-        } else if (StringUtils.equalsIgnoreCase(project.getPlatform(), IssuesManagePlatform.Jira.name())) {
-            JiraPlatform jira = new JiraPlatform(issuesRequest);
-            this.doCheckThirdProjectExist(jira, project.getJiraKey());
-        } else if (StringUtils.equalsIgnoreCase(project.getPlatform(), IssuesManagePlatform.Zentao.name())) {
-            ZentaoPlatform zentao = new ZentaoPlatform(issuesRequest);
-            this.doCheckThirdProjectExist(zentao, project.getZentaoId());
         }
+    }
+
+    public void issueImportTemplate(String projectId, HttpServletResponse response) {
+        Map<String, String> userMap = baseUserService.getProjectMemberOption(projectId).stream().collect(Collectors.toMap(User::getId, User::getName));
+        // 获取缺陷模板及自定义字段
+        IssueTemplateDao issueTemplate = getIssueTemplateByProjectId(projectId);
+        List<CustomFieldDao> customFields = Optional.ofNullable(issueTemplate.getCustomFields()).orElse(new ArrayList<>());
+        // 根据自定义字段获取表头
+        List<List<String>> heads = new IssueExcelDataFactory().getIssueExcelDataLocal().getHead(issueTemplate.getIsThirdTemplate(), customFields, null);
+        // 导出空模板, heads->表头, headHandler->表头处理
+        IssueTemplateHeadWriteHandler headHandler = new IssueTemplateHeadWriteHandler(userMap, heads, issueTemplate.getCustomFields());
+        new EasyExcelExporter(new IssueExcelDataFactory().getExcelDataByLocal())
+                .exportByCustomWriteHandler(response, heads, null, Translator.get("issue_import_template_name"),
+                        Translator.get("issue_import_template_sheet"), headHandler);
+    }
+
+    public ExcelResponse issueImport(IssueImportRequest request, MultipartFile importFile) {
+        if (importFile == null) {
+            MSException.throwException(Translator.get("upload_fail"));
+        }
+        Map<String, String> userMap = baseUserService.getProjectMemberOption(request.getProjectId()).stream().collect(Collectors.toMap(User::getId, User::getName));
+        // 获取第三方平台自定义字段
+        List<CustomFieldDao> pluginCustomFields = getPluginCustomFields(request.getProjectId());
+        // 获取缺陷模板及自定义字段
+        IssueTemplateDao issueTemplate = getIssueTemplateByProjectId(request.getProjectId());
+        List<CustomFieldDao> customFields = Optional.ofNullable(issueTemplate.getCustomFields()).orElse(new ArrayList<>());
+        customFields.addAll(pluginCustomFields);
+        // 获取本地EXCEL数据对象
+        Class clazz = new IssueExcelDataFactory().getExcelDataByLocal();
+        // IssueExcelListener读取file内容
+        IssueExcelListener issueExcelListener = new IssueExcelListener(request, clazz, issueTemplate.getIsThirdTemplate(), customFields, userMap);
+        try {
+            EasyExcelFactory.read(importFile.getInputStream(), issueExcelListener).sheet().doRead();
+        } catch (IOException e) {
+            LogUtil.error(e.getMessage(), e);
+            e.printStackTrace();
+        }
+        // 获取错误信息并返回
+        List<ExcelErrData<IssueExcelData>> errList = issueExcelListener.getErrList();
+        ExcelResponse excelResponse = new ExcelResponse();
+        if (CollectionUtils.isNotEmpty(errList)) {
+            excelResponse.setErrList(errList);
+            excelResponse.setSuccess(Boolean.FALSE);
+        } else {
+            excelResponse.setSuccess(Boolean.TRUE);
+        }
+        return excelResponse;
+    }
+
+    public void issueExport(IssueExportRequest request, HttpServletResponse response) {
+        EasyExcelExporter.resetCellMaxTextLength();
+        Map<String, String> userMap = baseUserService.getProjectMemberOption(request.getProjectId()).stream().collect(Collectors.toMap(User::getId, User::getName));
+        // 第三方平台的自定义字段
+        List<CustomFieldDao> pluginCustomFields = getPluginCustomFields(request.getProjectId());
+        // 获取缺陷模板及自定义字段
+        IssueTemplateDao issueTemplate = getIssueTemplateByProjectId(request.getProjectId());
+        List<CustomFieldDao> customFields = Optional.ofNullable(issueTemplate.getCustomFields()).orElse(new ArrayList<>());
+        customFields.addAll(pluginCustomFields);
+        // 根据自定义字段获取表头内容
+        List<List<String>> heads = new IssueExcelDataFactory().getIssueExcelDataLocal().getHead(issueTemplate.getIsThirdTemplate(), customFields, request);
+        // 获取导出缺陷列表
+        List<IssuesDao> exportIssues = getExportIssues(request, issueTemplate.getIsThirdTemplate(), customFields);
+        // 解析issue对象数据->excel对象数据
+        List<IssueExcelData> excelDataList = parseIssueDataToExcelData(exportIssues);
+        // 解析excel对象数据->excel列表数据
+        List<List<Object>> data = parseExcelDataToList(heads, excelDataList);
+        // 导出EXCEL
+        IssueTemplateHeadWriteHandler headHandler = new IssueTemplateHeadWriteHandler(userMap, heads, issueTemplate.getCustomFields());
+        // heads-> 表头内容, data -> 导出EXCEL列表数据, headHandler -> 表头处理
+        new EasyExcelExporter(new IssueExcelDataFactory().getExcelDataByLocal())
+                .exportByCustomWriteHandler(response, heads, data, Translator.get("issue_list_export_excel"),
+                        Translator.get("issue_list_export_excel_sheet"), headHandler);
+    }
+
+    public List<IssuesDao> getExportIssues(IssueExportRequest exportRequest, Boolean isThirdTemplate, List<CustomFieldDao> customFields) {
+        // 根据列表条件获取符合缺陷集合
+        IssuesRequest request = new IssuesRequest();
+        request.setProjectId(exportRequest.getProjectId());
+        request.setWorkspaceId(exportRequest.getWorkspaceId());
+        request.setSelectAll(exportRequest.getIsSelectAll());
+        request.setExportIds(exportRequest.getExportIds());
+        // 列表排序
+        request.setOrders(exportRequest.getOrders());
+        request.setOrders(ServiceUtils.getDefaultOrderByField(request.getOrders(), "create_time"));
+        request.getOrders().forEach(order -> {
+            if (StringUtils.isNotEmpty(order.getName()) && order.getName().startsWith("custom")) {
+                request.setIsCustomSorted(true);
+                request.setCustomFieldId(order.getName().replace("custom_", StringUtils.EMPTY));
+                order.setPrefix("cfi");
+                order.setName("value");
+            }
+        });
+        ServiceUtils.setBaseQueryRequestCustomMultipleFields(request);
+        List<IssuesDao> issues = extIssuesMapper.getIssues(request);
+
+        Map<String, Set<String>> caseSetMap = getCaseSetMap(issues);
+        Map<String, User> userMap = getUserMap(issues);
+        Map<String, String> planMap = getPlanMap(issues);
+        Map<String, List<IssueCommentDTO>> commentMap = getCommentMap(issues);
+
+        // 设置creator, caseCount, commnet
+        issues.forEach(item -> {
+            User createUser = userMap.get(item.getCreator());
+            if (createUser != null) {
+                item.setCreatorName(createUser.getName());
+            }
+            String resourceName = planMap.get(item.getResourceId());
+            if (StringUtils.isNotBlank(resourceName)) {
+                item.setResourceName(resourceName);
+            }
+
+            Set<String> caseIdSet = caseSetMap.get(item.getId());
+            if (caseIdSet == null) {
+                caseIdSet = new HashSet<>();
+            }
+            item.setCaseIds(new ArrayList<>(caseIdSet));
+            item.setCaseCount(caseIdSet.size());
+            List<IssueCommentDTO> commentDTOList = commentMap.get(item.getId());
+            if (CollectionUtils.isNotEmpty(commentDTOList) && commentDTOList.size() > 0) {
+                List<String> comments = commentDTOList.stream().map(IssueCommentDTO::getDescription).collect(Collectors.toList());
+                item.setComment(StringUtils.join(comments, ";"));
+            }
+        });
+        // 解析自定义字段
+        buildCustomField(issues, isThirdTemplate, customFields);
+        return issues;
+    }
+
+    private List<IssueExcelData> parseIssueDataToExcelData(List<IssuesDao> exportIssues) {
+        List<IssueExcelData> excelDataList = new ArrayList<>();
+        for (int i = 0; i < exportIssues.size(); i++) {
+            IssuesDao issuesDao = exportIssues.get(i);
+            IssueExcelData excelData = new IssueExcelData();
+            BeanUtils.copyBean(excelData, issuesDao);
+            buildCustomData(issuesDao, excelData);
+            excelDataList.add(excelData);
+        }
+        return excelDataList;
+    }
+
+    private void buildCustomData(IssuesDao issuesDao, IssueExcelData excelData) {
+        if (CollectionUtils.isNotEmpty(issuesDao.getFields())) {
+            Map<String, Object> customData = new LinkedHashMap<>();
+            issuesDao.getFields().forEach(field -> {
+                customData.put(field.getName(), field.getValue());
+            });
+            excelData.setCustomData(customData);
+        }
+    }
+
+    private List<List<Object>> parseExcelDataToList(List<List<String>> heads, List<IssueExcelData> excelDataList) {
+        List<List<Object>> result = new ArrayList<>();
+        IssueExportHeadField[] exportHeadFields = IssueExportHeadField.values();
+        //转化excel头
+        List<String> headList = new ArrayList<>();
+        for (List<String> list : heads) {
+            for (String head : list) {
+                headList.add(head);
+            }
+        }
+
+        for (IssueExcelData data : excelDataList) {
+            List<Object> rowData = new ArrayList<>();
+            Map<String, Object> customData = data.getCustomData();
+            for (String head : headList) {
+                boolean isSystemField = false;
+                for (IssueExportHeadField exportHeadField : exportHeadFields) {
+                    if (StringUtils.equals(head, exportHeadField.getName())) {
+                        rowData.add(exportHeadField.parseExcelDataValue(data));
+                        isSystemField = true;
+                        break;
+                    }
+                }
+                if (!isSystemField) {
+                    // 自定义字段
+                    Object value = customData.get(head);
+                    if (value == null || StringUtils.equals(value.toString(), "null")) {
+                        value = StringUtils.EMPTY;
+                    }
+                    rowData.add(parseCustomFieldValue(value.toString()));
+                }
+            }
+            result.add(rowData);
+        }
+        return result;
+    }
+
+    private IssueTemplateDao getIssueTemplateByProjectId(String projectId) {
+        IssueTemplateDao issueTemplateDao;
+        Project project = baseProjectService.getProjectById(projectId);
+        if (PlatformPluginService.isPluginPlatform(project.getPlatform())
+                && platformPluginService.isThirdPartTemplateSupport(project.getPlatform())
+                && project.getThirdPartTemplate()) {
+            // 第三方Jira平台
+            issueTemplateDao = getThirdPartTemplate(project.getId());
+            issueTemplateDao.setIsThirdTemplate(Boolean.TRUE);
+        } else {
+            issueTemplateDao = trackIssueTemplateService.getTemplate(projectId);
+            issueTemplateDao.setIsThirdTemplate(Boolean.FALSE);
+        }
+        return issueTemplateDao;
     }
 
     private void doCheckThirdProjectExist(AbstractIssuePlatform platform, String relateId) {
@@ -1118,7 +1728,7 @@ public class IssuesService {
         return filterIssues;
     }
 
-    private void uploadAzureCopyAttachment(AttachmentRequest attachmentRequest,  String platform, String platformId) {
+    private void uploadAzureCopyAttachment(AttachmentRequest attachmentRequest, String platform, String platformId) {
         List<String> attachmentIds = attachmentService.getAttachmentIdsByParam(attachmentRequest);
         if (CollectionUtils.isNotEmpty(attachmentIds)) {
             attachmentIds.forEach(attachmentId -> {
@@ -1133,5 +1743,161 @@ public class IssuesService {
                 azurePlatform.syncIssuesAttachment(uploadRequest, file, AttachmentSyncType.UPLOAD);
             });
         }
+    }
+
+    private String parseCustomFieldValue(String value) {
+        if (value.contains(",")) {
+            value = value.replaceAll(",", ";");
+        }
+        if (value.contains("\"")) {
+            value = value.replaceAll("\"", StringUtils.EMPTY);
+        }
+        if (value.contains("[") || value.contains("]")) {
+            value = value.replaceAll("]", StringUtils.EMPTY).replaceAll("\\[", StringUtils.EMPTY);
+        }
+        return value;
+    }
+
+    private String parseOptionValue(String options, String tarVal) {
+        if (StringUtils.isEmpty(options) || StringUtils.isEmpty(tarVal)) {
+            return StringUtils.EMPTY;
+        }
+        List<Map> optionList = JSON.parseArray(options, Map.class);
+        for (Map option : optionList) {
+            String text = option.get("text").toString();
+            String value = option.get("value").toString();
+            if (StringUtils.containsIgnoreCase(tarVal, value)) {
+                tarVal = tarVal.replaceAll(value, text);
+            }
+        }
+        return tarVal;
+    }
+
+    public Issues checkIssueExist(Integer num, String projectId) {
+        IssuesExample example = new IssuesExample();
+        example.createCriteria().andNumEqualTo(num).andProjectIdEqualTo(projectId);
+        List<Issues> issues = issuesMapper.selectByExample(example);
+        return CollectionUtils.isNotEmpty(issues) && issues.size() > 0 ? issues.get(0) : null;
+    }
+
+    public void saveImportData(List<IssuesUpdateRequest> issues) {
+        issues.forEach(issue -> {
+            addIssues(issue, null);
+        });
+    }
+
+    public void updateImportData(List<IssuesUpdateRequest> issues) {
+        issues.forEach(issue -> {
+            updateIssues(issue);
+        });
+    }
+
+    public void setFilterIds(IssuesRequest request) {
+        List<String> issueIds = new ArrayList<>();
+        if (request.getThisWeekUnClosedTestPlanIssue()) {
+            issueIds = extIssuesMapper.getTestPlanThisWeekIssue(request.getProjectId());
+        } else if (request.getAllTestPlanIssue() || request.getUnClosedTestPlanIssue()) {
+            issueIds = extIssuesMapper.getTestPlanIssue(request.getProjectId());
+        } else {
+            issueIds = Collections.EMPTY_LIST;
+        }
+
+        Map<String, String> statusMap = customFieldIssuesService.getIssueStatusMap(issueIds, request.getProjectId());
+        if (MapUtils.isEmpty(statusMap) && CollectionUtils.isNotEmpty(issueIds)) {
+            // 未找到自定义字段状态, 则获取平台状态
+            IssuesRequest issuesRequest = new IssuesRequest();
+            issuesRequest.setProjectId(SessionUtils.getCurrentProjectId());
+            issuesRequest.setFilterIds(issueIds);
+            List<IssuesDao> issues = extIssuesMapper.getIssues(issuesRequest);
+            statusMap = issues.stream().collect(Collectors.toMap(IssuesDao::getId, i -> Optional.ofNullable(i.getPlatformStatus()).orElse("new")));
+        }
+
+        if (MapUtils.isEmpty(statusMap)) {
+            request.setFilterIds(issueIds);
+        } else {
+            if (request.getThisWeekUnClosedTestPlanIssue() || request.getUnClosedTestPlanIssue()) {
+                CustomField customField = baseCustomFieldService.getCustomFieldByName(SessionUtils.getCurrentProjectId(), SystemCustomField.ISSUE_STATUS);
+                JSONArray statusArray = JSONArray.parseArray(customField.getOptions());
+                Map<String, String> tmpStatusMap = statusMap;
+                List<String> unClosedIds = issueIds.stream()
+                        .filter(id -> !StringUtils.equals(tmpStatusMap.getOrDefault(id, StringUtils.EMPTY).replaceAll("\"", StringUtils.EMPTY), "closed"))
+                        .collect(Collectors.toList());
+                Iterator<String> iterator = unClosedIds.iterator();
+                while (iterator.hasNext()) {
+                    String unClosedId = iterator.next();
+                    String status = statusMap.getOrDefault(unClosedId, StringUtils.EMPTY).replaceAll("\"", StringUtils.EMPTY);
+                    IssueStatus statusEnum = IssueStatus.getEnumByName(status);
+                    if (statusEnum == null) {
+                        boolean exist = false;
+                        for (int i = 0; i < statusArray.size(); i++) {
+                            JSONObject statusObj = (JSONObject) statusArray.get(i);
+                            if (StringUtils.equals(status, statusObj.get("value").toString())) {
+                                exist = true;
+                            }
+                        }
+                        if (!exist) {
+                            iterator.remove();
+                        }
+                    }
+                }
+                request.setFilterIds(unClosedIds);
+            } else {
+                request.setFilterIds(issueIds);
+            }
+        }
+    }
+
+    public boolean thirdPartTemplateEnable(String projectId) {
+        Project project = baseProjectService.getProjectById(projectId);
+        return BooleanUtils.isTrue(project.getThirdPartTemplate())
+                && platformPluginService.isThirdPartTemplateSupport(project.getPlatform());
+    }
+
+    public boolean syncThirdPartyAllIssues(IssueSyncRequest syncRequest) {
+        syncRequest.setProjectId(syncRequest.getProjectId());
+        XpackIssueService xpackIssueService = CommonBeanFactory.getBean(XpackIssueService.class);
+        if (StringUtils.isNotBlank(syncRequest.getProjectId())) {
+            // 获取当前项目执行同步缺陷Key
+            String syncValue = getSyncKey(syncRequest.getProjectId());
+            // 存在即正在同步中
+            if (StringUtils.isNotEmpty(syncValue)) {
+                return false;
+            }
+            // 不存在则设置Key, 设置过期时间, 执行完成后delete掉
+            setSyncKey(syncRequest.getProjectId());
+
+            try {
+                Project project = baseProjectService.getProjectById(syncRequest.getProjectId());
+
+                if (!isThirdPartTemplate(project)) {
+                    syncRequest.setDefaultCustomFields(getDefaultCustomFields(syncRequest.getProjectId()));
+                }
+
+                xpackIssueService.syncThirdPartyIssues(project, syncRequest);
+
+                if (platformPluginService.isPluginPlatform(project.getPlatform())) {
+                    syncAllPluginIssueAttachment(project, syncRequest);
+                }
+            } catch (Exception e) {
+                LogUtil.error(e);
+                MSException.throwException(e);
+            } finally {
+                deleteSyncKey(syncRequest.getProjectId());
+            }
+        }
+        return true;
+    }
+
+    /**
+     * xpack 中反射调用，勿删
+     */
+    public void execSyncAll(Project project, IssueSyncRequest issueSyncRequest) {
+        Platform platform = platformPluginService.getPlatform(project.getPlatform(), project.getWorkspaceId());
+        SyncAllIssuesRequest syncAllIssuesRequest = new SyncAllIssuesRequest();
+        BeanUtils.copyBean(syncAllIssuesRequest, issueSyncRequest);
+        syncAllIssuesRequest.setDefaultCustomFields(getDefaultCustomField(project));
+        syncAllIssuesRequest.setProjectConfig(PlatformPluginService.getCompatibleProjectConfig(project));
+        syncAllIssuesRequest.setHandleSyncFunc(issueSyncRequest.getHandleSyncFunc());
+        platform.syncAllIssues(syncAllIssuesRequest);
     }
 }

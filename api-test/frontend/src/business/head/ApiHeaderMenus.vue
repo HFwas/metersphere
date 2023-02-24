@@ -1,65 +1,79 @@
 <template>
   <div id="menu-bar" v-if="isRouterAlive">
     <el-row type="flex">
-      <project-change :project-name="currentProject"/>
+      <project-change :project-name="currentProject" />
       <el-col :span="14">
-        <el-menu class="header-menu" :unique-opened="true" mode="horizontal" router :default-active='currentPath'>
-
+        <el-menu class="header-menu" :unique-opened="true" mode="horizontal" router :default-active="currentPath">
           <el-menu-item :index="'/api/home'" v-permission="['PROJECT_API_HOME:READ']">
-            {{ $t("i18n.home") }}
+            {{ $t('i18n.home') }}
           </el-menu-item>
           <el-menu-item :index="'/api/definition'" v-permission="['PROJECT_API_DEFINITION:READ']">
-            {{ $t("i18n.definition") }}
+            {{ $t('i18n.definition') }}
           </el-menu-item>
 
           <el-menu-item :index="'/api/automation'" v-permission="['PROJECT_API_SCENARIO:READ']">
-            {{ $t("i18n.automation") }}
+            {{ $t('i18n.automation') }}
           </el-menu-item>
 
           <el-menu-item :index="'/api/automation/report'" v-permission="['PROJECT_API_REPORT:READ']">
-            {{ $t("i18n.report") }}
+            {{ $t('i18n.report') }}
           </el-menu-item>
         </el-menu>
       </el-col>
 
       <el-col :span="10">
-        <ms-header-right-menus/>
+        <ms-header-right-menus />
       </el-col>
     </el-row>
   </div>
-
 </template>
 
 <script>
-
-import MsRecentList from "metersphere-frontend/src/components/head/RecentList";
-import MsShowAll from "metersphere-frontend/src/components/head/ShowAll";
-import MsCreateButton from "metersphere-frontend/src/components/head/CreateButton";
-import ProjectChange from "metersphere-frontend/src/components/head/ProjectSwitch";
-import MsHeaderRightMenus from "metersphere-frontend/src/components/layout/HeaderRightMenus";
+import MsRecentList from 'metersphere-frontend/src/components/head/RecentList';
+import MsShowAll from 'metersphere-frontend/src/components/head/ShowAll';
+import MsCreateButton from 'metersphere-frontend/src/components/head/CreateButton';
+import ProjectChange from 'metersphere-frontend/src/components/head/ProjectSwitch';
+import MsHeaderRightMenus from 'metersphere-frontend/src/components/layout/HeaderRightMenus';
+import { PROJECT_ID, PROJECT_NAME, WORKSPACE, WORKSPACE_ID } from 'metersphere-frontend/src/utils/constants';
 
 export default {
-  name: "MsApiHeaderMenus",
-  components: {MsCreateButton, MsShowAll, MsRecentList, ProjectChange, MsHeaderRightMenus},
+  name: 'MsApiHeaderMenus',
+  components: {
+    MsCreateButton,
+    MsShowAll,
+    MsRecentList,
+    ProjectChange,
+    MsHeaderRightMenus,
+  },
   data() {
     return {
       currentPath: '',
       isRouterAlive: true,
       apiTestProjectPath: '',
-      currentProject: ''
+      currentProject: '',
     };
   },
   watch: {
-    '$route': {
+    $route: {
       immediate: true,
       handler(to) {
-        let path = to.path.split("/", 4);
+        if (to.path === "/api/automation/") {
+          if (to.query.projectName && to.query.projectId) {
+            sessionStorage.setItem(PROJECT_NAME, to.query.projectName);
+            sessionStorage.setItem(PROJECT_ID, to.query.projectId);
+          }
+          if (to.query.workspaceName && to.query.workspaceId) {
+            sessionStorage.setItem(WORKSPACE, to.query.workspaceName);
+            sessionStorage.setItem(WORKSPACE_ID, to.query.workspaceId);
+          }
+        }
+        let path = to.path.split('/', 4);
         this.currentPath = '/' + path[1] + '/' + path[2];
-        if (path[3] === "report") {
+        if (path[3] === 'report') {
           this.currentPath = this.currentPath + '/' + path[3];
         }
-      }
-    }
+      },
+    },
   },
   methods: {
     reload() {
@@ -69,20 +83,15 @@ export default {
       });
     },
   },
-  mounted() {
-
-  },
-  beforeDestroy() {
-
-  }
+  mounted() {},
+  beforeDestroy() {},
 };
-
 </script>
 
 <style scoped>
 #menu-bar {
-  border-bottom: 1px solid #E6E6E6;
-  background-color: #FFF;
+  border-bottom: 1px solid #e6e6e6;
+  background-color: #fff;
 }
 
 .menu-divider {

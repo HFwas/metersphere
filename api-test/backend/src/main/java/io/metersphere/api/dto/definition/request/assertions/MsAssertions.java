@@ -2,16 +2,17 @@ package io.metersphere.api.dto.definition.request.assertions;
 
 import io.metersphere.api.dto.definition.request.ParameterConfig;
 import io.metersphere.api.dto.definition.request.assertions.document.MsAssertionDocument;
-import io.metersphere.service.definition.ApiDefinitionService;
 import io.metersphere.commons.constants.ElementConstants;
 import io.metersphere.commons.constants.PropertyConstant;
 import io.metersphere.commons.utils.CommonBeanFactory;
+import io.metersphere.commons.utils.ErrorReportLibraryUtil;
 import io.metersphere.plugin.core.MsParameter;
 import io.metersphere.plugin.core.MsTestElement;
-import io.metersphere.commons.utils.ErrorReportLibraryUtil;
+import io.metersphere.service.definition.ApiDefinitionService;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.assertions.*;
 import org.apache.jmeter.save.SaveService;
@@ -106,22 +107,22 @@ public class MsAssertions extends MsTestElement {
     private ResponseAssertion responseAssertion(MsAssertionRegex assertionRegex) {
         ResponseAssertion assertion = null;
         boolean isErrorReportAssertion = false;
-        if(StringUtils.startsWith(this.getName(),"ErrorReportAssertion:")){
+        if (StringUtils.startsWith(this.getName(), "ErrorReportAssertion:")) {
             assertion = new ErrorReportAssertion();
             isErrorReportAssertion = true;
-        }else {
+        } else {
             assertion = new ResponseAssertion();
         }
         assertion.setEnabled(this.isEnable());
 
         if (StringUtils.isNotEmpty(assertionRegex.getDescription())) {
-            if(!isErrorReportAssertion){
+            if (!isErrorReportAssertion) {
                 //正常断言要在desc增加匹配信息，用于接受结果后和误报断言进行匹配
-                assertionRegex.setDescription(assertionRegex.getDescription() + ErrorReportLibraryUtil.ASSERTION_CONTENT_REGEX_DELIMITER + assertionRegex.getSubject()+":"+assertionRegex.getExpression());
+                assertionRegex.setDescription(assertionRegex.getDescription() + ErrorReportLibraryUtil.ASSERTION_CONTENT_REGEX_DELIMITER + assertionRegex.getSubject() + ":" + assertionRegex.getExpression());
             }
             assertion.setName(this.getName() + delimiter + assertionRegex.getDescription());
         } else {
-            assertion.setName(this.getName() + delimiter + "AssertionRegex" + ErrorReportLibraryUtil.ASSERTION_CONTENT_REGEX_DELIMITER + assertionRegex.getSubject()+":"+assertionRegex.getExpression());
+            assertion.setName(this.getName() + delimiter + "AssertionRegex" + ErrorReportLibraryUtil.ASSERTION_CONTENT_REGEX_DELIMITER + assertionRegex.getSubject() + ":" + assertionRegex.getExpression());
         }
         assertion.setProperty(TestElement.TEST_CLASS, ResponseAssertion.class.getName());
         assertion.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("AssertionGui"));
@@ -196,8 +197,11 @@ public class MsAssertions extends MsTestElement {
         return assertion;
     }
 
-    private JSR223Assertion jsr223Assertion(MsAssertionJSR223 assertionJSR223) {
-        JSR223Assertion assertion = new JSR223Assertion();
+    private TestElement jsr223Assertion(MsAssertionJSR223 assertionJSR223) {
+        TestElement assertion = new BeanShellAssertion();
+        if (assertionJSR223.getJsrEnable() == null || BooleanUtils.isTrue(assertionJSR223.getJsrEnable())) {
+            assertion = new JSR223Assertion();
+        }
         assertion.setEnabled(this.isEnable());
         if (StringUtils.isNotEmpty(assertionJSR223.getDesc())) {
             assertion.setName("JSR223" + delimiter + this.getName() + delimiter + assertionJSR223.getDesc() + delimiterScript + assertionJSR223.getScript());
@@ -218,7 +222,7 @@ public class MsAssertions extends MsTestElement {
             scriptLanguage = "rhino";
         }
         assertion.setProperty("scriptLanguage", scriptLanguage);
-        assertion.setProperty("script", assertionJSR223.getScript());
+        assertion.setProperty(ElementConstants.SCRIPT, assertionJSR223.getScript());
         return assertion;
     }
 

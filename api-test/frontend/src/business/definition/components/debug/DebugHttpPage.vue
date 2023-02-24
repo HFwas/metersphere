@@ -1,15 +1,19 @@
 <template>
-
   <div class="card-container">
     <el-card class="card-content">
       <el-form :model="debugForm" :rules="rules" ref="debugForm" :inline="true" label-position="right">
-        <p class="tip">{{ $t('test_track.plan_view.base_info') }} </p>
+        <p class="tip">{{ $t('test_track.plan_view.base_info') }}</p>
 
         <el-form-item :label="$t('api_report.request')" prop="url">
-          <el-input :placeholder="$t('api_test.definition.request.path_all_info')" v-model="debugForm.url"
-                    class="ms-http-input" size="small" :disabled="testCase!=undefined" @blur="urlChange">
+          <el-input
+            :placeholder="$t('api_test.definition.request.path_all_info')"
+            v-model="debugForm.url"
+            class="ms-http-input"
+            size="small"
+            :disabled="testCase != undefined"
+            @blur="urlChange">
             <el-select v-model="debugForm.method" slot="prepend" style="width: 100px" size="small">
-              <el-option v-for="item in reqOptions" :key="item.id" :label="item.label" :value="item.id"/>
+              <el-option v-for="item in reqOptions" :key="item.id" :label="item.label" :value="item.id" />
             </el-select>
           </el-input>
         </el-form-item>
@@ -19,74 +23,92 @@
             {{ $t('report.stop_btn') }}
           </el-button>
           <div v-else>
-            <el-dropdown split-button type="primary" class="ms-api-button" @click="handleCommand"
-                         @command="handleCommand" size="small" v-if="testCase===undefined && !scenario">
+            <el-dropdown
+              split-button
+              type="primary"
+              class="ms-api-button"
+              @click="handleCommand"
+              @command="handleCommand"
+              size="small"
+              v-if="testCase === undefined && !scenario">
               {{ $t('commons.test') }}
               <el-dropdown-menu slot="dropdown">
-                <el-dropdown-item command="save_as">{{
-                    $t('api_test.definition.request.save_as_case')
-                  }}
+                <el-dropdown-item command="save_as"
+                  >{{ $t('api_test.definition.request.save_as_case') }}
                 </el-dropdown-item>
               </el-dropdown-menu>
             </el-dropdown>
             <el-button v-if="scenario" size="small" type="primary" @click="handleCommand">
               {{ $t('commons.test') }}
             </el-button>
-            <el-button size="small" type="primary" @click.stop @click="generate"
-                       style="margin-left: 10px"
-                       v-if="hasPermission('PROJECT_API_DEFINITION:READ+CREATE_API') && hasLicense()">
+            <el-button
+              size="small"
+              type="primary"
+              @click.stop
+              @click="generate"
+              style="margin-left: 10px"
+              v-if="hasPermission('PROJECT_API_DEFINITION:READ+CREATE_API') && hasLicense()">
               {{ $t('commons.generate_test_data') }}
             </el-button>
           </div>
-
         </el-form-item>
       </el-form>
       <div v-loading="loading">
-        <p class="tip">{{ $t('api_test.definition.request.req_param') }} </p>
+        <p class="tip">{{ $t('api_test.definition.request.req_param') }}</p>
         <!-- HTTP 请求参数 -->
-        <ms-api-request-form :isShowEnable="true" :definition-test="true" :headers="request.headers" :request="request"
-                             :response="responseData" ref="apiRequestForm"/>
+        <ms-api-request-form
+          :isShowEnable="true"
+          :definition-test="true"
+          :headers="request.headers"
+          :request="request"
+          :response="responseData"
+          ref="apiRequestForm" />
 
         <!-- HTTP 请求返回数据 -->
-        <p class="tip">{{ $t('api_test.definition.request.res_param') }} </p>
-        <ms-request-result-tail v-if="!loading" :response="responseData" ref="debugResult"/>
+        <p class="tip">{{ $t('api_test.definition.request.res_param') }}</p>
+        <ms-request-result-tail v-if="!loading" :response="responseData" ref="debugResult" />
         <!-- 执行组件 -->
-        <ms-run :debug="true" :reportId="reportId" :isStop="isStop" :run-data="runData" @runRefresh="runRefresh"
-                ref="runTest"/>
+        <ms-run
+          :debug="true"
+          :reportId="reportId"
+          :isStop="isStop"
+          :run-data="runData"
+          @runRefresh="runRefresh"
+          @errorRefresh="errorRefresh"
+          ref="runTest" />
       </div>
     </el-card>
 
     <div v-if="scenario">
-      <el-button style="float: right;margin: 20px" type="primary" @click="handleCommand('save_as_api')">
+      <el-button style="float: right; margin: 20px" type="primary" @click="handleCommand('save_as_api')">
         {{ $t('commons.save') }}
       </el-button>
     </div>
     <!-- 加载用例 -->
-    <ms-api-case-list :currentApi="debugForm" @refreshModule="refreshModule" :loaded="false" ref="caseList"/>
+    <ms-api-case-list :currentApi="debugForm" @refreshModule="refreshModule" :loaded="false" ref="caseList" />
   </div>
 </template>
 
 <script>
-import {getApiReportDetail} from "@/api/definition-report";
-import MsApiRequestForm from "../request/http/ApiHttpRequestForm";
-import MsResponseResult from "../response/ResponseResult";
-import MsRequestMetric from "../response/RequestMetric";
-import {getUUID} from "metersphere-frontend/src/utils";
-import {getCurrentUser} from "metersphere-frontend/src/utils/token";
-import {hasLicense, hasPermission} from "metersphere-frontend/src/utils/permission";
-import MsResponseText from "../response/ResponseText";
-import MsRun from "../Run";
-import {createComponent} from "../jmeter/components";
-import {REQ_METHOD} from "../../model/JsonData";
-import MsRequestResultTail from "../response/RequestResultTail";
-import {KeyValue} from "../../model/ApiTestModel";
-import MsApiCaseList from "../case/EditApiCase";
-import {TYPE_TO_C} from "@/business/automation/scenario/Setting";
-import {mergeRequestDocumentData} from "@/business/definition/api-definition";
-import {execStop} from "@/api/scenario";
+import MsApiRequestForm from '../request/http/ApiHttpRequestForm';
+import MsResponseResult from '../response/ResponseResult';
+import MsRequestMetric from '../response/RequestMetric';
+import { getUUID } from 'metersphere-frontend/src/utils';
+import { getCurrentUser } from 'metersphere-frontend/src/utils/token';
+import { hasLicense, hasPermission } from 'metersphere-frontend/src/utils/permission';
+import MsResponseText from '../response/ResponseText';
+import MsRun from '../Run';
+import { createComponent } from '../jmeter/components';
+import { REQ_METHOD } from '../../model/JsonData';
+import MsRequestResultTail from '../response/RequestResultTail';
+import { KeyValue } from '../../model/ApiTestModel';
+import MsApiCaseList from '../case/EditApiCase';
+import { TYPE_TO_C } from '@/business/automation/scenario/Setting';
+import { mergeRequestDocumentData } from '@/business/definition/api-definition';
+import { execStop } from '@/api/scenario';
 
 export default {
-  name: "ApiConfig",
+  name: 'DebugHttpPage',
   components: {
     MsRequestResultTail,
     MsResponseResult,
@@ -94,7 +116,7 @@ export default {
     MsRequestMetric,
     MsResponseText,
     MsRun,
-    MsApiCaseList
+    MsApiCaseList,
   },
   props: {
     currentProtocol: String,
@@ -102,74 +124,48 @@ export default {
     scenario: Boolean,
   },
   data() {
-    let validateURL = (rule, value, callback) => {
-      try {
-        new URL(this.debugForm.url);
-        callback();
-      } catch (e) {
-        callback(this.$t('api_test.request.url_invalid'));
-      }
-    };
     return {
       rules: {
-        method: [{required: true, message: this.$t('test_track.case.input_maintainer'), trigger: 'change'}],
+        method: [
+          {
+            required: true,
+            message: this.$t('test_track.case.input_maintainer'),
+            trigger: 'change',
+          },
+        ],
         url: [
-          {max: 500, required: true, message: this.$t('commons.input_limit', [1, 500]), trigger: 'blur'},
-          /*
-                      {validator: validateURL, trigger: 'blur'}
-          */
+          {
+            max: 500,
+            required: true,
+            message: this.$t('commons.input_limit', [1, 500]),
+            trigger: 'blur',
+          },
         ],
       },
-      debugForm: {method: REQ_METHOD[0].id, environmentId: ""},
+      debugForm: { method: REQ_METHOD[0].id, environmentId: '' },
       options: [],
-      responseData: {type: 'HTTP', responseResult: {}, subRequestResults: []},
+      responseData: { type: 'HTTP', responseResult: {}, subRequestResults: [] },
       loading: false,
-      debugResultId: "",
       runData: [],
-      reportId: "",
+      reportId: '',
       reqOptions: REQ_METHOD,
-      createCase: "",
+      createCase: '',
       request: {},
       isStop: false,
-    }
+    };
   },
   created() {
-    if (this.testCase) {
-      if (this.testCase.id) {
-        // 执行结果信息
-        getApiReportDetail(this.testCase.id).then(response => {
-          if (response.data) {
-            let data = JSON.parse(response.data.content);
-            this.responseData = data;
-          }
-        });
-      }
-      this.request = this.testCase.request;
-      if (this.request) {
-        this.debugForm.method = this.request.method;
-        if (this.request.url) {
-          this.debugForm.url = this.request.url;
-        } else {
-          this.debugForm.url = this.request.path;
-        }
-      }
-    } else {
-      this.createHttp();
-    }
-  },
-  watch: {
-    debugResultId() {
-      this.getResult()
-    },
+    this.createHttp();
   },
   methods: {
-    hasPermission, hasLicense,
+    hasPermission,
+    hasLicense,
     generate() {
       this.$refs.apiRequestForm.generate();
     },
     handleCommand(e) {
       mergeRequestDocumentData(this.request);
-      if (e === "save_as") {
+      if (e === 'save_as') {
         this.saveAs();
       } else if (e === 'save_as_api') {
         this.saveAsApi();
@@ -185,7 +181,7 @@ export default {
       });
     },
     createHttp() {
-      this.request = createComponent("HTTPSamplerProxy");
+      this.request = createComponent('HTTPSamplerProxy');
     },
     runDebug() {
       this.$refs['debugForm'].validate((valid) => {
@@ -200,18 +196,21 @@ export default {
           /*触发执行操作*/
           this.reportId = getUUID().substring(0, 8);
         }
-      })
+      });
     },
     refreshModule() {
       this.$emit('refreshModule');
     },
     runRefresh(data) {
-      this.responseData = data;
+      this.responseData = data || { type: 'HTTP', responseResult: {}, subRequestResults: [] };
       this.loading = false;
       this.isStop = false;
       if (this.$refs.debugResult) {
         this.$refs.debugResult.reload();
       }
+    },
+    errorRefresh() {
+      this.runRefresh();
     },
     saveAsApi() {
       this.$refs['debugForm'].validate((valid) => {
@@ -220,13 +219,13 @@ export default {
           this.request.id = getUUID();
           this.debugForm.request = this.request;
           this.debugForm.userId = getCurrentUser().id;
-          this.debugForm.status = "Underway";
+          this.debugForm.status = 'Underway';
           this.debugForm.protocol = this.currentProtocol;
           this.$emit('saveAs', this.debugForm);
         } else {
           return false;
         }
-      })
+      });
     },
     compatibleHistory(stepArray) {
       if (stepArray) {
@@ -253,7 +252,7 @@ export default {
           this.debugForm.id = this.request.id;
           this.debugForm.request = this.request;
           this.debugForm.userId = getCurrentUser().id;
-          this.debugForm.status = "Underway";
+          this.debugForm.status = 'Underway';
           this.debugForm.protocol = this.currentProtocol;
           this.debugForm.saved = true;
           // 历史数据兼容处理
@@ -265,35 +264,38 @@ export default {
         } else {
           return false;
         }
-      })
+      });
     },
     urlChange() {
       if (!this.debugForm.url) return;
       let url = this.getURL(this.debugForm.url);
       if (url && url.pathname) {
         if (this.debugForm.url.indexOf('?') != -1) {
-          this.debugForm.url = decodeURIComponent(this.debugForm.url.substr(0, this.debugForm.url.indexOf("?")));
+          this.debugForm.url = decodeURIComponent(this.debugForm.url.substr(0, this.debugForm.url.indexOf('?')));
         }
         this.debugForm.path = url.pathname;
       } else {
         this.debugForm.path = url;
       }
-
     },
     getURL(urlStr) {
       try {
         let url = new URL(urlStr);
         if (url.search && url.search.length > 1) {
-          let params = url.search.substr(1).split("&");
-          params.forEach(param => {
+          let params = url.search.substr(1).split('&');
+          params.forEach((param) => {
             if (param) {
-              let keyValues = param.split("=");
+              let keyValues = param.split('=');
               if (keyValues) {
-                this.request.arguments.splice(0, 0, new KeyValue({
-                  name: keyValues[0],
-                  required: false,
-                  value: keyValues[1]
-                }));
+                this.request.arguments.splice(
+                  0,
+                  0,
+                  new KeyValue({
+                    name: keyValues[0],
+                    required: false,
+                    value: keyValues[1],
+                  })
+                );
               }
             }
           });
@@ -303,8 +305,8 @@ export default {
         return urlStr;
       }
     },
-  }
-}
+  },
+};
 </script>
 
 <style scoped>

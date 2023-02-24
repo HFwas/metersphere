@@ -1,101 +1,122 @@
 <template>
   <div id="app" v-loading="loading">
     <el-row>
-      <el-col>
-        <el-button style="float: right" type="text" size="mini" @click="expandAll">
+      <el-col></el-col>
+      <div style="float: right">
+        <el-button style="margin-right: 5px" type="text" size="mini" @click="expandAll">
           {{ expandTitle }}
         </el-button>
-      </el-col>
+
+        <api-params-config
+          v-if="apiJsonSchemaConfigFields"
+          :storage-key="storageKey"
+          @refresh="refreshApiParamsField"
+          :api-params-config-fields="apiJsonSchemaConfigFields" />
+      </div>
     </el-row>
     <div :style="jsonSchemaDisable ? '' : 'min-height: 200px'">
-      <json-schema-panel class="schema"
-                         :disabled="jsonSchemaDisable"
-                         :value="schema"
-                         :show-mock-vars="showMockVars"
-                         :scenario-definition="scenarioDefinition"
-                         :expand-all-params="expandAllParams"
-                         @editScenarioAdvance="editScenarioAdvance"
-                         lang="zh_CN" custom/>
+      <div style="overflow: auto">
+        <json-schema-panel
+          class="schema"
+          v-if="reloadedApiVariable"
+          :disabled="jsonSchemaDisable"
+          :value="schema"
+          :show-mock-vars="showMockVars"
+          :scenario-definition="scenarioDefinition"
+          :param-columns="apiJsonSchemaShowColumns"
+          :expand-all-params="expandAllParams"
+          @editScenarioAdvance="editScenarioAdvance"
+          lang="zh_CN"
+          custom />
+      </div>
     </div>
   </div>
 </template>
 
 <script>
-import JsonSchemaPanel
-  from "@/business/definition/components/document/components/JsonSchema/JsonSchemaPanel";
+import JsonSchemaPanel from '@/business/definition/components/document/components/JsonSchema/JsonSchemaPanel';
+import { getApiJsonSchemaConfigFields, getShowFields } from 'metersphere-frontend/src/utils/custom_field';
+import ApiParamsConfig from '@/business/definition/components/request/components/ApiParamsConfig';
 
 const Convert = require('@/business/commons/json-schema/convert/convert.js');
 const MsConvert = new Convert();
 
 export default {
   name: 'JsonSchemaShow',
-  components: {JsonSchemaPanel},
+  components: { JsonSchemaPanel, ApiParamsConfig },
   props: {
     body: {},
     showPreview: {
       type: Boolean,
-      default: true
+      default: true,
     },
     jsonSchemaDisable: {
       type: Boolean,
-      default: false
+      default: false,
     },
     showMockVars: {
       type: Boolean,
       default() {
         return false;
-      }
+      },
     },
     scenarioDefinition: Array,
   },
   created() {
     if (!this.body.jsonSchema && this.body.raw && this.checkIsJson(this.body.raw)) {
-      let obj = {"root": MsConvert.format(JSON.parse(this.body.raw))}
+      let obj = { root: MsConvert.format(JSON.parse(this.body.raw)) };
       this.schema = obj;
     } else if (this.body.jsonSchema) {
-      this.schema = {"root": this.body.jsonSchema};
+      this.schema = { root: this.body.jsonSchema };
     }
     this.body.jsonSchema = this.schema.root;
+    this.apiJsonSchemaShowColumns = getShowFields(this.storageKey);
   },
   watch: {
     schema: {
       handler(newValue, oldValue) {
         this.body.jsonSchema = this.schema.root;
       },
-      deep: true
+      deep: true,
     },
     body: {
       handler(newValue, oldValue) {
         if (!this.body.jsonSchema && this.body.raw && this.checkIsJson(this.body.raw)) {
-          let obj = {"root": MsConvert.format(JSON.parse(this.body.raw))}
+          let obj = { root: MsConvert.format(JSON.parse(this.body.raw)) };
           this.schema = obj;
         } else if (this.body.jsonSchema) {
-          this.schema = {"root": this.body.jsonSchema};
+          this.schema = { root: this.body.jsonSchema };
         }
         this.body.jsonSchema = this.schema.root;
       },
-      deep: true
-    }
+      deep: true,
+    },
   },
   data() {
     return {
-      schema:
-        {
-          "root": {
-            "type": "object",
-            "properties": {},
-          }
+      schema: {
+        root: {
+          type: 'object',
+          properties: {},
         },
+      },
+      reloadedApiVariable: true,
+      storageKey: 'API_JSON_SCHEMA_SHOW_FIELD',
+      apiJsonSchemaConfigFields: getApiJsonSchemaConfigFields(this),
+      apiJsonSchemaShowColumns: [],
       loading: false,
       expandAllParams: false,
-    }
+    };
   },
   computed: {
     expandTitle() {
-      return this.expandAllParams ? this.$t("commons.close_all") : this.$t("commons.expand_all");
-    }
+      return this.expandAllParams ? this.$t('commons.close_all') : this.$t('commons.expand_all');
+    },
   },
   methods: {
+    refreshApiParamsField() {
+      this.apiJsonSchemaShowColumns = getShowFields(this.storageKey);
+    },
     expandAll() {
       this.expandAllParams = !this.expandAllParams;
     },
@@ -112,14 +133,12 @@ export default {
       this.$nextTick(() => {
         this.schema.root = data;
         this.body.jsonSchema = this.schema.root;
-      })
+      });
     },
     editScenarioAdvance(data) {
       this.$emit('editScenarioAdvance', data);
     },
-  }
-}
+  },
+};
 </script>
-<style>
-
-</style>
+<style></style>

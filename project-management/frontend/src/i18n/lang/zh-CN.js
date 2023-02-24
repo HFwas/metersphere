@@ -6,6 +6,7 @@ const message = {
   pj: {
     environment_import_repeat_tip: "(已过滤同名称的环境配置 {0})",
     check_third_project_success: "检查通过",
+    api_run_pool_title: '接口执行资源池',
   },
   file_manage: {
     my_file: '我的文件',
@@ -34,6 +35,15 @@ const message = {
   },
   project_version: {
     version_time: '版本周期',
+  },
+  environment: {
+    export_variable_tip : "导出接口测试变量",
+    need_expire_time : "请输入过期时间",
+    need_relevance_ui_scenario : "请关联登录场景",
+    view_ui_relevane : "查看关联",
+    cancel_ui_relevane : "取消关联",
+    re_ui_relevane : "重新关联",
+    relevance_ui : "关联登录场景/指令",
   }
 }
 

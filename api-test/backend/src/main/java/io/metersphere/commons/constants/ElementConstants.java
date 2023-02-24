@@ -30,7 +30,7 @@ public class ElementConstants {
     public static final String CONSTANT_TIMER = "ConstantTimer";
     public static final String ASSERTIONS = "Assertions";
     public static final String EXTRACT = "Extract";
-
+    public static final String STEP_CREATED = "Created";
     public final static List<String> REQUESTS = new ArrayList<String>() {{
         this.add(ElementConstants.HTTP_SAMPLER);
         this.add(ElementConstants.DUBBO_SAMPLER);
@@ -49,4 +49,12 @@ public class ElementConstants {
         this.add(ElementConstants.AUTH_MANAGER);
         this.add(ElementConstants.ABS_SAMPLER);
     }};
+
+    public static final String SCRIPT = "script";
+    public static final String BEANSHELL = "beanshell";
+    public static final String IS_REF = "isRef";
+    public static final String FILE_ID = "fileId";
+    public static final String RESOURCE_ID = "resourceId";
+    public static final String FILENAME = "filename";
+    public static final String COVER = "COVER";
 }

@@ -1,11 +1,14 @@
 package io.metersphere.api.jmeter;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import io.metersphere.api.dto.MsgDTO;
+import io.metersphere.commons.constants.ApiRunMode;
 import io.metersphere.commons.constants.KafkaTopicConstants;
-import io.metersphere.commons.utils.NamedThreadFactory;
+import io.metersphere.commons.utils.*;
 import io.metersphere.service.ApiExecutionQueueService;
 import io.metersphere.service.TestResultService;
+import io.metersphere.service.definition.ApiDefinitionEnvService;
 import io.metersphere.utils.LoggerUtil;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.springframework.context.annotation.Configuration;
@@ -21,16 +24,15 @@ import java.util.concurrent.TimeUnit;
 @Configuration
 public class MsKafkaListener {
     public static final String CONSUME_ID = "ms-api-exec-consume";
+    public static final String DEBUG_CONSUME_ID = "ms-api-debug-consume";
     @Resource
     private ApiExecutionQueueService apiExecutionQueueService;
     @Resource
     private TestResultService testResultService;
-    @Resource
-    private ObjectMapper mapper;
     // 线程池维护线程的最少数量
-    private final static int CORE_POOL_SIZE = 20;
+    private final static int CORE_POOL_SIZE = 5;
     // 线程池维护线程的最大数量
-    private final static int MAX_POOL_SIZE = 20;
+    private final static int MAX_POOL_SIZE = 5;
     // 线程池维护线程所允许的空闲时间
     private final static int KEEP_ALIVE_TIME = 1;
     // 线程池所使用的缓冲队列大小
@@ -52,15 +54,31 @@ public class MsKafkaListener {
                 KafkaListenerTask task = new KafkaListenerTask();
                 task.setApiExecutionQueueService(apiExecutionQueueService);
                 task.setTestResultService(testResultService);
-                task.setMapper(mapper);
                 task.setRecord(item);
                 threadPool.execute(task);
-                this.outKafkaPoolLogger();
             });
+            JvmUtil.memoryInfo();
         } catch (Exception e) {
             LoggerUtil.error("KAFKA消费失败：", e);
         } finally {
             ack.acknowledge();
+        }
+    }
+
+    @KafkaListener(id = DEBUG_CONSUME_ID, topics = KafkaTopicConstants.DEBUG_TOPICS, groupId = "${spring.kafka.consumer.debug.group-id}")
+    public void debugConsume(ConsumerRecord<?, String> record) {
+        try {
+            LoggerUtil.info("接收到执行结果：", record.key());
+            if (ObjectUtils.isNotEmpty(record.value()) && WebSocketUtil.has(record.key().toString())) {
+                MsgDTO dto = JSONUtil.parseObject(record.value(), MsgDTO.class);
+                if (StringUtils.equalsAnyIgnoreCase(dto.getRunMode(), ApiRunMode.DEFINITION.name(), ApiRunMode.API_PLAN.name()) && dto.getContent().startsWith("result_")) {
+                    ApiDefinitionEnvService apiDefinitionEnvService = CommonBeanFactory.getBean(ApiDefinitionEnvService.class);
+                    apiDefinitionEnvService.setEnvAndPoolName(dto);
+                }
+                WebSocketUtil.sendMessageSingle(dto);
+            }
+        } catch (Exception e) {
+            LoggerUtil.error("KAFKA消费失败：", e);
         }
     }
 

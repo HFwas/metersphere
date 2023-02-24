@@ -98,7 +98,9 @@ export function LOG_MODULE_MAP(_this) {
     ['SYSTEM_AUTHORIZATION_MANAGEMENT', _this.$t('operating_log.system_authorization_management')],
     ['UI_ELEMENT', _this.$t('operating_log.ui_element')],
     ['UI_AUTOMATION', _this.$t('operating_log.ui_automation')],
+    ['UI_AUTOMATION_SCHEDULE', _this.$t('operating_log.ui_automation_schedule')],
     ['UI_AUTOMATION_REPORT', _this.$t('operating_log.ui_automation_report')],
+    ['PLUGIN_MANAGE', _this.$t('system.operating_log.plugin_manage')],
   ]);
   return LOG_MODULE_MAP;
 }
@@ -116,6 +118,11 @@ export function SYSLIST() {
         {
           label: i18n.t('ui.ui_automation'),
           value: [i18n.t('ui.ui_automation'), 'UI_AUTOMATION'],
+          leaf: true
+        },
+        {
+          label: i18n.t('operating_log.ui_automation_schedule'),
+          value: [i18n.t('operating_log.ui_automation_schedule'), 'UI_AUTOMATION_SCHEDULE'],
           leaf: true
         },
         {
@@ -226,7 +233,16 @@ export function SYSLIST() {
           value: [i18n.t('commons.system') + "-" + i18n.t('license.title'), 'SYSTEM_AUTHORIZATION_MANAGEMENT'],
           leaf: true
         },
-
+        {
+          label: i18n.t('commons.system') + "-" + i18n.t('operating_log.group_permission'),
+          value: [i18n.t('commons.system') + "-" + i18n.t('operating_log.group_permission'), 'GROUP_PERMISSION'],
+          leaf: true
+        },
+        {
+          label: i18n.t('commons.system') + "-" + i18n.t('system.operating_log.plugin_manage'),
+          value: [i18n.t('commons.system') + "-" + i18n.t('system.operating_log.plugin_manage'), 'PLUGIN_MANAGE'],
+          leaf: true
+        },
         {
           label: i18n.t('commons.workspace'),
           value: [i18n.t('commons.workspace'), 'SYSTEM_WORKSPACE'],
@@ -246,7 +262,12 @@ export function SYSLIST() {
           label: i18n.t('commons.workspace') + "-" + i18n.t('permission.workspace_project_environment.name'),
           value: [i18n.t('commons.workspace') + "-" + i18n.t('permission.workspace_project_environment.name'), 'PROJECT_ENVIRONMENT_SETTING'],
           leaf: true
-        }
+        },
+        {
+          label: i18n.t('commons.workspace') + "-" + i18n.t('project.manager'),
+          value: [i18n.t('commons.workspace') + "-" + i18n.t('project.manager'), 'PROJECT_PROJECT_MANAGER'],
+          leaf: true
+        },
       ]
     },
     {
@@ -305,6 +326,11 @@ export function WORKSYSLIST() {
         {
           label: i18n.t('ui.ui_automation'),
           value: [i18n.t('ui.ui_automation'), 'UI_AUTOMATION'],
+          leaf: true
+        },
+        {
+          label: i18n.t('operating_log.ui_automation_schedule'),
+          value: [i18n.t('operating_log.ui_automation_schedule'), 'UI_AUTOMATION_SCHEDULE'],
           leaf: true
         },
         {

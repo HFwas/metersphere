@@ -26,17 +26,17 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 public class FileUtils {
-//    public static final String BODY_FILE_DIR = "/opt/metersphere/data/body";
-    public static final String BODY_FILE_DIR = "/Users/houfei/workspace/metersphere/data/body";
-//    public static final String MD_IMAGE_DIR = "/opt/metersphere/data/image/markdown";
-    public static final String MD_IMAGE_DIR = "/Users/houfei/workspace/metersphere/data/image/markdown";
-//    public static final String UI_IMAGE_DIR = "/opt/metersphere/data/image/ui/screenshots";
-    public static final String UI_IMAGE_DIR = "/Users/houfei/workspace/metersphere/data/image/ui/screenshots";
-//    public static final String ATTACHMENT_DIR = "/opt/metersphere/data/attachment";
-    public static final String ATTACHMENT_DIR = "/Users/houfei/workspace/metersphere/data/attachment";
-//    public static final String ATTACHMENT_TMP_DIR = "/opt/metersphere/data/attachment/tmp";
-    public static final String ATTACHMENT_TMP_DIR = "/Users/houfei/workspace/metersphere/data/attachment/tmp";
+    public static final String BODY_FILE_DIR = "/opt/metersphere/data/body";
+    public static final String MD_IMAGE_DIR = "/opt/metersphere/data/image/markdown";
+    public static final String UI_IMAGE_DIR = "/opt/metersphere/data/image/ui/screenshots";
+    public static final String ATTACHMENT_DIR = "/opt/metersphere/data/attachment";
+    public static final String ATTACHMENT_TMP_DIR = "/opt/metersphere/data/attachment/tmp";
 
+    public static void validateFileName(String fileName) {
+        if (StringUtils.isNotEmpty(fileName) && StringUtils.contains(fileName, "." + File.separator)) {
+            MSException.throwException(Translator.get("invalid_parameter"));
+        }
+    }
 
     public static byte[] listBytesToZip(Map<String, byte[]> mapReport) {
         try {
@@ -98,6 +98,7 @@ public class FileUtils {
             }
             for (int i = 0; i < bodyUploadIds.size(); i++) {
                 MultipartFile item = bodyFiles.get(i);
+                validateFileName(item.getOriginalFilename());
                 File file = new File(filePath + File.separator + bodyUploadIds.get(i) + "_" + item.getOriginalFilename());
                 try (InputStream in = item.getInputStream(); OutputStream out = new FileOutputStream(file)) {
                     file.createNewFile();
@@ -117,6 +118,7 @@ public class FileUtils {
     public static String create(String id, MultipartFile item) {
         String filePath = BODY_FILE_DIR + "/plugin";
         if (item != null) {
+            validateFileName(item.getOriginalFilename());
             File testDir = new File(filePath);
             if (!testDir.exists()) {
                 testDir.mkdirs();
@@ -146,6 +148,7 @@ public class FileUtils {
                 testDir.mkdirs();
             }
             bodyFiles.forEach(item -> {
+                validateFileName(item.getOriginalFilename());
                 File file = new File(path + File.separator + item.getOriginalFilename());
                 try (InputStream in = item.getInputStream(); OutputStream out = new FileOutputStream(file)) {
                     file.createNewFile();
@@ -166,6 +169,18 @@ public class FileUtils {
         } catch (Exception e) {
             LoggerUtil.error(e);
         }
+    }
+
+    /**
+     * 强制覆盖文件
+     *
+     * @param sourceId 源ID
+     * @param targetId 目标ID
+     */
+    public static void forceOverrideBodyFiles(String sourceId, String targetId) {
+        //删除源文件
+        deleteBodyFiles(targetId);
+        copyBodyFiles(sourceId, targetId);
     }
 
     /**
@@ -264,8 +279,8 @@ public class FileUtils {
     }
 
     public static String createFile(MultipartFile bodyFile) {
-//        String dir = "/opt/metersphere/data/body/tmp/";
-        String dir = "/Users/houfei/workspace/metersphere/data/body/tmp/";
+        validateFileName(bodyFile.getOriginalFilename());
+        String dir = "/opt/metersphere/data/body/tmp/";
         File fileDir = new File(dir);
         if (!fileDir.exists()) {
             fileDir.mkdirs();
@@ -296,6 +311,7 @@ public class FileUtils {
     }
 
     public static String uploadFile(MultipartFile uploadFile, String path, String name) {
+        validateFileName(name);
         if (uploadFile == null) {
             return null;
         }
@@ -372,62 +388,10 @@ public class FileUtils {
         }
     }
 
-    /**
-     * 获取当前jmx 涉及到的文件  执行时
-     *
-     * @param tree
-     */
-    public static void getExecuteFiles(HashTree tree, String reportId, List<BodyFile> files) {
-        FileMetadataService fileMetadataService = CommonBeanFactory.getBean(FileMetadataService.class);
-        for (Object key : tree.keySet()) {
-            HashTree node = tree.get(key);
-            if (key instanceof HTTPSamplerProxy) {
-                HTTPSamplerProxy source = (HTTPSamplerProxy) key;
-                if (source != null && source.getHTTPFiles().length > 0) {
-                    for (HTTPFileArg arg : source.getHTTPFiles()) {
-                        BodyFile file = new BodyFile();
-                        file.setId(arg.getParamName());
-                        file.setName(arg.getPath());
-                        if (arg.getPropertyAsBoolean("isRef") && fileMetadataService != null) {
-                            FileMetadata fileMetadata = fileMetadataService.getFileMetadataById(arg.getPropertyAsString("fileId"));
-                            if (fileMetadata != null && !StringUtils.equals(fileMetadata.getStorage(), StorageConstants.LOCAL.name())) {
-                                file.setStorage(fileMetadata.getStorage());
-                                file.setFileId(arg.getPropertyAsString("fileId"));
-                                file.setName(reportId + File.separator + fileMetadata.getName());
-                                arg.setPath(BODY_FILE_DIR + File.separator + reportId + File.separator + fileMetadata.getName());
-                            }
-                        }
-                        files.add(file);
-                    }
-                }
-            } else if (key instanceof CSVDataSet) {
-                CSVDataSet source = (CSVDataSet) key;
-                if (source != null && StringUtils.isNotEmpty(source.getPropertyAsString("filename"))) {
-                    BodyFile file = new BodyFile();
-                    file.setId(source.getPropertyAsString("filename"));
-                    file.setName(source.getPropertyAsString("filename"));
-                    if (source.getPropertyAsBoolean("isRef") && fileMetadataService != null) {
-                        FileMetadata fileMetadata = fileMetadataService.getFileMetadataById(source.getPropertyAsString("fileId"));
-                        if (fileMetadata != null && !StringUtils.equals(fileMetadata.getStorage(), StorageConstants.LOCAL.name())) {
-                            file.setStorage(fileMetadata.getStorage());
-                            file.setFileId(source.getPropertyAsString("fileId"));
-                            file.setName(reportId + File.separator + fileMetadata.getName());
-                            ((CSVDataSet) key).setProperty("filename", BODY_FILE_DIR + File.separator + reportId + File.separator + fileMetadata.getName());
-                        }
-                    }
-                    files.add(file);
-                }
-            }
-            if (node != null) {
-                getExecuteFiles(node, reportId, files);
-            }
-        }
-    }
-
     public static byte[] fileToByte(File tradeFile) {
         byte[] buffer = null;
         try (FileInputStream fis = new FileInputStream(tradeFile);
-             ByteArrayOutputStream bos = new ByteArrayOutputStream();) {
+             ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
             byte[] b = new byte[1024];
             int n;
             while ((n = fis.read(b)) != -1) {
@@ -435,7 +399,7 @@ public class FileUtils {
             }
             buffer = bos.toByteArray();
         } catch (Exception e) {
-            LoggerUtil.error(e);
+            LogUtil.error(e);
         }
         return buffer;
     }

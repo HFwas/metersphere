@@ -1,11 +1,10 @@
 package io.metersphere.base.mapper.plan.ext;
 
-import io.metersphere.api.dto.plan.TestPlanApiScenarioInfoDTO;
 import io.metersphere.api.dto.automation.ApiScenarioDTO;
 import io.metersphere.api.dto.automation.TestPlanFailureScenarioDTO;
 import io.metersphere.api.dto.automation.TestPlanScenarioRequest;
+import io.metersphere.api.dto.plan.TestPlanApiScenarioInfoDTO;
 import io.metersphere.base.domain.TestPlanApiScenario;
-
 import io.metersphere.dto.PlanReportCaseDTO;
 import org.apache.ibatis.annotations.Param;
 
@@ -29,6 +28,8 @@ public interface ExtTestPlanScenarioCaseMapper {
 
     List<TestPlanApiScenarioInfoDTO> selectLegalDataByTestPlanId(String planId);
 
+    List<TestPlanApiScenarioInfoDTO> selectByPlanIds(List<String> planScenarioIds);
+
     List<PlanReportCaseDTO> selectForPlanReport(String planId);
 
     List<TestPlanFailureScenarioDTO> getFailureList(@Param("planId") String planId, @Param("status") String status);
@@ -43,7 +44,10 @@ public interface ExtTestPlanScenarioCaseMapper {
 
     List<String> getIdsOrderByUpdateTime(@Param("planId") String planId);
 
-    Long getPreOrder(@Param("planId")String planId, @Param("baseOrder") Long baseOrder);
+    Long getPreOrder(@Param("planId") String planId, @Param("baseOrder") Long baseOrder);
 
-    Long getLastOrder(@Param("planId")String planId, @Param("baseOrder") Long baseOrder);
+    Long getLastOrder(@Param("planId") String planId, @Param("baseOrder") Long baseOrder);
+
+    List<String> selectNameByIdIn(List<String> ids);
+    String selectProjectId(String testPlanId);
 }

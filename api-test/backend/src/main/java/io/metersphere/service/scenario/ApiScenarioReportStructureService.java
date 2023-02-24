@@ -10,9 +10,12 @@ import io.metersphere.commons.constants.MsTestElementConstants;
 import io.metersphere.commons.constants.PropertyConstant;
 import io.metersphere.commons.constants.ReportTypeConstants;
 import io.metersphere.commons.enums.ApiReportStatus;
+import io.metersphere.commons.enums.StorageEnums;
 import io.metersphere.commons.utils.*;
 import io.metersphere.constants.RunModeConstants;
 import io.metersphere.dto.RequestResult;
+import io.metersphere.dto.RunModeConfigDTO;
+import io.metersphere.service.BaseTestResourcePoolService;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.BooleanUtils;
@@ -45,7 +48,7 @@ public class ApiScenarioReportStructureService {
             ElementConstants.IF_CONTROLLER,
             ElementConstants.CONSTANT_TIMER
     );
-    private static final String RESOURCE_ID = "resourceId";
+    private static final String RESOURCE_ID = ElementConstants.RESOURCE_ID;
     private static final String REFERENCED = "referenced";
     private static final String ERROR_CODE = "errorCode";
     private static final String ID = "id";
@@ -70,6 +73,8 @@ public class ApiScenarioReportStructureService {
     private ApiScenarioEnvService apiScenarioEnvService;
     @Resource
     private ApiScenarioReportMapper apiScenarioReportMapper;
+    @Resource
+    private BaseTestResourcePoolService baseTestResourcePoolService;
 
     public void save(List<ApiScenarioWithBLOBs> apiScenarios, String reportId, String reportType) {
         List<StepTreeDTO> dtoList = new LinkedList<>();
@@ -500,6 +505,10 @@ public class ApiScenarioReportStructureService {
             dto.setName(report.getName());
             dto.setEnvConfig(report.getEnvConfig());
             this.initProjectEnvironmentByEnvConfig(dto, report.getEnvConfig());
+            this.getEnvConfig(dto, report.getEnvConfig());
+            if (report != null && report.getReportType().equals(ReportTypeConstants.SCENARIO_INDEPENDENT.name())) {
+                dto.setMode(null);
+            }
             return dto;
         }
     }
@@ -690,6 +699,26 @@ public class ApiScenarioReportStructureService {
             return requestResult;
         } else {
             return (T) clazz.getInterfaces();
+        }
+    }
+
+    public void getEnvConfig(ApiScenarioReportDTO dto, String envConfig) {
+        RunModeConfigDTO runModeConfigDTO = null;
+        try {
+            runModeConfigDTO = JSON.parseObject(envConfig, RunModeConfigDTO.class);
+        } catch (Exception e) {
+            LogUtil.error("解析" + envConfig + "为RunModeConfigDTO时失败！", e);
+        }
+        if (runModeConfigDTO != null && StringUtils.isNotBlank(runModeConfigDTO.getResourcePoolId())) {
+            TestResourcePool resourcePool = baseTestResourcePoolService.getResourcePool(runModeConfigDTO.getResourcePoolId());
+            if (resourcePool != null) {
+                dto.setPoolName(resourcePool.getName());
+            }
+        } else {
+            dto.setPoolName(StorageEnums.LOCAL.name());
+        }
+        if (runModeConfigDTO != null && StringUtils.isNotBlank(runModeConfigDTO.getMode())) {
+            dto.setMode(runModeConfigDTO.getMode());
         }
     }
 }

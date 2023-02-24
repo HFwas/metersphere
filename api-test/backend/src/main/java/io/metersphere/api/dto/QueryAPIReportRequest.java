@@ -22,7 +22,9 @@ public class QueryAPIReportRequest {
     private List<OrderRequest> orders;
     private Map<String, List<String>> filters;
     private Map<String, Object> combine;
-
+    private String selectDataType;
+    private String selectDataRange;
+    private String versionId;
     /**
      * 查询哪种用例的报告 SCENARIO/API
      */

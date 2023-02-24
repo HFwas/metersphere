@@ -22,6 +22,17 @@
             <artifactId>xpack-interface</artifactId>
             <version>${revision}</version>
         </dependency>
+        <dependency>
+            <artifactId>metersphere-platform-plugin-sdk</artifactId>
+            <groupId>io.metersphere</groupId>
+            <version>${platform-plugin-sdk.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>io.metersphere</groupId>
+                    <artifactId>domain</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
     </dependencies>
 
     <build>
@@ -110,13 +121,7 @@
                     </execution>
                 </executions>
             </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <configuration>
-                    <release>${java.version}</release>
-                </configuration>
-            </plugin>
+
         </plugins>
     </build>
 

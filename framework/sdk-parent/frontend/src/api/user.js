@@ -6,7 +6,7 @@ export function login(url, data) {
 }
 
 export function logout() {
-  return get("/signout")
+  return get("/signout");
 }
 
 export function isLogin() {
@@ -55,6 +55,10 @@ export function getProjectUsers() {
 
 export function getAuthSources() {
   return get('/authsource/list/allenable')
+}
+
+export function getAuthSource(id) {
+  return get('/authsource/' + id)
 }
 
 export function getProjectMemberOption() {

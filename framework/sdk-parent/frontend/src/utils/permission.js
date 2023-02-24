@@ -1,8 +1,12 @@
-import {LicenseKey} from "./constants";
+import {LicenseKey, SUPER_GROUP} from "./constants";
 import {getCurrentProjectID, getCurrentUser, getCurrentWorkspaceId} from "./token";
 
 export function hasPermission(permission) {
   let user = getCurrentUser();
+  let index = user.groups.findIndex(g => g.id === SUPER_GROUP);
+  if (index !== -1) {
+    return true;
+  }
 
   user.userGroups.forEach(ug => {
     user.groupPermissions.forEach(gp => {

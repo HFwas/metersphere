@@ -1,5 +1,6 @@
 package io.metersphere.base.mapper.ext;
 
+import io.metersphere.api.dto.ApiCaseBasicInfoDTO;
 import io.metersphere.api.dto.ApiCountChartResult;
 import io.metersphere.api.dto.ApiCountRequest;
 import io.metersphere.api.dto.datacount.ApiDataCountResult;
@@ -18,18 +19,15 @@ public interface ExtApiTestCaseMapper {
 
     List<ApiTestCaseResult> list(@Param("request") ApiTestCaseRequest request);
 
-    List<ApiTestCaseWithBLOBs> caseList(@Param("request") ApiTestCaseRequest request);
-
     List<ApiTestCaseDTO> listSimple(@Param("request") ApiTestCaseRequest request);
 
     List<String> selectIdsNotExistsInPlan(@Param("projectId") String projectId, @Param("planId") String planId);
 
     List<String> selectIdsNotExistsInReview(@Param("projectId") String projectId, @Param("reviewId") String reviewId);
 
+    List<ApiDataCountResult> countProtocolByProjectID(@Param("projectId") String projectId, @Param("versionId") String versionId);
 
-    List<ApiDataCountResult> countProtocolByProjectID(String projectId);
-
-    long countByProjectIDAndCreateInThisWeek(@Param("projectId") String projectId, @Param("firstDayTimestamp") long firstDayTimestamp, @Param("lastDayTimestamp") long lastDayTimestamp);
+    long countByProjectIDAndCreateInThisWeek(@Param("projectId") String projectId, @Param("versionId") String versionId, @Param("firstDayTimestamp") long firstDayTimestamp, @Param("lastDayTimestamp") long lastDayTimestamp);
 
     List<ApiTestCaseInfo> getRequest(@Param("request") ApiTestCaseRequest request);
 
@@ -89,7 +87,7 @@ public interface ExtApiTestCaseMapper {
 
     int countById(String resourceID);
 
-    List<ExecuteResultCountDTO> selectExecuteResultByProjectId(String projectId);
+    List<ExecuteResultCountDTO> selectExecuteResultByProjectId(@Param("projectId") String projectId, @Param("versionId") String versionId);
 
     int deleteCaseToGc(ApiTestCaseRequest request);
 
@@ -102,4 +100,12 @@ public interface ExtApiTestCaseMapper {
     List<BaseCase> selectBaseCaseByProjectId(@Param("projectId") String projectId);
 
     int getCaseCountById(String id);
+
+    ApiDefinition selectApiBasicInfoByCaseId(String id);
+
+    ApiCaseBasicInfoDTO selectApiCaseBasicInfoById(String ids);
+
+    List<String> selectSourceIdByProjectIdIsNull();
+
+    long countSourceIdByProjectIdIsNull();
 }

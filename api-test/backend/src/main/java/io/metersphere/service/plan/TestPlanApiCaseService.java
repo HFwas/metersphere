@@ -4,27 +4,25 @@ import com.alibaba.nacos.common.utils.CollectionUtils;
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import io.metersphere.api.dto.ApiCaseRelevanceRequest;
+import io.metersphere.api.dto.ApiReportEnvConfigDTO;
 import io.metersphere.api.dto.EnvironmentType;
+import io.metersphere.api.dto.QueryReferenceRequest;
+import io.metersphere.api.dto.automation.TestPlanDTO;
 import io.metersphere.api.dto.automation.TestPlanFailureApiDTO;
-import io.metersphere.api.dto.definition.ApiModuleDTO;
-import io.metersphere.api.dto.definition.ApiTestCaseDTO;
-import io.metersphere.api.dto.definition.ApiTestCaseRequest;
-import io.metersphere.api.dto.definition.BatchRunDefinitionRequest;
-import io.metersphere.api.dto.definition.RunCaseRequest;
-import io.metersphere.api.dto.definition.TestPlanApiCaseDTO;
+import io.metersphere.api.dto.definition.*;
 import io.metersphere.api.dto.plan.TestPlanApiCaseBatchRequest;
 import io.metersphere.api.dto.plan.TestPlanApiCaseInfoDTO;
 import io.metersphere.api.exec.api.ApiCaseExecuteService;
 import io.metersphere.api.exec.api.ApiExecuteService;
+import io.metersphere.api.jmeter.JMeterService;
 import io.metersphere.base.domain.*;
 import io.metersphere.base.mapper.ApiDefinitionExecResultMapper;
+import io.metersphere.base.mapper.ApiScenarioReportMapper;
 import io.metersphere.base.mapper.ApiTestCaseMapper;
 import io.metersphere.base.mapper.ext.ExtApiDefinitionExecResultMapper;
 import io.metersphere.base.mapper.plan.TestPlanApiCaseMapper;
 import io.metersphere.base.mapper.plan.ext.ExtTestPlanApiCaseMapper;
-import io.metersphere.commons.constants.ApiRunMode;
-import io.metersphere.commons.constants.CommonConstants;
-import io.metersphere.commons.constants.TriggerMode;
+import io.metersphere.commons.constants.*;
 import io.metersphere.commons.enums.ApiReportStatus;
 import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.utils.*;
@@ -32,6 +30,7 @@ import io.metersphere.dto.MsExecResponseDTO;
 import io.metersphere.dto.RunModeConfigDTO;
 import io.metersphere.environment.service.BaseEnvGroupProjectService;
 import io.metersphere.log.vo.OperatingLogDetails;
+import io.metersphere.request.OrderRequest;
 import io.metersphere.request.ResetOrderRequest;
 import io.metersphere.service.BaseProjectService;
 import io.metersphere.service.ServiceUtils;
@@ -51,18 +50,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.LinkedHashMap;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -103,12 +91,10 @@ public class TestPlanApiCaseService {
     private ApiExecuteService apiExecuteService;
     @Resource
     private TestPlanService testPlanService;
-
-    public TestPlanApiCase getInfo(String caseId, String testPlanId) {
-        TestPlanApiCaseExample example = new TestPlanApiCaseExample();
-        example.createCriteria().andApiCaseIdEqualTo(caseId).andTestPlanIdEqualTo(testPlanId);
-        return testPlanApiCaseMapper.selectByExample(example).get(0);
-    }
+    @Resource
+    private JMeterService jMeterService;
+    @Resource
+    private ApiScenarioReportMapper apiScenarioReportMapper;
 
     public List<TestPlanApiCaseDTO> list(ApiTestCaseRequest request) {
         request.setProjectId(null);
@@ -184,6 +170,15 @@ public class TestPlanApiCaseService {
         TestPlanApiCaseExample example = new TestPlanApiCaseExample();
         example.createCriteria().andTestPlanIdEqualTo(planId);
         return testPlanApiCaseMapper.deleteByExample(example);
+    }
+
+    public void deleteByPlanIds(List<String> planIds) {
+        if (CollectionUtils.isEmpty(planIds)) {
+            return;
+        }
+        TestPlanApiCaseExample example = new TestPlanApiCaseExample();
+        example.createCriteria().andTestPlanIdIn(planIds);
+        testPlanApiCaseMapper.deleteByExample(example);
     }
 
     public void deleteApiCaseBath(TestPlanApiCaseBatchRequest request) {
@@ -305,7 +300,7 @@ public class TestPlanApiCaseService {
             ApiTestCaseExample testCaseExample = new ApiTestCaseExample();
             testCaseExample.createCriteria().andIdIn(nodes.stream().map(TestPlanApiCase::getApiCaseId).collect(Collectors.toList()));
             List<ApiTestCase> testCases = apiTestCaseMapper.selectByExample(testCaseExample);
-            if (org.apache.commons.collections.CollectionUtils.isNotEmpty(testCases)) {
+            if (CollectionUtils.isNotEmpty(testCases)) {
                 List<String> names = testCases.stream().map(ApiTestCase::getName).collect(Collectors.toList());
                 OperatingLogDetails details = new OperatingLogDetails(JSON.toJSONString(ids), testCases.get(0).getProjectId(), String.join(",", names), nodes.get(0).getCreateUser(), new LinkedList<>());
                 return JSON.toJSONString(details);
@@ -322,18 +317,7 @@ public class TestPlanApiCaseService {
      */
     public List<MsExecResponseDTO> run(BatchRunDefinitionRequest request) {
         if (request.getConfig() != null) {
-            RunModeConfigDTO config = request.getConfig();
-            if (config != null) {
-                String envType = config.getEnvironmentType();
-                String envGroupId = config.getEnvironmentGroupId();
-                Map<String, String> envMap = config.getEnvMap();
-                if ((StringUtils.equals(envType, EnvironmentType.JSON.toString()) && envMap != null && !envMap.isEmpty())) {
-                    setApiCaseEnv(null, request.getPlanIds(), envMap);
-                } else if ((StringUtils.equals(envType, EnvironmentType.GROUP.toString()) && StringUtils.isNotBlank(envGroupId))) {
-                    Map<String, String> map = environmentGroupProjectService.getEnvMap(envGroupId);
-                    setApiCaseEnv(null, request.getPlanIds(), map);
-                }
-            }
+            jMeterService.verifyPool(request.getProjectId(), request.getConfig());
             return testPlanApiCaseExecuteService.run(request);
         }
         return null;
@@ -430,7 +414,11 @@ public class TestPlanApiCaseService {
                         try {
                             Map content = JSON.parseMap(contentStr);
                             if (StringUtils.isNotEmpty(contentStr)) {
-                                content.put("envName", apiDefinitionService.getEnvNameByEnvConfig(result.getProjectId(), result.getEnvConfig()));
+                                ApiReportEnvConfigDTO envConfig = apiDefinitionService.getEnvNameByEnvConfig(result.getProjectId(), result.getEnvConfig());
+                                if (envConfig != null) {
+                                    content.put("envName", envConfig.getEnvName());
+                                    content.put("poolName", envConfig.getResourcePoolName());
+                                }
                             }
                             contentStr = JSON.toJSONString(content);
                             apiCase.setResponse(contentStr);
@@ -456,11 +444,20 @@ public class TestPlanApiCaseService {
                         try {
                             responseObj = JSON.parseMap(execResult.getContent());
                         } catch (Exception e) {
+                            LogUtil.error("转换content失败!", e);
                         }
                         if (StringUtils.isNotEmpty(execResult.getEnvConfig())) {
-                            responseObj.put("envName", apiDefinitionService.getEnvNameByEnvConfig(execResult.getProjectId(), execResult.getEnvConfig()));
+                            ApiReportEnvConfigDTO envConfig = apiDefinitionService.getEnvNameByEnvConfig(execResult.getProjectId(), execResult.getEnvConfig());
+                            if (envConfig != null) {
+                                responseObj.put("envName", envConfig.getEnvName());
+                                responseObj.put("poolName", envConfig.getResourcePoolName());
+                            }
                         }
-                        item.setResponse(responseObj.toString());
+                        /*
+                         * 之前这里的写法是responseObj.toString()。
+                         * 猜测是fastjson转换之后，只是单纯的把JSONObject改成了map。所以这里放进去的不是json格式的数据
+                         */
+                        item.setResponse(JSON.toJSONString(responseObj));
                     }
                 });
             }
@@ -479,6 +476,7 @@ public class TestPlanApiCaseService {
     /**
      * 从接口定义查询责任人
      * 如果之后接口用例有独立的责任人，则不从接口定义查
+     *
      * @param apiTestCases
      */
     private void buildPrincipal(List<TestPlanFailureApiDTO> apiTestCases) {
@@ -519,16 +517,27 @@ public class TestPlanApiCaseService {
         return extTestPlanApiCaseMapper.selectForPlanReport(planId);
     }
 
+    public String selectProjectId(String id) {
+        return extTestPlanApiCaseMapper.selectProjectId(id);
+    }
+
     public Map<String, List<String>> getPlanProjectEnvMap(List<String> resourceIds) {
         Map<String, List<String>> result = new LinkedHashMap<>();
         if (!CollectionUtils.isEmpty(resourceIds)) {
             List<ApiDefinitionExecResultWithBLOBs> execResults = apiDefinitionExecResultService.selectByResourceIdsAndMaxCreateTime(resourceIds);
+            Map<String, List<String>> projectConfigMap = new HashMap<>();
             execResults.forEach(item -> {
                 String envConf = item.getEnvConfig();
                 String projectId = item.getProjectId();
-                Map<String, List<String>> projectEnvMap = apiDefinitionService.getProjectEnvNameByEnvConfig(projectId, envConf);
-                this.setProjectEnvMap(result, projectEnvMap);
+                if (projectConfigMap.containsKey(projectId)) {
+                    projectConfigMap.get(projectId).add(envConf);
+                } else {
+                    projectConfigMap.put(projectId, new ArrayList<>() {{
+                        this.add(envConf);
+                    }});
+                }
             });
+            result = apiDefinitionService.getProjectEnvNameByEnvConfig(projectConfigMap);
         }
         return result;
     }
@@ -587,6 +596,9 @@ public class TestPlanApiCaseService {
 
         testPlanService.statusReset(request.getPlanId());
         sqlSession.flushStatements();
+        if (sqlSession != null && sqlSessionFactory != null) {
+            SqlSessionUtils.closeSqlSession(sqlSession, sqlSessionFactory);
+        }
     }
 
     public void relevanceByTestIds(List<String> ids, String planId) {
@@ -626,7 +638,6 @@ public class TestPlanApiCaseService {
             List<TestPlanApiCase> testPlanApiCases = testPlanApiCaseMapper.selectByExample(testPlanApiCaseExample);
             TestPlanApiCaseMapper apiCaseMapper = sqlSession.getMapper(TestPlanApiCaseMapper.class);
             if (!CollectionUtils.isEmpty(testPlanApiCases)) {
-                Long nextApiOrder = ServiceUtils.getNextOrder(targetPlanId, extTestPlanApiCaseMapper::getLastOrder);
                 for (TestPlanApiCase apiCase : testPlanApiCases) {
                     TestPlanApiCase api = new TestPlanApiCase();
                     api.setId(UUID.randomUUID().toString());
@@ -636,12 +647,14 @@ public class TestPlanApiCaseService {
                     api.setCreateTime(System.currentTimeMillis());
                     api.setUpdateTime(System.currentTimeMillis());
                     api.setCreateUser(SessionUtils.getUserId());
-                    api.setOrder(nextApiOrder);
-                    nextApiOrder += 5000;
+                    api.setOrder(apiCase.getOrder());
                     apiCaseMapper.insert(api);
                 }
             }
             sqlSession.flushStatements();
+            if (sqlSession != null && sqlSessionFactory != null) {
+                SqlSessionUtils.closeSqlSession(sqlSession, sqlSessionFactory);
+            }
         }
     }
 
@@ -682,7 +695,7 @@ public class TestPlanApiCaseService {
             String caseId = testPlanApiCase.getApiCaseId();
             String envId = testPlanApiCase.getEnvironmentId();
             String projectId = projectCaseIdMap.get(caseId);
-            if (StringUtils.isNotBlank(projectId)) {
+            if (StringUtils.isNotBlank(projectId) && StringUtils.isNotBlank(envId)) {
                 if (envMap.containsKey(projectId)) {
                     List<String> list = envMap.get(projectId);
                     if (!list.contains(envId)) {
@@ -694,6 +707,7 @@ public class TestPlanApiCaseService {
                     envMap.put(projectId, envs);
                 }
             }
+
         });
         return envMap;
     }
@@ -734,9 +748,9 @@ public class TestPlanApiCaseService {
 
         List<String> caseIds = apiCases.stream().map(TestPlanApiCase::getApiCaseId).collect(Collectors.toList());
 
-        List<String> definitionIds = apiTestCaseService.selectCasesBydIds(caseIds).stream().filter(apiTestCase -> apiTestCase.getStatus() == null || !CommonConstants.TrashStatus.equals(apiTestCase.getStatus())).map(ApiTestCase::getApiDefinitionId).collect(Collectors.toList());
+        List<String> definitionIds = apiTestCaseService.selectCasesBydIds(caseIds).stream().filter(apiTestCase -> apiTestCase.getStatus() == null || !CommonConstants.TRASH_STATUS.equals(apiTestCase.getStatus())).map(ApiTestCase::getApiDefinitionId).collect(Collectors.toList());
 
-        List<String> dataNodeIds = apiDefinitionService.selectApiDefinitionBydIds(definitionIds).stream().filter(apiDefinition -> apiDefinition.getStatus() == null || !CommonConstants.TrashStatus.equals(apiDefinition.getStatus())).map(ApiDefinition::getModuleId).collect(Collectors.toList());
+        List<String> dataNodeIds = apiDefinitionService.selectApiDefinitionBydIds(definitionIds).stream().filter(apiDefinition -> apiDefinition.getStatus() == null || !CommonConstants.TRASH_STATUS.equals(apiDefinition.getStatus())).map(ApiDefinition::getModuleId).collect(Collectors.toList());
 
         List<ApiModuleDTO> nodeTrees = apiModuleService.getNodeTrees(testCaseNodes);
 
@@ -759,11 +773,22 @@ public class TestPlanApiCaseService {
         if (apiCase == null) {
             MSException.throwException("用例已经被删除");
         }
+
         String reportName = apiCase.getName();
         ApiDefinitionExecResultWithBLOBs result = ApiDefinitionExecResultUtil.add(testId, ApiReportStatus.RUNNING.name(), reportId, Objects.requireNonNull(SessionUtils.getUser()).getId());
         result.setName(reportName);
         result.setProjectId(apiCase.getProjectId());
         result.setTriggerMode(TriggerMode.MANUAL.name());
+        RunModeConfigDTO runModeConfigDTO = new RunModeConfigDTO();
+        jMeterService.verifyPool(result.getProjectId(), runModeConfigDTO);
+        if (StringUtils.isNotEmpty(testPlanApiCase.getEnvironmentId())) {
+            runModeConfigDTO.setEnvMap(new HashMap<>() {{
+                this.put(result.getProjectId(), testPlanApiCase.getEnvironmentId());
+            }});
+            runModeConfigDTO.setResourcePoolId(runModeConfigDTO.getResourcePoolId());
+            result.setEnvConfig(JSON.toJSONString(runModeConfigDTO));
+        }
+        result.setActuator(runModeConfigDTO.getResourcePoolId());
         apiDefinitionExecResultMapper.insert(result);
         apiCase.setId(testId);
 
@@ -775,7 +800,60 @@ public class TestPlanApiCaseService {
         request.setBloBs(apiCase);
         request.setReportId(reportId);
         Map<String, Object> extendedParameters = new HashMap<>();
-        extendedParameters.put("SYN_RES", true);
+        extendedParameters.put(ExtendedParameter.SYNC_STATUS, true);
         apiExecuteService.exec(request, extendedParameters);
+    }
+
+    public List<TestPlanApiCase> selectByIds(ArrayList<String> list) {
+        TestPlanApiCaseExample example = new TestPlanApiCaseExample();
+        example.createCriteria().andIdIn(list);
+        return testPlanApiCaseMapper.selectByExample(example);
+    }
+
+    //获取case和测试计划引用关系
+    public List<TestPlanDTO> getReference(QueryReferenceRequest request) {
+        if (CollectionUtils.isEmpty(request.getOrders())) {
+            OrderRequest req = new OrderRequest();
+            req.setName("name");
+            req.setType("asc");
+            request.setOrders(new ArrayList<>() {{
+                this.add(req);
+            }});
+        }
+        if (StringUtils.equals(request.getScenarioType(), ReportTypeConstants.API.name())) {
+            request.setApiId(request.getId());
+        } else {
+            request.setScenarioId(request.getId());
+        }
+        return extTestPlanApiCaseMapper.selectTestPlanByRelevancy(request);
+    }
+
+    public List<ApiDefinitionExecResultWithBLOBs> selectExtForPlanReport(String planId) {
+        ApiDefinitionExecResultExample example = new ApiDefinitionExecResultExample();
+        example.createCriteria().andRelevanceTestPlanReportIdEqualTo(planId);
+        List<ApiDefinitionExecResultWithBLOBs> results = apiDefinitionExecResultMapper.selectByExampleWithBLOBs(example);
+        return results;
+    }
+
+    public List<ApiScenarioReportWithBLOBs> selectExtForPlanScenarioReport(String planId) {
+        ApiScenarioReportExample example = new ApiScenarioReportExample();
+        example.createCriteria().andRelevanceTestPlanReportIdEqualTo(planId);
+        List<ApiScenarioReportWithBLOBs> results = apiScenarioReportMapper.selectByExampleWithBLOBs(example);
+        return results;
+    }
+
+
+    public List<String> getApiCaseProjectIds(String planId) {
+        TestPlanApiCaseExample caseExample = new TestPlanApiCaseExample();
+        caseExample.createCriteria().andTestPlanIdEqualTo(planId);
+        List<TestPlanApiCase> testPlanApiCases = testPlanApiCaseMapper.selectByExample(caseExample);
+        List<String> apiCaseIds = testPlanApiCases.stream().map(TestPlanApiCase::getApiCaseId).collect(Collectors.toList());
+        if (CollectionUtils.isEmpty(apiCaseIds)) {
+            return new ArrayList<>();
+        }
+        ApiTestCaseExample example = new ApiTestCaseExample();
+        example.createCriteria().andIdIn(apiCaseIds);
+        List<ApiTestCase> apiTestCases = apiTestCaseMapper.selectByExample(example);
+        return apiTestCases.stream().map(ApiTestCase::getProjectId).distinct().collect(Collectors.toList());
     }
 }

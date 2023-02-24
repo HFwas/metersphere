@@ -45,11 +45,18 @@
           </el-input>
         </div>
 
-        <p>{{ $t('api_test.request.headers') }}</p>
-        <el-row>
-          <el-link class="ms-el-link" @click="batchAdd" style="color: #783887"> {{ $t("commons.batch_add") }}</el-link>
-        </el-row>
-        <ms-api-key-value :items="condition.headers" :isShowEnable="true" :suggestions="headerSuggestions"/>
+        <!-- 接口测试配置       -->
+        <form-section :title="$t('commons.api')" :init-active=true>
+          <p>{{ $t('api_test.request.headers') }}</p>
+          <el-row>
+            <el-link class="ms-el-link" @click="batchAdd" style="color: #783887"> {{
+                $t("commons.batch_add")
+              }}
+            </el-link>
+          </el-row>
+          <ms-api-key-value :items="condition.headers" :isShowEnable="true" :suggestions="headerSuggestions"/>
+        </form-section>
+
         <div style="margin-top: 20px">
           <el-button v-if="!condition.id" type="primary" style="float: right" size="mini" @click="add">
             {{ $t('commons.add') }}
@@ -121,10 +128,12 @@ import {getUUID} from "../../utils";
 import {KeyValue} from "../../model/EnvTestModel";
 import Vue from "vue";
 import BatchAddParameter from "./commons/BatchAddParameter";
+import FormSection from "metersphere-frontend/src/components/form/FormSection";
+import MsInstructionsIcon from 'metersphere-frontend/src/components/MsInstructionsIcon';
 
 export default {
   name: "MsEnvironmentHttpConfig",
-  components: {MsApiKeyValue, MsSelectTree, MsTableOperatorButton, BatchAddParameter},
+  components: {MsApiKeyValue, MsSelectTree, MsTableOperatorButton, BatchAddParameter, FormSection, MsInstructionsIcon},
   props: {
     httpConfig: new HttpConfig(),
     projectId: String,
@@ -165,9 +174,21 @@ export default {
         socket: "",
         domain: "",
         port: 0,
-        headers: [new KeyValue()]
+        headers: [new KeyValue()],
+        headlessEnabled: true,
+        browser: 'CHROME'
       },
-      beforeCondition: {}
+      beforeCondition: {},
+      browsers: [
+        {
+          label: this.$t("chrome"),
+          value: "CHROME",
+        },
+        {
+          label: this.$t("firefox"),
+          value: "FIREFOX",
+        },
+      ],
     };
   },
   watch: {
@@ -289,7 +310,7 @@ export default {
     list() {
       if (this.projectId) {
         this.result = getApiModuleByProjectIdAndProtocol(this.projectId, "HTTP").then((response) => {
-          if (response.data  && response.data !== null) {
+          if (response.data && response.data !== null) {
             this.moduleOptions = response.data;
           }
         });
@@ -453,12 +474,12 @@ export default {
       params.forEach(item => {
         if (item) {
           let line = item.split(/：|:/);
-          let values = item.split(line[0] + ":");
+          let values = item.substr(line[0].length + 1);
           let required = false;
           keyValues.push(new KeyValue({
             name: line[0],
             required: required,
-            value: values[1],
+            value: values,
             type: "text",
             valid: false,
             file: false,

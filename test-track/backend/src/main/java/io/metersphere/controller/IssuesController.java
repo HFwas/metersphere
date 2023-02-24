@@ -11,25 +11,32 @@ import io.metersphere.commons.constants.OperLogModule;
 import io.metersphere.commons.constants.PermissionConstants;
 import io.metersphere.commons.utils.PageUtils;
 import io.metersphere.commons.utils.Pager;
-import io.metersphere.dto.*;
+import io.metersphere.dto.CustomFieldDao;
+import io.metersphere.dto.IssuesStatusCountDao;
+import io.metersphere.excel.domain.ExcelResponse;
 import io.metersphere.log.annotation.MsAuditLog;
 import io.metersphere.notice.annotation.SendNotice;
-import io.metersphere.xpack.track.dto.*;
-import io.metersphere.service.issue.domain.jira.JiraIssueType;
-import io.metersphere.service.issue.domain.zentao.ZentaoBuild;
-
-import io.metersphere.request.issues.JiraIssueTypeRequest;
+import io.metersphere.platform.domain.SelectOption;
+import io.metersphere.request.PlatformOptionRequest;
+import io.metersphere.request.issues.IssueExportRequest;
+import io.metersphere.request.issues.IssueImportRequest;
 import io.metersphere.request.issues.PlatformIssueTypeRequest;
 import io.metersphere.request.testcase.AuthUserIssueRequest;
 import io.metersphere.request.testcase.IssuesCountRequest;
+import io.metersphere.service.BaseCheckPermissionService;
+import io.metersphere.service.IssuesService;
+import io.metersphere.service.PlatformPluginService;
+import io.metersphere.xpack.track.dto.*;
 import io.metersphere.xpack.track.dto.request.IssuesRequest;
 import io.metersphere.xpack.track.dto.request.IssuesUpdateRequest;
-import io.metersphere.service.IssuesService;
+import org.apache.commons.collections.CollectionUtils;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import javax.annotation.Resource;
+import javax.servlet.http.HttpServletResponse;
+import java.util.Collections;
 import java.util.List;
 
 @RequestMapping("issues")
@@ -38,12 +45,22 @@ public class IssuesController {
 
     @Resource
     private IssuesService issuesService;
+    @Resource
+    private BaseCheckPermissionService baseCheckPermissionService;
+    @Resource
+    private PlatformPluginService platformPluginService;
 
     @PostMapping("/list/{goPage}/{pageSize}")
     @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ)
     public Pager<List<IssuesDao>> list(@PathVariable int goPage, @PathVariable int pageSize, @RequestBody IssuesRequest request) {
-        Page<List<Issues>> page = PageHelper.startPage(goPage, pageSize, true);
-        return PageUtils.setPageInfo(page, issuesService.list(request));
+        issuesService.setFilterIds(request);
+        if (request.getThisWeekUnClosedTestPlanIssue() && CollectionUtils.isEmpty(request.getFilterIds())) {
+            Page<List<Issues>> page = PageHelper.startPage(goPage, pageSize, true);
+            return PageUtils.setPageInfo(page, Collections.EMPTY_LIST);
+        } else {
+            Page<List<Issues>> page = PageHelper.startPage(goPage, pageSize, true);
+            return PageUtils.setPageInfo(page, issuesService.list(request));
+        }
     }
 
     @PostMapping("/dashboard/list/{goPage}/{pageSize}")
@@ -115,10 +132,18 @@ public class IssuesController {
     }
 
     @GetMapping("/delete/{id}")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ_DELETE)
     @MsAuditLog(module = OperLogModule.TRACK_BUG, type = OperLogConstants.DELETE, beforeEvent = "#msClass.getLogDetails(#id)", msClass = IssuesService.class)
     @SendNotice(taskType = NoticeConstants.TaskType.DEFECT_TASK, target = "#targetClass.getIssue(#id)", targetClass = IssuesService.class, event = NoticeConstants.Event.DELETE, subject = "缺陷通知")
     public void delete(@PathVariable String id) {
         issuesService.delete(id);
+    }
+
+    @PostMapping("/batchDelete")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ_DELETE)
+    @MsAuditLog(module = OperLogModule.TRACK_BUG, type = OperLogConstants.DELETE, beforeEvent = "#msClass.getLogDetails(#request)", msClass = IssuesService.class)
+    public void batchDelete(@RequestBody IssuesUpdateRequest request) {
+        issuesService.batchDelete(request);
     }
 
     @PostMapping("/tapd/user")
@@ -126,19 +151,14 @@ public class IssuesController {
         return issuesService.getTapdProjectUsers(request);
     }
 
-    @PostMapping("/zentao/user")
-    public List<PlatformUser> getZentaoUsers(@RequestBody IssuesRequest request) {
-        return issuesService.getZentaoUsers(request);
+    @GetMapping("/sync/{projectId}")
+    public boolean syncThirdPartyIssues(@PathVariable String projectId) {
+        return issuesService.syncThirdPartyIssues(projectId);
     }
 
-    @PostMapping("/zentao/builds")
-    public List<ZentaoBuild> getZentaoBuilds(@RequestBody IssuesRequest request) {
-        return issuesService.getZentaoBuilds(request);
-    }
-
-    @PostMapping("/sync")
-    public boolean getPlatformIssue(@RequestBody IssueSyncRequest request) {
-        return issuesService.syncThirdPartyIssues(request);
+    @PostMapping("/sync/all")
+    public boolean syncThirdPartyAllIssues(@RequestBody IssueSyncRequest request) {
+        return issuesService.syncThirdPartyAllIssues(request);
     }
 
     @GetMapping("/sync/check/{projectId}")
@@ -171,14 +191,19 @@ public class IssuesController {
         return issuesService.getThirdPartTemplate(projectId);
     }
 
-    @PostMapping("/jira/issuetype")
-    public List<JiraIssueType> getJiraIssueType(@RequestBody JiraIssueTypeRequest request) {
-        return issuesService.getIssueTypes(request);
+    @GetMapping("/plugin/custom/fields/{projectId}")
+    public List<CustomFieldDao> getPluginCustomFields(@PathVariable String projectId) {
+        return issuesService.getPluginCustomFields(projectId);
     }
 
     @GetMapping("/demand/list/{projectId}")
-    public List<DemandDTO> getDemandList(@PathVariable String projectId) {
+    public List getDemandList(@PathVariable String projectId) {
         return issuesService.getDemandList(projectId);
+    }
+
+    @GetMapping("/third/part/template/enable/{projectId}")
+    public boolean thirdPartTemplateEnable(@PathVariable String projectId) {
+        return issuesService.thirdPartTemplateEnable(projectId);
     }
 
     @PostMapping("/platform/transitions")
@@ -186,8 +211,42 @@ public class IssuesController {
         return issuesService.getPlatformTransitions(request);
     }
 
+    @PostMapping("/platform/status")
+    public List<PlatformStatusDTO> getPlatformStatus(@RequestBody PlatformIssueTypeRequest request) {
+        return issuesService.getPlatformStatus(request);
+    }
+
+    @GetMapping("/platform/option")
+    public List<SelectOption> getPlatformOptions() {
+        return platformPluginService.getPlatformOptions();
+    }
+
+    @PostMapping("/platform/form/option")
+    public List<SelectOption> getPlatformOptions(@RequestBody PlatformOptionRequest request) {
+        return platformPluginService.getFormOption(request);
+    }
+
     @PostMapping("/check/third/project")
     public void checkThirdProjectExist(@RequestBody Project project) {
         issuesService.checkThirdProjectExist(project);
+    }
+
+    @GetMapping("/import/template/download/{projectId}")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ_CREATE)
+    public void downloadImportTemplate(@PathVariable String projectId, HttpServletResponse response) {
+        issuesService.issueImportTemplate(projectId, response);
+    }
+
+    @PostMapping("/import")
+    @MsAuditLog(module = OperLogModule.TRACK_BUG, type = OperLogConstants.IMPORT, project = "#request.projectId")
+    public ExcelResponse issueImport(@RequestPart("request") IssueImportRequest request,  @RequestPart("file") MultipartFile file) {
+        baseCheckPermissionService.checkProjectOwner(request.getProjectId());
+        return issuesService.issueImport(request, file);
+    }
+
+    @PostMapping("/export")
+    @MsAuditLog(module = OperLogModule.TRACK_BUG, type = OperLogConstants.EXPORT, project = "#exportRequest.projectId")
+    public void exportIssues(@RequestBody IssueExportRequest exportRequest, HttpServletResponse response) {
+        issuesService.issueExport(exportRequest, response);
     }
 }

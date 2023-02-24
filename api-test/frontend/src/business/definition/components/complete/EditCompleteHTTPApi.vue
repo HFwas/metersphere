@@ -1,56 +1,92 @@
 <template>
-
   <div class="card-container">
     <el-card class="card-content" v-loading="httpForm.loading">
       <el-form :model="httpForm" :rules="rule" ref="httpForm" label-width="80px" label-position="right">
         <!-- 操作按钮 -->
-        <div style="float: right;margin-right: 20px" class="ms-opt-btn">
+        <div class="ms-opt-btn">
           <el-tooltip :content="$t('commons.follow')" placement="bottom" effect="dark" v-if="!showFollow">
-            <i class="el-icon-star-off"
-               style="color: var(--primary_color); font-size: 25px; margin-right: 5px; position: relative; top: 5px; cursor: pointer "
-               @click="saveFollow"/>
+            <i
+              class="el-icon-star-off"
+              style="
+                color: var(--primary_color);
+                font-size: 25px;
+                margin-right: 5px;
+                position: relative;
+                top: 5px;
+                cursor: pointer;
+              "
+              @click="saveFollow" />
           </el-tooltip>
           <el-tooltip :content="$t('commons.cancel')" placement="bottom" effect="dark" v-if="showFollow">
-            <i class="el-icon-star-on"
-               style="color: var(--primary_color); font-size: 28px; margin-right: 5px; position: relative; top: 5px; cursor: pointer "
-               @click="saveFollow"/>
+            <i
+              class="el-icon-star-on"
+              style="
+                color: var(--primary_color);
+                font-size: 28px;
+                margin-right: 5px;
+                position: relative;
+                top: 5px;
+                cursor: pointer;
+              "
+              @click="saveFollow" />
           </el-tooltip>
           <el-link type="primary" style="margin-right: 5px" @click="openHis" v-if="httpForm.id">
             {{ $t('operating_log.change_history') }}
           </el-link>
           <!--  版本历史 -->
-          <mx-version-history v-xpack
-                              ref="versionHistory"
-                              :version-data="versionData"
-                              :current-id="httpForm.id"
-                              @compare="compare" @checkout="checkout" @create="create" @del="del"/>
-          <el-button v-if="!isXpack || !apiSyncRuleRelation.showUpdateRule" type="primary" size="small"
-                     @click="saveApi" title="ctrl + s"
-                     v-permission="['PROJECT_API_DEFINITION:READ+EDIT_API']">{{ $t('commons.save') }}
+          <mx-version-history
+            v-xpack
+            ref="versionHistory"
+            :version-data="versionData"
+            :current-id="httpForm.id"
+            :has-latest="hasLatest"
+            @compare="compare"
+            @checkout="checkout"
+            @create="create"
+            @setLatest="setLatest"
+            @del="del"
+          />
+          <el-button
+            v-if="!isXpack || !apiSyncRuleRelation.showUpdateRule"
+            type="primary"
+            size="small"
+            @click="saveApi"
+            title="ctrl + s"
+            v-permission="['PROJECT_API_DEFINITION:READ+EDIT_API']"
+            >{{ $t('commons.save') }}
           </el-button>
-          <el-dropdown v-else
-                       v-permission="['PROJECT_API_DEFINITION:READ+EDIT_API']"
-                       split-button type="primary" size="small" @click="saveApi" @command="handleCommand">
+          <el-dropdown
+            v-else
+            v-permission="['PROJECT_API_DEFINITION:READ+EDIT_API']"
+            split-button
+            type="primary"
+            size="small"
+            @click="saveApi"
+            @command="handleCommand">
             {{ $t('commons.save') }}
             <el-dropdown-menu slot="dropdown">
-              <el-dropdown-item command="openSyncRule">{{
-                  $t('commons.save') + '&' + $t('workstation.sync') + $t('commons.setting')
-                }}
+              <el-dropdown-item command="openSyncRule"
+                >{{ $t('commons.save') + '&' + $t('workstation.sync') + $t('commons.setting') }}
               </el-dropdown-item>
             </el-dropdown-menu>
           </el-dropdown>
         </div>
-        <br/>
+        <br />
 
         <!-- 基础信息 -->
         <div class="base-info">
           <el-row>
             <el-col :span="16">
               <el-form-item :label="$t('api_report.request')" prop="path">
-                <el-input :placeholder="$t('api_test.definition.request.path_info')" v-model="httpForm.path"
-                          class="ms-http-input" size="small" style="margin-top: 5px" @change="urlChange">
+                <el-input
+                  :placeholder="$t('api_test.definition.request.path_info')"
+                  v-model="httpForm.path"
+                  class="ms-http-input"
+                  size="small"
+                  style="margin-top: 5px"
+                  @change="urlChange">
                   <el-select v-model="httpForm.method" slot="prepend" style="width: 100px" size="small">
-                    <el-option v-for="item in reqOptions" :key="item.id" :label="item.label" :value="item.id"/>
+                    <el-option v-for="item in reqOptions" :key="item.id" :label="item.label" :value="item.id" />
                   </el-select>
                 </el-input>
               </el-form-item>
@@ -60,27 +96,24 @@
 
         <!-- 请求参数 -->
         <div>
-          <ms-form-divider :title="$t('api_test.definition.request.req_param')"/>
-          <ms-api-request-form :showScript="false" :request="request" :headers="request.headers"
-                               :isShowEnable="isShowEnable"/>
+          <ms-form-divider :title="$t('api_test.definition.request.req_param')" />
+          <ms-api-request-form
+            :showScript="false"
+            :request="request"
+            :headers="request.headers"
+            :isShowEnable="isShowEnable" />
         </div>
-
       </el-form>
 
       <!-- 响应内容-->
-      <ms-form-divider :title="$t('api_test.definition.request.res_param')"/>
-      <ms-response-text :response="response"/>
+      <ms-form-divider :title="$t('api_test.definition.request.res_param')" />
+      <ms-response-text :response="response" />
 
-      <api-other-info :api="httpForm" ref="apiOtherInfo"/>
+      <api-other-info :api="httpForm" ref="apiOtherInfo" />
 
-      <ms-change-history ref="changeHistory"/>
+      <ms-change-history ref="changeHistory" />
 
-      <el-dialog
-        :fullscreen="true"
-        :visible.sync="dialogVisible"
-        :destroy-on-close="true"
-        width="100%"
-      >
+      <el-dialog :fullscreen="true" :visible.sync="dialogVisible" :destroy-on-close="true" width="100%">
         <http-api-version-diff
           v-if="dialogVisible"
           :old-data="httpForm"
@@ -95,18 +128,15 @@
           :request="newRequest"
           :old-request="request"
           :response="newResponse"
-          :old-response="response"
-        ></http-api-version-diff>
+          :old-response="response"></http-api-version-diff>
       </el-dialog>
-
     </el-card>
 
     <el-dialog
       :title="$t('commons.sync_other_info')"
       :visible.sync="createNewVersionVisible"
       :show-close="false"
-      width="30%"
-    >
+      width="30%">
       <div>
         <el-checkbox v-model="httpForm.newVersionRemark">{{ $t('commons.remark') }}</el-checkbox>
         <el-checkbox v-model="httpForm.newVersionDeps">{{ $t('commons.relationship.name') }}</el-checkbox>
@@ -115,91 +145,24 @@
       </div>
 
       <template v-slot:footer>
-        <ms-dialog-footer
-          @cancel="cancelCreateNewVersion"
-          :title="$t('commons.edit_info')"
-          @confirm="saveApi">
+        <ms-dialog-footer @cancel="cancelCreateNewVersion" :title="$t('commons.edit_info')" @confirm="saveApi">
         </ms-dialog-footer>
       </template>
     </el-dialog>
-
-    <el-dialog :visible.sync="batchSyncApiVisible"
-               :title="$t('commons.save')+'&'+$t('workstation.sync')+$t('commons.setting')" v-if="isXpack">
-      <el-row style="margin-bottom: 10px;box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1)">
-        <div class="timeClass">
-          <span style="font-size: 16px;font-weight: bold;padding-left: 10px;">{{
-              $t('api_test.definition.one_click_sync') + "case"
-            }}</span>
-          <el-switch v-model="apiSyncRuleRelation.syncCase" style="padding-right: 10px"></el-switch>
-        </div>
-        <br/>
-        <span style="font-size: 12px;padding-left: 10px;">{{ $t('workstation.batch_sync_api_tips') }}</span><br/><br/>
-        <span v-if="apiSyncRuleRelation.syncCase" style="font-size: 16px; font-weight: bold;padding-left: 10px;">
-        {{ $t('workstation.sync') + $t('commons.setting') }}
-        <i class="el-icon-arrow-down" v-if="showApiSyncConfig" @click="showApiSyncConfig=false"/>
-        <i class="el-icon-arrow-right" v-if="!showApiSyncConfig" @click="showApiSyncConfig=true"/>
-      </span><br/><br/>
-        <div v-if="showApiSyncConfig">
-          <sync-setting style="padding-left: 20px" v-if="apiSyncRuleRelation.syncCase"
-                        v-bind:sync-data="apiSyncRuleRelation.apiSyncConfig"
-                        ref="synSetting" @updateSyncData="updateSyncData"></sync-setting>
-        </div>
-      </el-row>
-      <el-row style="margin-bottom: 10px;box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1)">
-        <div class="timeClass">
-          <span style="font-size: 16px;font-weight: bold;padding-left: 10px;">
-            {{ $t('api_test.definition.change_notification') }}
-            <el-tooltip class="ms-num" effect="dark"
-                        :content="$t('project_application.workstation.api_receiver_tip')"
-                        placement="top">
-                  <i class="el-icon-warning"/>
-            </el-tooltip>
-          </span>
-          <el-switch v-model="apiSyncRuleRelation.sendNotice" style="padding-right: 10px"></el-switch>
-        </div>
-        <span style="font-size: 12px;padding-left: 10px;">
-          {{ $t('api_test.definition.recipient_tips') }}
-        </span><br/>
-        <p
-          style="font-size: 12px;color: var(--primary_color);margin-bottom: 20px;text-decoration:underline;cursor: pointer;padding-left: 10px;"
-          @click="gotoApiMessage">
-          {{ $t('project_application.workstation.go_to_api_message') }}
-        </p>
-        <el-row v-if="apiSyncRuleRelation.sendNotice" style="margin-bottom: 5px;margin-top: 5px">
-          <el-col :span="4"><span
-            style="font-weight: bold;padding-left: 10px;">{{ $t('api_test.definition.recipient') + ":" }}</span>
-          </el-col>
-          <el-col :span="20" style="color: var(--primary_color)">
-            <el-checkbox v-model="apiSyncRuleRelation.caseCreator">{{ 'CASE' + $t('api_test.creator') }}</el-checkbox>
-            <el-checkbox v-model="apiSyncRuleRelation.scenarioCreator">
-              {{ $t('commons.scenario') + $t('api_test.creator') }}
-            </el-checkbox>
-          </el-col>
-        </el-row>
-      </el-row>
-      <el-row>
-        <el-checkbox v-model="apiSyncRuleRelation.showUpdateRule" style="padding-left: 10px;">{{
-            $t('project_application.workstation.no_show_setting')
-          }}
-        </el-checkbox>
-        <el-tooltip class="ms-num" effect="dark"
-                    :content="$t('project_application.workstation.no_show_setting_tip')"
-                    placement="top">
-          <i class="el-icon-warning"/>
-        </el-tooltip>
-      </el-row>
-      <span slot="footer" class="dialog-footer">
-        <el-button @click="batchSyncApiVisible = false">{{ $t('commons.cancel') }}</el-button>
-        <el-button type="primary" @click="batchSync()">{{ $t('commons.confirm') }}</el-button>
-      </span>
-    </el-dialog>
-
+    <api-sync-case-config
+      :is-xpack="isXpack"
+      :api-sync-rule-relation="apiSyncRuleRelation"
+      :batch-sync-api-visible="batchSyncApiVisible"
+      :show-api-sync-config="true"
+      @batchSync="batchSync"
+      ref="syncCaseConfig"
+    >
+    </api-sync-case-config>
   </div>
 </template>
 
 <script>
-
-import {createMockConfig} from "@/api/api-mock";
+import { createMockConfig } from '@/api/api-mock';
 import {
   citedApiScenarioCount,
   definitionFollow,
@@ -208,41 +171,42 @@ import {
   getDefinitionByIdAndRefId,
   getDefinitionVersions,
   getMockEnvironment,
-  updateDefinitionFollows
-} from "@/api/definition";
-import {apiTestCaseCount} from "@/api/api-test-case";
-import {relationGet, updateRuleRelation} from "@/api/xpack";
-import MsApiRequestForm from "../request/http/ApiHttpRequestForm";
-import MsResponseText from "../response/ResponseText";
-import {API_STATUS, REQ_METHOD} from "../../model/JsonData";
-import {KeyValue} from "../../model/ApiTestModel";
-import MsInputTag from "@/business/automation/scenario/MsInputTag";
-import MsJsr233Processor from "../../../automation/scenario/component/Jsr233Processor";
-import MsSelectTree from "metersphere-frontend/src/components/select-tree/SelectTree";
-import MsChangeHistory from "@/business/history/ApiHistory";
-import {getCurrentUser} from "metersphere-frontend/src/utils/token";
-import {getUUID} from "metersphere-frontend/src/utils";
-import {hasLicense} from "metersphere-frontend/src/utils/permission";
-import MsFormDivider from "metersphere-frontend/src/components/MsFormDivider";
-import ApiOtherInfo from "@/business/definition/components/complete/ApiOtherInfo";
-import HttpApiVersionDiff from "./version/HttpApiVersionDiff";
-import {createComponent} from ".././jmeter/components";
-import {TYPE_TO_C} from "@/business/automation/scenario/Setting";
-import MsDialogFooter from "metersphere-frontend/src/components/MsDialogFooter";
-import {getProjectMemberOption} from "@/api/project";
-import {deepClone} from "metersphere-frontend/src/utils/tableUtils";
-import SyncSetting from "@/business/definition/util/SyncSetting";
-import {useApiStore} from "@/store";
+  updateDefinitionFollows,
+} from '@/api/definition';
+import { apiTestCaseCount } from '@/api/api-test-case';
+import { relationGet, updateRuleRelation } from '@/api/xpack';
+import MsApiRequestForm from '../request/http/ApiHttpRequestForm';
+import MsResponseText from '../response/ResponseText';
+import { API_STATUS, REQ_METHOD } from '../../model/JsonData';
+import { KeyValue } from '../../model/ApiTestModel';
+import MsInputTag from 'metersphere-frontend/src/components/MsInputTag';
+import MsJsr233Processor from '../../../automation/scenario/component/Jsr233Processor';
+import MsSelectTree from 'metersphere-frontend/src/components/select-tree/SelectTree';
+import MsChangeHistory from '@/business/history/ApiHistory';
+import { getCurrentUser } from 'metersphere-frontend/src/utils/token';
+import {getUUID} from 'metersphere-frontend/src/utils';
+import {hasLicense} from 'metersphere-frontend/src/utils/permission';
+import MsFormDivider from 'metersphere-frontend/src/components/MsFormDivider';
+import ApiOtherInfo from '@/business/definition/components/complete/ApiOtherInfo';
+import HttpApiVersionDiff from './version/HttpApiVersionDiff';
+import {createComponent} from '.././jmeter/components';
+import {TYPE_TO_C} from '@/business/automation/scenario/Setting';
+import MsDialogFooter from 'metersphere-frontend/src/components/MsDialogFooter';
+import {getProjectMemberOption} from '@/api/project';
+import {getDefaultVersion, setLatestVersionById} from 'metersphere-frontend/src/api/version';
 
-const {Body} = require("@/business/definition/model/ApiTestModel");
-const Sampler = require("@/business/definition/components/jmeter/components/sampler/sampler");
+import {useApiStore} from '@/store';
+import ApiSyncCaseConfig from "@/business/definition/components/sync/ApiSyncCaseConfig";
+
+const {Body} = require('@/business/definition/model/ApiTestModel');
+const Sampler = require('@/business/definition/components/jmeter/components/sampler/sampler');
 
 const store = useApiStore();
 
 export default {
-  name: "MsAddCompleteHttpApi",
+  name: 'MsAddCompleteHttpApi',
   components: {
-    MxVersionHistory: () => import("metersphere-frontend/src/components/version/MxVersionHistory"),
+    MxVersionHistory: () => import('metersphere-frontend/src/components/version/MxVersionHistory'),
     MsDialogFooter,
     ApiOtherInfo,
     MsFormDivider,
@@ -253,11 +217,11 @@ export default {
     MsSelectTree,
     MsChangeHistory,
     HttpApiVersionDiff,
-    SyncSetting
+    ApiSyncCaseConfig
   },
   data() {
     let validateURL = (rule, value, callback) => {
-      if (!this.httpForm.path.startsWith("/")) {
+      if (!this.httpForm.path.startsWith('/')) {
         callback(this.$t('api_test.definition.request.path_valid_info'));
       }
       callback();
@@ -272,22 +236,49 @@ export default {
     return {
       rule: {
         name: [
-          {required: true, message: this.$t('test_track.case.input_name'), trigger: 'blur'},
-          {max: 100, message: this.$t('test_track.length_less_than') + '100', trigger: 'blur'}
+          {
+            required: true,
+            message: this.$t('test_track.case.input_name'),
+            trigger: 'blur',
+          },
+          {
+            max: 100,
+            message: this.$t('test_track.length_less_than') + '100',
+            trigger: 'blur',
+          },
         ],
-        path: [{required: true, message: this.$t('api_test.definition.request.path_info'), trigger: 'blur'}, {
-          validator: validateURL,
-          trigger: 'blur'
-        }],
-        userId: [{required: true, message: this.$t('test_track.case.input_maintainer'), trigger: 'change'}],
-        moduleId: [{required: true, validator: validateModuleId, trigger: 'change'}],
-        status: [{required: true, message: this.$t('commons.please_select'), trigger: 'change'}],
+        path: [
+          {
+            required: true,
+            message: this.$t('api_test.definition.request.path_info'),
+            trigger: 'blur',
+          },
+          {
+            validator: validateURL,
+            trigger: 'blur',
+          },
+        ],
+        userId: [
+          {
+            required: true,
+            message: this.$t('test_track.case.input_maintainer'),
+            trigger: 'change',
+          },
+        ],
+        moduleId: [{ required: true, validator: validateModuleId, trigger: 'change' }],
+        status: [
+          {
+            required: true,
+            message: this.$t('commons.please_select'),
+            trigger: 'change',
+          },
+        ],
       },
-      httpForm: {environmentId: "", path: "", tags: []},
-      beforeHttpForm: {environmentId: "", path: "", tags: []},
-      beforeRequest: {arguments: []},
+      httpForm: { environmentId: '', path: '', tags: [] },
+      beforeHttpForm: { environmentId: '', path: '', tags: [] },
+      beforeRequest: { arguments: [] },
       beforeResponse: {},
-      newData: {environmentId: "", path: "", tags: []},
+      newData: { environmentId: '', path: '', tags: [] },
       dialogVisible: false,
       isShowEnable: true,
       showFollow: false,
@@ -301,15 +292,14 @@ export default {
         id: 'id',
         label: 'name',
       },
-      mockBaseUrl: "",
-      newMockBaseUrl: "",
+      mockBaseUrl: '',
+      newMockBaseUrl: '',
       versionData: [],
       newRequest: Sampler,
       newResponse: {},
       createNewVersionVisible: false,
       batchSyncApiVisible: false,
       isXpack: false,
-      showApiSyncConfig: true,
       apiSyncRuleRelation: {
         caseCreator: true,
         scenarioCreator: true,
@@ -320,25 +310,34 @@ export default {
         sendNotice: true,
       },
       noShowSyncRuleRelation: false,
-      citedScenarioCount: 0
+      citedScenarioCount: 0,
+      latestVersionId: '',
+      hasLatest: false
     };
   },
-  props: {moduleOptions: {}, request: {}, response: {}, basisData: {}, syncTabs: Array, projectId: String},
+  props: {
+    moduleOptions: {},
+    request: {},
+    response: {},
+    basisData: {},
+    syncTabs: Array,
+    projectId: String,
+  },
   watch: {
     'httpForm.path': {
       handler(v, v1) {
         if (v && v1 && v !== v1) {
           this.apiMapStatus();
         }
-      }
+      },
     },
     syncTabs() {
       if (this.basisData && this.syncTabs && this.syncTabs.includes(this.basisData.id)) {
         // 标示接口在其他地方更新过，当前页面需要同步
-        getDefinitionById(this.basisData.id).then(response => {
+        getDefinitionById(this.basisData.id).then((response) => {
           if (response.data) {
             let request = JSON.parse(response.data.request);
-            let index = this.syncTabs.findIndex(item => {
+            let index = this.syncTabs.findIndex((item) => {
               if (item === this.basisData.id) {
                 return true;
               }
@@ -355,7 +354,7 @@ export default {
       if (!this.batchSyncApiVisible && this.apiSyncRuleRelation.showUpdateRule) {
         this.noShowSyncRuleRelation = true;
       }
-    }
+    },
   },
   computed: {
     getUrlPrefix() {
@@ -366,12 +365,12 @@ export default {
         let protocol = this.httpForm.method;
         if (protocol === 'GET' || protocol === 'DELETE') {
           if (this.httpForm.request != null && this.httpForm.request.rest != null) {
-            let pathUrlArr = path.split("/");
-            let newPath = "";
-            pathUrlArr.forEach(item => {
-              if (item !== "") {
+            let pathUrlArr = path.split('/');
+            let newPath = '';
+            pathUrlArr.forEach((item) => {
+              if (item !== '') {
                 let pathItem = item;
-                if (item.indexOf("{") === 0 && item.indexOf("}") === (item.length - 1)) {
+                if (item.indexOf('{') === 0 && item.indexOf('}') === item.length - 1) {
                   let paramItem = item.substr(1, item.length - 2);
                   for (let i = 0; i < this.httpForm.request.rest.length; i++) {
                     let param = this.httpForm.request.rest[i];
@@ -380,10 +379,10 @@ export default {
                     }
                   }
                 }
-                newPath += "/" + pathItem;
+                newPath += '/' + pathItem;
               }
             });
-            if (newPath !== "") {
+            if (newPath !== '') {
               path = newPath;
             }
           }
@@ -399,12 +398,12 @@ export default {
         let protocol = this.newData.method;
         if (protocol === 'GET' || protocol === 'DELETE') {
           if (this.newData.request != null && this.newData.request.rest != null) {
-            let pathUrlArr = path.split("/");
-            let newPath = "";
-            pathUrlArr.forEach(item => {
-              if (item !== "") {
+            let pathUrlArr = path.split('/');
+            let newPath = '';
+            pathUrlArr.forEach((item) => {
+              if (item !== '') {
                 let pathItem = item;
-                if (item.indexOf("{") === 0 && item.indexOf("}") === (item.length - 1)) {
+                if (item.indexOf('{') === 0 && item.indexOf('}') === item.length - 1) {
                   let paramItem = item.substr(1, item.length - 2);
                   for (let i = 0; i < this.newData.request.rest.length; i++) {
                     let param = this.newData.request.rest[i];
@@ -413,21 +412,21 @@ export default {
                     }
                   }
                 }
-                newPath += "/" + pathItem;
+                newPath += '/' + pathItem;
               }
             });
-            if (newPath !== "") {
+            if (newPath !== '') {
               path = newPath;
             }
           }
         }
         return this.newMockBaseUrl + path;
       }
-    }
+    },
   },
   methods: {
     apiMapStatus() {
-      store.apiStatus.set("fromChange", true);
+      store.apiStatus.set('fromChange', true);
       if (this.httpForm.id) {
         store.apiMap.set(this.httpForm.id, store.apiStatus);
       }
@@ -436,11 +435,11 @@ export default {
       return getCurrentUser();
     },
     openHis() {
-      this.$refs.changeHistory.open(this.httpForm.id, ["接口定义", "接口定義", "Api definition", "API_DEFINITION"]);
+      this.$refs.changeHistory.open(this.httpForm.id, ['接口定义', '接口定義', 'Api definition', 'API_DEFINITION']);
     },
     mockSetting() {
       if (this.basisData.id) {
-        store.currentApiCase = {mock: getUUID()};
+        store.currentApiCase = { mock: getUUID() };
         this.$emit('changeTab', 'mock');
       } else {
         this.$alert(this.$t('api_test.mock.create_error'));
@@ -457,88 +456,262 @@ export default {
       });
     },
     getMaintainerOptions() {
-      getProjectMemberOption().then(data => {
+      getProjectMemberOption().then((data) => {
         this.maintainerOptions = data.data;
       });
     },
     setParameter() {
       this.request.path = this.httpForm.path;
       this.request.method = this.httpForm.method;
-      this.httpForm.request.useEnvironment = undefined;
+      if (this.httpForm && this.httpForm.request) {
+        this.httpForm.request.useEnvironment = undefined;
+      }
       if (this.httpForm.tags instanceof Array) {
         this.httpForm.tags = JSON.stringify(this.httpForm.tags);
       }
-      if (this.beforeHttpForm.tags instanceof Array) {
-        this.beforeHttpForm.tags = JSON.stringify(this.beforeHttpForm.tags);
+      if (this.beforeHttpForm) {
+        if (this.beforeHttpForm.tags instanceof Array) {
+          this.beforeHttpForm.tags = JSON.stringify(this.beforeHttpForm.tags);
+        }
       }
     },
     saveApi() {
       this.$refs['httpForm'].validate((valid) => {
         if (valid) {
           this.setParameter();
-
           if (!this.httpForm.versionId) {
             if (this.$refs.versionHistory && this.$refs.versionHistory.currentVersion) {
               this.httpForm.versionId = this.$refs.versionHistory.currentVersion.id;
             }
           }
           if (hasLicense() && (this.httpForm.caseTotal > 0 || this.citedScenarioCount > 0) && !this.httpForm.isCopy) {
-            if ((this.httpForm.method !== this.beforeHttpForm.method) && !this.noShowSyncRuleRelation) {
+            if (this.httpForm.method !== this.beforeHttpForm.method && !this.noShowSyncRuleRelation) {
               this.batchSyncApiVisible = true;
+              this.$refs.syncCaseConfig.show();
             }
-            if ((this.httpForm.path !== this.beforeHttpForm.path) && !this.noShowSyncRuleRelation) {
+            if (this.httpForm.path !== this.beforeHttpForm.path && !this.noShowSyncRuleRelation) {
               this.batchSyncApiVisible = true;
+              this.$refs.syncCaseConfig.show();
             }
             if (this.request.headers && this.beforeRequest.headers) {
-              let submitRequestHeaders = JSON.stringify(this.request.headers);
-              let beforeRequestHeaders = JSON.stringify(this.beforeRequest.headers);
-              if ((submitRequestHeaders !== beforeRequestHeaders) && !this.noShowSyncRuleRelation) {
-                this.batchSyncApiVisible = true;
+              if (this.request.headers.length === this.beforeRequest.headers.length) {
+                let requestHeaders = [];
+                let beforeHeaders = [];
+                for (let i = 0; i < this.request.headers.length; i++) {
+                  this.beforeRequest.headers[i].valid = this.request.headers[i].valid
+                  if (this.request.headers[i].isEdit !== undefined) {
+                    this.beforeRequest.headers[i].isEdit = this.request.headers[i].isEdit
+                  }
+                  if (this.request.headers[i].uuid) {
+                    this.beforeRequest.headers[i].uuid = this.request.headers[i].uuid
+                  }
+                  if (this.request.headers[i].time) {
+                    this.beforeRequest.headers[i].time = this.request.headers[i].time
+                  }
+                  if (this.request.headers[i].name === undefined) {
+                    this.beforeRequest.headers[i].name = undefined
+                  }
+                  let newRequest = this.request.headers[i];
+                  const ordered = {};
+                  Object.keys(newRequest).sort().forEach(function (key) {
+                    ordered[key] = newRequest[key];
+                  });
+                  requestHeaders.push(ordered);
+                  let beforeRequest = this.beforeRequest.headers[i];
+                  const beforeOrdered = {};
+                  Object.keys(beforeRequest).sort().forEach(function (key) {
+                    beforeOrdered[key] = beforeRequest[key];
+                  });
+                  beforeHeaders.push(beforeOrdered)
+                }
+
+                let submitRequestHeaders = JSON.stringify(requestHeaders);
+                let beforeRequestHeaders = JSON.stringify(beforeHeaders);
+                if (submitRequestHeaders !== beforeRequestHeaders && !this.noShowSyncRuleRelation) {
+                  this.batchSyncApiVisible = true;
+                  this.$refs.syncCaseConfig.show();
+                }
+              } else {
+                let submitRequestHeaders = JSON.stringify(this.request.headers);
+                let beforeRequestHeaders = JSON.stringify(this.beforeRequest.headers);
+                if (submitRequestHeaders !== beforeRequestHeaders && !this.noShowSyncRuleRelation) {
+                  this.batchSyncApiVisible = true;
+                  this.$refs.syncCaseConfig.show();
+                }
               }
             }
             if (this.request.arguments && this.beforeRequest.arguments) {
-              let submitRequestQuery = JSON.stringify(this.request.arguments);
-              let beforeRequestQuery = JSON.stringify(this.beforeRequest.arguments);
-              if ((submitRequestQuery !== beforeRequestQuery) && !this.noShowSyncRuleRelation) {
-                this.batchSyncApiVisible = true;
+              if (this.request.arguments.length === this.beforeRequest.arguments.length) {
+                let requestArguments = [];
+                let beforeArguments = [];
+                for (let i = 0; i < this.request.arguments.length; i++) {
+                  if (this.request.arguments[i].isEdit !== undefined) {
+                    this.beforeRequest.arguments[i].isEdit = this.request.arguments[i].isEdit
+                  }
+                  if (this.request.arguments[i].uuid) {
+                    this.beforeRequest.arguments[i].uuid = this.request.arguments[i].uuid
+                  }
+                  if (this.request.arguments[i].time) {
+                    this.beforeRequest.arguments[i].time = this.request.arguments[i].time
+                  }
+                  if (this.request.arguments[i].name === undefined) {
+                    this.beforeRequest.arguments[i].name = undefined
+                  }
+                  this.beforeRequest.arguments[i].valid = this.request.arguments[i].valid
+                  let newRequest = this.request.arguments[i];
+                  const ordered = {};
+                  Object.keys(newRequest).sort().forEach(function (key) {
+                    ordered[key] = newRequest[key];
+                  });
+                  requestArguments.push(ordered);
+                  let beforeRequest = this.beforeRequest.arguments[i];
+                  const beforeOrdered = {};
+                  Object.keys(beforeRequest).sort().forEach(function (key) {
+                    beforeOrdered[key] = beforeRequest[key];
+                  });
+                  beforeArguments.push(beforeOrdered)
+                }
+                let submitRequestQuery = JSON.stringify(requestArguments);
+                let beforeRequestQuery = JSON.stringify(beforeArguments);
+                if (submitRequestQuery !== beforeRequestQuery && !this.noShowSyncRuleRelation) {
+                  this.batchSyncApiVisible = true;
+                  this.$refs.syncCaseConfig.show();
+                }
+              } else {
+                let submitRequestQuery = JSON.stringify(this.request.arguments);
+                let beforeRequestQuery = JSON.stringify(this.beforeRequest.arguments);
+                if (submitRequestQuery !== beforeRequestQuery && !this.noShowSyncRuleRelation) {
+                  this.batchSyncApiVisible = true;
+                  this.$refs.syncCaseConfig.show();
+                }
               }
             }
             if (this.request.rest && this.beforeRequest.rest) {
-              let submitRequestRest = JSON.stringify(this.request.rest);
-              let beforeRequestRest = JSON.stringify(this.beforeRequest.rest);
-              if ((submitRequestRest !== beforeRequestRest) && !this.noShowSyncRuleRelation) {
-                this.batchSyncApiVisible = true;
+              if (this.request.rest.length === this.beforeRequest.rest.length) {
+                let requestRest = [];
+                let beforeRest = [];
+                for (let i = 0; i < this.request.rest.length; i++) {
+                  if (this.request.rest[i].isEdit !== undefined) {
+                    this.beforeRequest.rest[i].isEdit = this.request.rest[i].isEdit
+                  }
+                  if (this.request.rest[i].uuid) {
+                    this.beforeRequest.rest[i].uuid = this.request.rest[i].uuid
+                  }
+                  if (this.request.rest[i].time) {
+                    this.beforeRequest.rest[i].time = this.request.rest[i].time
+                  }
+                  if (this.request.rest[i].name === undefined) {
+                    this.beforeRequest.rest[i].name = undefined
+                  }
+                  this.beforeRequest.rest[i].valid = this.request.rest[i].valid
+
+                  let newRequest = this.request.rest[i];
+                  const ordered = {};
+                  Object.keys(newRequest).sort().forEach(function (key) {
+                    ordered[key] = newRequest[key];
+                  });
+                  requestRest.push(ordered);
+                  let beforeRequest = this.beforeRequest.rest[i];
+                  const beforeOrdered = {};
+                  Object.keys(beforeRequest).sort().forEach(function (key) {
+                    beforeOrdered[key] = beforeRequest[key];
+                  });
+                  beforeRest.push(beforeOrdered)
+                }
+                let submitRequestRest = JSON.stringify(requestRest);
+                let beforeRequestRest = JSON.stringify(beforeRest);
+                if (submitRequestRest !== beforeRequestRest && !this.noShowSyncRuleRelation) {
+                  this.batchSyncApiVisible = true;
+                  this.$refs.syncCaseConfig.show();
+                }
+              } else {
+                let submitRequestRest = JSON.stringify(this.request.rest);
+                let beforeRequestRest = JSON.stringify(this.beforeRequest.rest);
+                if (submitRequestRest !== beforeRequestRest && !this.noShowSyncRuleRelation) {
+                  this.batchSyncApiVisible = true;
+                  this.$refs.syncCaseConfig.show();
+                }
               }
             }
             if (this.request.body && this.beforeRequest.body) {
+              if (this.request.body.valid) {
+                this.beforeRequest.body.valid = this.request.body.valid
+              }
+              if (this.request.body.kvs.length === this.beforeRequest.body.kvs.length) {
+                let requestKvs = [];
+                let beforeKvs = [];
+                for (let i = 0; i < this.request.body.kvs.length; i++) {
+                  if (this.request.body.kvs[i].isEdit !== undefined) {
+                    this.beforeRequest.body.kvs[i].isEdit = this.request.body.kvs[i].isEdit
+                  }
+                  if (this.request.body.kvs[i].files !== null && this.request.body.kvs[i].files.length === 0) {
+                    this.beforeRequest.body.kvs[i].files = this.request.body.kvs[i].files
+                  }
+                  if (this.request.body.kvs[i].uuid) {
+                    this.beforeRequest.body.kvs[i].uuid = this.request.body.kvs[i].uuid
+                  }
+                  if (this.request.body.kvs[i].time) {
+                    this.beforeRequest.body.kvs[i].time = this.request.body.kvs[i].time
+                  }
+                  if (this.request.body.kvs[i].name === undefined) {
+                    this.beforeRequest.body.kvs[i].name = undefined
+                  }
+                  this.beforeRequest.body.kvs[i].valid = this.request.body.kvs[i].valid
+
+                  let newRequest = this.request.body.kvs[i];
+                  const ordered = {};
+                  Object.keys(newRequest).sort().forEach(function (key) {
+                    ordered[key] = newRequest[key];
+                  });
+                  requestKvs.push(ordered);
+                  let beforeRequest = this.request.body.kvs[i];
+                  const beforeOrdered = {};
+                  Object.keys(beforeRequest).sort().forEach(function (key) {
+                    beforeOrdered[key] = beforeRequest[key];
+                  });
+                  beforeKvs.push(beforeOrdered)
+                }
+                this.request.body.kvs = requestKvs;
+                this.beforeRequest.body.kvs = beforeKvs
+              }
               let submitRequestBody = JSON.stringify(this.request.body);
               let beforeRequestBody = JSON.stringify(this.beforeRequest.body);
-              if ((submitRequestBody !== beforeRequestBody) && !this.noShowSyncRuleRelation) {
+              if (submitRequestBody !== beforeRequestBody && !this.noShowSyncRuleRelation) {
                 this.batchSyncApiVisible = true;
+                this.$refs.syncCaseConfig.show();
               }
             }
             if (this.request.authManager && this.beforeRequest.authManager) {
               let submitRequestAuthManager = JSON.stringify(this.request.authManager);
               let beforeRequestAuthManager = JSON.stringify(this.beforeRequest.authManager);
-              if ((submitRequestAuthManager !== beforeRequestAuthManager) && !this.noShowSyncRuleRelation) {
+              if (submitRequestAuthManager !== beforeRequestAuthManager && !this.noShowSyncRuleRelation) {
                 this.batchSyncApiVisible = true;
+                this.$refs.syncCaseConfig.show();
               }
             }
             if (this.request.hashTree && this.beforeRequest.hashTree) {
               let submitRequestHashTree = JSON.stringify(this.request.hashTree);
               let beforeRequestHashTree = JSON.stringify(this.beforeRequest.hashTree);
-              if ((submitRequestHashTree !== beforeRequestHashTree) && !this.noShowSyncRuleRelation) {
+              if (submitRequestHashTree !== beforeRequestHashTree && !this.noShowSyncRuleRelation) {
                 this.batchSyncApiVisible = true;
+                this.$refs.syncCaseConfig.show();
               }
             }
-            if (((this.request.connectTimeout !== this.beforeRequest.connectTimeout) || (this.request.responseTimeout !== this.beforeRequest.responseTimeout)
-              || (this.request.followRedirects !== this.beforeRequest.followRedirects) || (this.request.alias !== this.beforeRequest.alias)
-              || this.apiSyncRuleRelation.showUpdateRule === true) && !this.noShowSyncRuleRelation) {
+            if (
+              (this.request.connectTimeout !== this.beforeRequest.connectTimeout ||
+                this.request.responseTimeout !== this.beforeRequest.responseTimeout ||
+                this.request.followRedirects !== this.beforeRequest.followRedirects ||
+                this.request.alias !== this.beforeRequest.alias ||
+                this.apiSyncRuleRelation.showUpdateRule === true) &&
+              !this.noShowSyncRuleRelation
+            ) {
               this.batchSyncApiVisible = true;
+              this.$refs.syncCaseConfig.show();
             }
             if (this.batchSyncApiVisible !== true) {
               this.$emit('saveApi', this.httpForm);
             }
+
           } else {
             this.$emit('saveApi', this.httpForm);
           }
@@ -550,57 +723,51 @@ export default {
         }
       });
     },
-    batchSync() {
+    batchSync(fromData) {
       if (hasLicense() && (this.httpForm.caseTotal > 0 || this.citedScenarioCount > 0) && !this.httpForm.isCopy) {
-        if (this.$refs.synSetting && this.$refs.synSetting.fromData) {
-          let fromData = this.$refs.synSetting.fromData;
-          fromData.method = true;
-          fromData.path = true;
-          fromData.protocol = true;
-          this.httpForm.triggerUpdate = JSON.stringify(fromData);
-          this.apiSyncRuleRelation.apiSyncCaseRequest = JSON.stringify(fromData);
-        }
+        this.httpForm.triggerUpdate = JSON.stringify(fromData);
+        this.apiSyncRuleRelation.apiSyncCaseRequest = JSON.stringify(fromData);
         if (this.apiSyncRuleRelation.sendNotice && this.apiSyncRuleRelation.sendNotice === true) {
           this.httpForm.sendSpecialMessage = this.apiSyncRuleRelation.sendNotice;
         } else {
-          this.httpForm.sendSpecialMessage = false
+          this.httpForm.sendSpecialMessage = false;
         }
 
         if (this.apiSyncRuleRelation.caseCreator && this.apiSyncRuleRelation.caseCreator === true) {
           this.httpForm.caseCreator = this.apiSyncRuleRelation.caseCreator;
         } else {
-          this.httpForm.caseCreator = false
+          this.httpForm.caseCreator = false;
         }
         if (this.apiSyncRuleRelation.scenarioCreator && this.apiSyncRuleRelation.scenarioCreator === true) {
           this.httpForm.scenarioCreator = this.apiSyncRuleRelation.scenarioCreator;
         } else {
-          this.httpForm.scenarioCreator = false
+          this.httpForm.scenarioCreator = false;
         }
         this.apiSyncRuleRelation.resourceId = this.httpForm.id;
-        this.apiSyncRuleRelation.resourceType = "API";
+        this.apiSyncRuleRelation.resourceType = 'API';
         this.saveApiSyncRuleRelation(this.apiSyncRuleRelation);
       }
     },
     saveApiSyncRuleRelation(apiSyncRuleRelation) {
       updateRuleRelation(apiSyncRuleRelation.resourceId, apiSyncRuleRelation).then(() => {
         this.$emit('saveApi', this.httpForm);
-        this.batchSyncApiVisible = false;
+        this.$refs.syncCaseConfig.close();
       });
     },
     createModules() {
-      this.$emit("createRootModelInTree");
+      this.$emit('createRootModelInTree');
     },
     urlChange() {
       if (!this.httpForm.path || this.httpForm.path.indexOf('?') === -1) return;
       let url = this.getURL(this.addProtocol(this.httpForm.path));
       if (url) {
-        this.httpForm.path = decodeURIComponent(this.httpForm.path.substr(0, this.httpForm.path.indexOf("?")));
+        this.httpForm.path = decodeURIComponent(this.httpForm.path.substr(0, this.httpForm.path.indexOf('?')));
       }
     },
     addProtocol(url) {
       if (url) {
-        if (!url.toLowerCase().startsWith("https") && !url.toLowerCase().startsWith("http")) {
-          return "https://" + url;
+        if (!url.toLowerCase().startsWith('https') && !url.toLowerCase().startsWith('http')) {
+          return 'https://' + url;
         }
       }
       return url;
@@ -609,16 +776,20 @@ export default {
       try {
         let url = new URL(urlStr);
         if (url.search && url.search.length > 1) {
-          let params = url.search.substr(1).split("&");
-          params.forEach(param => {
+          let params = url.search.substr(1).split('&');
+          params.forEach((param) => {
             if (param) {
-              let keyValues = param.split("=");
+              let keyValues = param.split('=');
               if (keyValues) {
-                this.request.arguments.splice(0, 0, new KeyValue({
-                  name: keyValues[0],
-                  required: false,
-                  value: keyValues[1]
-                }));
+                this.request.arguments.splice(
+                  0,
+                  0,
+                  new KeyValue({
+                    name: keyValues[0],
+                    required: false,
+                    value: keyValues[1],
+                  })
+                );
               }
             }
           });
@@ -629,7 +800,7 @@ export default {
       }
     },
     setModule(id, data) {
-      if (id && id !== "") {
+      if (id && id !== '') {
         this.httpForm.moduleId = id;
       }
       if (data && data.path) {
@@ -638,17 +809,17 @@ export default {
     },
     initMockEnvironment() {
       let protocol = document.location.protocol;
-      protocol = protocol.substring(0, protocol.indexOf(":"));
-      getMockEnvironment(this.projectId).then(response => {
+      protocol = protocol.substring(0, protocol.indexOf(':'));
+      getMockEnvironment(this.projectId).then((response) => {
         this.mockEnvironment = response.data;
         let httpConfig = JSON.parse(this.mockEnvironment.config);
         if (httpConfig != null) {
           httpConfig = httpConfig.httpConfig;
           let httpType = httpConfig.defaultCondition;
           let conditions = httpConfig.conditions;
-          conditions.forEach(condition => {
+          conditions.forEach((condition) => {
             if (condition.type === httpType) {
-              this.mockBaseUrl = condition.protocol + "://" + condition.socket;
+              this.mockBaseUrl = condition.protocol + '://' + condition.socket;
               this.newMockBaseUrl = this.mockBaseUrl;
             }
           });
@@ -682,26 +853,46 @@ export default {
         }
       }
     },
+    getDefaultVersion() {
+      getDefaultVersion(this.projectId)
+        .then(response => {
+          this.latestVersionId = response.data;
+          this.getVersionHistory();
+        });
+    },
     getVersionHistory() {
-      getDefinitionVersions(this.httpForm.id).then(response => {
+      getDefinitionVersions(this.httpForm.id).then((response) => {
         if (this.httpForm.isCopy) {
-          this.versionData = response.data.filter(v => v.versionId === this.httpForm.versionId);
+          this.versionData = response.data.filter((v) => v.versionId === this.httpForm.versionId);
         } else {
           this.versionData = response.data;
+        }
+        if (this.versionData[0]) {
+          this.beforeHttpForm = this.versionData[0];
+          this.beforeRequest = JSON.parse(this.versionData[0].request);
+          this.beforeResponse = JSON.parse(this.versionData[0].response);
+        }
+        let latestVersionData = response.data.filter((v) => v.versionId === this.latestVersionId);
+        if (latestVersionData.length > 0) {
+          this.hasLatest = false
+        } else {
+          this.hasLatest = true;
         }
       });
     },
     compare(row) {
-      this.httpForm.createTime = this.$refs.versionHistory.versionOptions.filter(v => v.id === this.httpForm.versionId)[0].createTime;
-      getDefinitionByIdAndRefId(row.id, this.httpForm.refId).then(response => {
-        getDefinitionById(response.data.id).then(res => {
+      this.httpForm.createTime = this.$refs.versionHistory.versionOptions.filter(
+        (v) => v.id === this.httpForm.versionId
+      )[0].createTime;
+      getDefinitionByIdAndRefId(row.id, this.httpForm.refId).then((response) => {
+        getDefinitionById(response.data.id).then((res) => {
           if (res.data) {
             this.newData = res.data;
             this.newData.createTime = row.createTime;
             this.dealWithTag(res.data);
             this.setRequest(res.data);
             if (!this.setRequest(res.data)) {
-              this.newRequest = createComponent("HTTPSamplerProxy");
+              this.newRequest = createComponent('HTTPSamplerProxy');
               this.dialogVisible = true;
             }
             this.formatApi(res.data);
@@ -711,7 +902,12 @@ export default {
     },
     setRequest(api) {
       if (api.request) {
-        if (Object.prototype.toString.call(api.request).match(/\[object (\w+)\]/)[1].toLowerCase() === 'object') {
+        if (
+          Object.prototype.toString
+            .call(api.request)
+            .match(/\[object (\w+)\]/)[1]
+            .toLowerCase() === 'object'
+        ) {
           this.newRequest = api.request;
         } else {
           this.newRequest = JSON.parse(api.request);
@@ -726,25 +922,35 @@ export default {
     },
     dealWithTag(api) {
       if (api.tags) {
-        if (Object.prototype.toString.call(api.tags) === "[object String]") {
+        if (Object.prototype.toString.call(api.tags) === '[object String]') {
           api.tags = JSON.parse(api.tags);
         }
       }
       if (this.httpForm.tags) {
-        if (Object.prototype.toString.call(this.httpForm.tags) === "[object String]") {
+        if (Object.prototype.toString.call(this.httpForm.tags) === '[object String]') {
           this.httpForm.tags = JSON.parse(this.httpForm.tags);
         }
       }
     },
     formatApi(api) {
       if (api.response != null && api.response !== 'null' && api.response) {
-        if (Object.prototype.toString.call(api.response).match(/\[object (\w+)\]/)[1].toLowerCase() === 'object') {
+        if (
+          Object.prototype.toString
+            .call(api.response)
+            .match(/\[object (\w+)\]/)[1]
+            .toLowerCase() === 'object'
+        ) {
           this.newResponse = api.response;
         } else {
           this.newResponse = JSON.parse(api.response);
         }
       } else {
-        this.newResponse = {headers: [], body: new Body(), statusCode: [], type: "HTTP"};
+        this.newResponse = {
+          headers: [],
+          body: new Body(),
+          statusCode: [],
+          type: 'HTTP',
+        };
       }
       if (!this.newRequest.hashTree) {
         this.newRequest.hashTree = [];
@@ -777,10 +983,15 @@ export default {
           if (!stepArray[i].clazzName) {
             stepArray[i].clazzName = TYPE_TO_C.get(stepArray[i].type);
           }
-          if (stepArray[i].type === "Assertions" && !stepArray[i].document) {
+          if (stepArray[i].type === 'Assertions' && !stepArray[i].document) {
             stepArray[i].document = {
-              type: "JSON",
-              data: {xmlFollowAPI: false, jsonFollowAPI: false, json: [], xml: []}
+              type: 'JSON',
+              data: {
+                xmlFollowAPI: false,
+                jsonFollowAPI: false,
+                json: [],
+                xml: [],
+              },
             };
           }
           if (stepArray[i].hashTree && stepArray[i].hashTree.length > 0) {
@@ -794,44 +1005,54 @@ export default {
       this.getVersionHistory();
     },
     checkout(row) {
-      let api = this.versionData.filter(v => v.versionId === row.id)[0];
+      let api = this.versionData.filter((v) => v.versionId === row.id)[0];
       if (api.tags && api.tags.length > 0) {
         api.tags = JSON.parse(api.tags);
       }
-      this.$emit("checkout", api);
+      this.$emit('checkout', api);
     },
     create(row) {
       // 创建新版本
       this.httpForm.versionId = row.id;
       this.httpForm.versionName = row.name;
-      apiTestCaseCount({id: this.httpForm.id}).then(response => {
+      apiTestCaseCount({ id: this.httpForm.id }).then((response) => {
         if (response.data > 0) {
           this.httpForm.caseTotal = response.data;
         }
         this.$set(this.httpForm, 'newVersionRemark', !!this.httpForm.remark);
         this.$set(this.httpForm, 'newVersionDeps', this.$refs.apiOtherInfo.relationshipCount > 0);
         this.$set(this.httpForm, 'newVersionCase', this.httpForm.caseTotal > 0);
-        createMockConfig({projectId: this.projectId, apiId: this.httpForm.id}).then(response => {
-          this.$set(this.httpForm, 'newVersionMock', response.data.mockExpectConfigList.length > 0);
+        createMockConfig({
+          projectId: this.projectId,
+          apiId: this.httpForm.id,
+        }).then(
+          (response) => {
+            this.$set(this.httpForm, 'newVersionMock', response.data.mockExpectConfigList.length > 0);
 
-          if (this.$refs.apiOtherInfo.relationshipCount > 0 || this.httpForm.remark ||
-            this.httpForm.newVersionCase || this.httpForm.newVersionMock) {
-            this.createNewVersionVisible = true;
-          } else {
-            this.saveApi();
+            if (
+              this.$refs.apiOtherInfo.relationshipCount > 0 ||
+              this.httpForm.remark ||
+              this.httpForm.newVersionCase ||
+              this.httpForm.newVersionMock
+            ) {
+              this.createNewVersionVisible = true;
+            } else {
+              this.saveApi();
+              if (this.$refs.versionHistory) {
+                this.$refs.versionHistory.loading = false;
+              }
+            }
+          },
+          (error) => {
             if (this.$refs.versionHistory) {
               this.$refs.versionHistory.loading = false;
             }
           }
-        }, error => {
-          if (this.$refs.versionHistory) {
-            this.$refs.versionHistory.loading = false;
-          }
-        });
+        );
       });
     },
     del(row) {
-      this.$alert(this.$t('api_test.definition.request.delete_confirm') + ' ' + row.name + " ？", '', {
+      this.$alert(this.$t('api_test.definition.request.delete_confirm') + ' ' + row.name + ' ？', '', {
         confirmButtonText: this.$t('commons.confirm'),
         callback: (action) => {
           if (action === 'confirm') {
@@ -840,17 +1061,23 @@ export default {
               this.getVersionHistory();
             });
           }
-        }
+        },
       });
     },
-    gotoApiMessage() {
-      let apiResolve = this.$router.resolve({
-        path: '/project/messagesettings'
+    setLatest(row) {
+      let param = {
+        projectId: this.projectId,
+        type: 'API',
+        versionId: row.id,
+        resourceId: this.basisData.id
+      }
+      setLatestVersionById(param).then(() => {
+        this.$success(this.$t('commons.modify_success'));
+        this.checkout(row);
       });
-      window.open(apiResolve.href, '_blank');
     },
     getSyncRule() {
-      relationGet(this.httpForm.id, 'API').then(response => {
+      relationGet(this.httpForm.id, 'API').then((response) => {
         if (response.data) {
           this.apiSyncRuleRelation = response.data;
           if (this.apiSyncRuleRelation.apiSyncCaseRequest) {
@@ -859,7 +1086,10 @@ export default {
           if (this.apiSyncRuleRelation.caseCreator === null || this.apiSyncRuleRelation.caseCreator === undefined) {
             this.apiSyncRuleRelation.caseCreator = true;
           }
-          if (this.apiSyncRuleRelation.scenarioCreator === null || this.apiSyncRuleRelation.scenarioCreator === undefined) {
+          if (
+            this.apiSyncRuleRelation.scenarioCreator === null ||
+            this.apiSyncRuleRelation.scenarioCreator === undefined
+          ) {
             this.apiSyncRuleRelation.scenarioCreator = true;
           }
           if (this.apiSyncRuleRelation.syncCase === null || this.apiSyncRuleRelation.syncCase === undefined) {
@@ -868,12 +1098,9 @@ export default {
           if (this.apiSyncRuleRelation.sendNotice === null || this.apiSyncRuleRelation.sendNotice === undefined) {
             this.apiSyncRuleRelation.sendNotice = true;
           }
-          this.noShowSyncRuleRelation = this.apiSyncRuleRelation.showUpdateRule
+          this.noShowSyncRuleRelation = this.apiSyncRuleRelation.showUpdateRule;
         }
       });
-    },
-    updateSyncData(value) {
-      this.apiSyncRuleRelation.apiSyncConfig = value;
     },
     handleCommand(command) {
       if (command === 'openSyncRule') {
@@ -882,26 +1109,26 @@ export default {
       }
     },
     getCitedScenarioCount() {
-      citedApiScenarioCount(this.httpForm.id).then(response => {
+      citedApiScenarioCount(this.httpForm.id).then((response) => {
         if (response.data) {
           this.citedScenarioCount = response.data;
         }
       });
     },
     getCaseCount() {
-      apiTestCaseCount({id: this.httpForm.id}).then(response => {
+      apiTestCaseCount({ id: this.httpForm.id }).then((response) => {
         if (response.data > 0) {
           this.httpForm.caseTotal = response.data;
         }
       });
-    }
+    },
   },
 
   created() {
     this.getMaintainerOptions();
     this.isXpack = !!hasLicense();
     if (!this.basisData.environmentId) {
-      this.basisData.environmentId = "";
+      this.basisData.environmentId = '';
     }
     if (this.basisData.moduleId && this.basisData.moduleId === 'default-module') {
       this.basisData.moduleId = this.moduleOptions[0].id;
@@ -910,11 +1137,11 @@ export default {
       this.basisData.caseTotal = 0;
     }
     this.httpForm = JSON.parse(JSON.stringify(this.basisData));
-    if(this.basisData.request) {
+    if (this.basisData.request && this.basisData.id) {
       this.httpForm.path = this.basisData.request.path;
       this.httpForm.method = this.basisData.request.method;
     }
-    definitionFollow(this.basisData.id).then(response => {
+    definitionFollow(this.basisData.id).then((response) => {
       this.httpForm.follows = response.data;
       this.beforeHttpForm.follows = response.data;
       for (let i = 0; i < response.data.length; i++) {
@@ -927,17 +1154,10 @@ export default {
     this.initMockEnvironment();
 
     if (hasLicense()) {
-      this.getVersionHistory();
+      this.getDefaultVersion();
       this.getSyncRule();
       this.getCitedScenarioCount();
       this.getCaseCount();
-    }
-  },
-  mounted() {
-    if (hasLicense()) {
-      this.beforeHttpForm = deepClone(this.basisData);
-      this.beforeRequest = deepClone(this.request);
-      this.beforeResponse = deepClone(this.response);
     }
   }
 };
@@ -961,9 +1181,9 @@ export default {
 
 .ms-opt-btn {
   position: fixed;
-  right: 50px;
+  right: 10px !important;
   z-index: 1;
-  top: 128px;
+  top: 85px;
 }
 
 /*.base-info .el-form-item :deep(.el-form-item__content) {*/

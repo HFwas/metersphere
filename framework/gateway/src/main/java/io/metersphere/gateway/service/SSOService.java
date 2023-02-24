@@ -1,14 +1,14 @@
 package io.metersphere.gateway.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import io.metersphere.base.domain.AuthSource;
 import io.metersphere.base.domain.User;
-import io.metersphere.commons.constants.SessionConstants;
+import io.metersphere.commons.constants.UserSource;
+import io.metersphere.commons.constants.UserStatus;
 import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.user.SessionUser;
-import io.metersphere.commons.utils.CodingUtil;
-import io.metersphere.commons.utils.IOUtils;
-import io.metersphere.commons.utils.JSON;
-import io.metersphere.commons.utils.SessionUtils;
+import io.metersphere.commons.utils.*;
+import io.metersphere.i18n.Translator;
 import io.metersphere.request.LoginRequest;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.http.HttpResponse;
@@ -43,10 +43,14 @@ import java.nio.charset.StandardCharsets;
 import java.security.KeyManagementException;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
+import java.time.Duration;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 
 @Service
@@ -197,8 +201,8 @@ public class SSOService {
         session.getAttributes().put("authId", authSource.getId());
         session.getAttributes().put("casTicket", ticket);
         // 记录cas对应关系
-        Long timeout = env.getProperty("spring.session.timeout", Long.class);
-        stringRedisTemplate.opsForValue().set(ticket, name, timeout, TimeUnit.SECONDS);
+        Duration timeout = env.getProperty("spring.session.timeout", Duration.class, Duration.ofHours(12));
+        stringRedisTemplate.opsForValue().set(ticket, name, timeout);
 
         return userOptional;
     }
@@ -229,4 +233,132 @@ public class SSOService {
         SessionUtils.kickOutUser(name);
         stringRedisTemplate.delete(ticket);
     }
+
+    public Optional<SessionUser> exchangeOauth2Token(String code, String authId, WebSession session, Locale locale) throws Exception {
+        AuthSource authSource = authSourceService.getAuthSource(authId);
+        Map<String, String> config = JSON.parseObject(authSource.getConfiguration(), new TypeReference<HashMap<String, String>>() {});
+        String url = config.get("tokenUrl")
+                + "?client_id=" + config.get("clientId")
+                + "&client_secret=" + config.get("secret")
+                + "&redirect_uri=" + config.get("redirectUrl")
+                + "&code=" + code
+                + "&grant_type=authorization_code";
+
+        Map<String, String> resultObj = null;
+        try {
+            RestTemplate restTemplate = getRestTemplateIgnoreSSL();
+            HttpHeaders headers = new HttpHeaders();
+            headers.add(HttpHeaders.ACCEPT, MediaType.APPLICATION_JSON_VALUE);
+            String credentials = EncryptUtils.base64Encoding(config.get("clientId") + ":" + config.get("secret"));
+            headers.add(HttpHeaders.AUTHORIZATION, "Basic " + credentials);
+            HttpEntity<String> param = new HttpEntity<>(headers);
+            ResponseEntity<String> response = restTemplate.postForEntity(url, param, String.class);
+            String content = response.getBody();
+            resultObj = JSON.parseObject(content, new TypeReference<HashMap<String, String>>() {});
+        } catch (Exception e) {
+            LogUtil.error("fail to get access_token", e);
+            MSException.throwException("fail to get access_token!");
+        }
+
+        String accessToken = resultObj.get("access_token");
+
+        if (StringUtils.isBlank(accessToken)) {
+            MSException.throwException("access_token is empty!");
+        }
+
+        return doOauth2Login(authSource, accessToken, session, locale);
+    }
+
+    private Optional<SessionUser> doOauth2Login(AuthSource authSource, String accessToken, WebSession session, Locale locale) throws Exception {
+        Map<String, String> oauth2Config = null;
+        Map<String, Object> resultObj = null;
+        try {
+            oauth2Config = JSON.parseObject(authSource.getConfiguration(), new TypeReference<HashMap<String, String>>() {});
+            String userInfoUrl = oauth2Config.get("userInfoUrl");
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + accessToken);
+            RestTemplate restTemplate = getRestTemplateIgnoreSSL();
+            HttpEntity<MultiValueMap<String, String>> httpEntity = new HttpEntity<>(headers);
+            ResponseEntity<String> response = restTemplate.exchange(userInfoUrl, HttpMethod.GET, httpEntity, String.class);
+            resultObj = JSON.parseObject(response.getBody(), new TypeReference<HashMap<String, Object>>() {});
+            LogUtil.info("user info: " + response.getBody());
+        } catch (Exception e) {
+            LogUtil.error("fail to get user info", e);
+            MSException.throwException("fail to get user info!");
+        }
+
+        String attrMapping = oauth2Config.get("mapping");
+        Map<String, String> mapping = this.getOauth2AttrMapping(attrMapping);
+
+        String userid = (String) resultObj.get(mapping.get("userid"));
+        String username = (String) resultObj.get(mapping.get("username"));
+        String email = (String) resultObj.get(mapping.get("email"));
+
+        if (StringUtils.isBlank(userid)) {
+            MSException.throwException("userid is empty!");
+        }
+        Pattern p = Pattern.compile("[\u4e00-\u9fa5]");
+        Matcher m = p.matcher(userid);
+        if (m.find()) {
+            MSException.throwException("userid cannot contain Chinese characters!");
+        }
+
+        if (StringUtils.isBlank(username)) {
+            username = userid;
+        }
+        if (!StringUtils.contains(email, "@")) {
+            email = null;
+        }
+
+        User u = userLoginService.selectUser(userid, email);
+        if (u == null) {
+            //
+            User user = new User();
+            user.setId(userid);
+            user.setName(username);
+            user.setEmail(email);
+            user.setSource(authSource.getType());
+            userLoginService.createOssUser(user);
+        } else {
+            if (!StringUtils.equals(u.getSource(), UserSource.OAuth2.name())) {
+                MSException.throwException("user already exist, user source type is " + u.getSource());
+            }
+            if (StringUtils.equals(u.getStatus(), UserStatus.DISABLED)) {
+                MSException.throwException("user is disabled!");
+            }
+        }
+
+        LoginRequest loginRequest = new LoginRequest();
+        loginRequest.setUsername(userid);
+        loginRequest.setPassword("nothing");
+        loginRequest.setAuthenticate(authSource.getType());
+        Optional<SessionUser> userOptional = userLoginService.login(loginRequest, session, locale);
+        session.getAttributes().put("authenticate", authSource.getType());
+        session.getAttributes().put("authId", authSource.getId());
+        return userOptional;
+    }
+
+    private Map<String, String> getOauth2AttrMapping(String mappingStr) {
+        Map<String, String> mapping = new HashMap<>();
+        try {
+            mapping = JSON.parseObject(mappingStr, new TypeReference<HashMap<String, String>>() {});
+        } catch (Exception e) {
+            LogUtil.error("get oauth2 mapping config error!", e);
+            MSException.throwException(Translator.get("oauth_mapping_config_error"));
+        }
+        String userid = mapping.get("userid");
+        if (StringUtils.isBlank(userid)) {
+            MSException.throwException(Translator.get("oauth_mapping_value_null") + ": userid");
+        }
+        String username = mapping.get("username");
+        if (StringUtils.isBlank(username)) {
+            MSException.throwException(Translator.get("oauth_mapping_value_null") + ": username");
+        }
+        String email = mapping.get("email");
+        if (StringUtils.isBlank(email)) {
+            MSException.throwException(Translator.get("oauth_mapping_value_null") + ": email");
+        }
+        return mapping;
+    }
+
 }

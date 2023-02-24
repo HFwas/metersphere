@@ -1,6 +1,6 @@
 <template>
   <span>
-    <el-select :disabled="isReadOnly" v-model="environmentId" size="small" class="environment-select"
+    <el-select :disabled="isReadOnly" v-model="environmentId" size="small" class="environment-select" filterable
                :placeholder="$t('api_test.definition.request.run_env')" clearable @clear="clear">
       <el-option v-for="(environment, key) in environments" :key="key"
                  :label="environment.name"
@@ -9,7 +9,8 @@
         {{ $t('api_test.environment.environment_config') }}
       </el-button>
       <template v-slot:empty>
-        <div class="empty-environment">
+        <!--这里只做没有可搜索内容时使用，否则如果没有符合搜索条件的，也会显示该项，与上面的btn重复显示 -->
+        <div class="empty-environment" v-if="environments.length===0">
           <el-button class="environment-button" size="mini" type="primary" @click="openEnvironmentConfig">
             {{ $t('api_test.environment.environment_config') }}
           </el-button>

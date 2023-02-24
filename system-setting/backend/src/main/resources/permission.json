@@ -108,12 +108,14 @@
     {
       "id": "SYSTEM_QUOTA:READ",
       "name": "permission.system_quota.read",
-      "resourceId": "SYSTEM_QUOTA"
+      "resourceId": "SYSTEM_QUOTA",
+      "license": true
     },
     {
       "id": "SYSTEM_QUOTA:READ+EDIT",
       "name": "permission.system_quota.edit",
-      "resourceId": "SYSTEM_QUOTA"
+      "resourceId": "SYSTEM_QUOTA",
+      "license": true
     },
     {
       "id": "SYSTEM_AUTH:READ",
@@ -337,7 +339,8 @@
     },
     {
       "id": "SYSTEM_QUOTA",
-      "name": "permission.system_quota.name"
+      "name": "permission.system_quota.name",
+      "license": true
     },
     {
       "id": "SYSTEM_AUTH",
@@ -346,6 +349,10 @@
     {
       "id": "SYSTEM_OPERATING_LOG",
       "name": "permission.system_operation_log.name"
+    },
+    {
+      "id": "SYSTEM_PLUGIN",
+      "name": "permission.system_plugin.name"
     },
     {
       "id": "WORKSPACE_USER",
@@ -373,12 +380,9 @@
       "name": "permission.workspace_operation_log.name"
     },
     {
-      "id": "SYSTEM_PLUGIN",
-      "name": "permission.system_plugin.name"
-    },
-    {
       "id": "PERSONAL_INFORMATION",
-      "name": "permission.personal_information.name"
+      "name": "permission.personal_information.name",
+      "global": true
     }
   ]
 }

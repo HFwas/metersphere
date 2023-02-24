@@ -27,13 +27,13 @@ import {
   TestPlan,
   ThreadGroup,
   XPath2Extractor,
-} from "metersphere-frontend/src/model/JMX";
-import Mock from "mockjs";
-import {funcFilters} from "metersphere-frontend/src/utils/func-filter";
+} from 'metersphere-frontend/src/model/JMX';
+import Mock from 'mockjs';
+import { funcFilters } from 'metersphere-frontend/src/utils/func-filter';
 
 export const uuid = function () {
-  let d = new Date().getTime()
-  let d2 = (performance && performance.now && (performance.now() * 1000)) || 0;
+  let d = new Date().getTime();
+  let d2 = (performance && performance.now && performance.now() * 1000) || 0;
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
     let r = Math.random() * 16;
     if (d > 0) {
@@ -43,33 +43,32 @@ export const uuid = function () {
       r = (d2 + r) % 16 | 0;
       d2 = Math.floor(d2 / 16);
     }
-    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
   });
-}
+};
 
-// export const BODY_FILE_DIR = "/opt/metersphere/data/body"; //存放body文件上传目录
-export const BODY_FILE_DIR = "/Users/houfei/workspace/metersphere/data/body"; //存放body文件上传目录
+export const BODY_FILE_DIR = '/opt/metersphere/data/body'; //存放body文件上传目录
 
 export const calculate = function (itemValue) {
   if (!itemValue) {
     return;
   }
   try {
-    if (itemValue.trim().startsWith("${")) {
+    if (itemValue.trim().startsWith('${')) {
       // jmeter 内置函数不做处理
       return itemValue;
     }
-    let funcs = itemValue.split("|");
+    let funcs = itemValue.split('|');
     let value = Mock.mock(funcs[0].trim());
     if (funcs.length === 1) {
       return value;
     }
     for (let i = 1; i < funcs.length; i++) {
       let func = funcs[i].trim();
-      let args = func.split(":");
+      let args = func.split(':');
       let strings = [];
       if (args[1]) {
-        strings = args[1].split(",");
+        strings = args[1].split(',');
       }
       value = funcFilters[args[0].trim()](value, ...strings);
     }
@@ -77,51 +76,50 @@ export const calculate = function (itemValue) {
   } catch (e) {
     return itemValue;
   }
-}
+};
 
 export const BODY_TYPE = {
-  KV: "KeyValue",
-  FORM_DATA: "Form Data",
-  RAW: "Raw",
-  WWW_FORM: "WWW_FORM",
-  XML: "XML",
-  BINARY: "BINARY",
-  JSON: "JSON"
-}
+  KV: 'KeyValue',
+  FORM_DATA: 'Form Data',
+  RAW: 'Raw',
+  WWW_FORM: 'WWW_FORM',
+  XML: 'XML',
+  BINARY: 'BINARY',
+  JSON: 'JSON',
+};
 
 export const BODY_FORMAT = {
-  TEXT: "text",
-  JSON: "json",
-  XML: "xml",
-  HTML: "html",
-}
+  TEXT: 'text',
+  JSON: 'json',
+  XML: 'xml',
+  HTML: 'html',
+};
 
 export const ASSERTION_TYPE = {
-  TEXT: "Text",
-  REGEX: "Regex",
-  JSON_PATH: "JSON",
-  DURATION: "Duration",
-  JSR223: "JSR223",
-  XPATH2: "XPath2",
-  DOCUMENT: "Document",
-}
+  TEXT: 'Text',
+  REGEX: 'Regex',
+  JSON_PATH: 'JSON',
+  DURATION: 'Duration',
+  JSR223: 'JSR223',
+  XPATH2: 'XPath2',
+  DOCUMENT: 'Document',
+};
 
 export const ASSERTION_REGEX_SUBJECT = {
-  RESPONSE_CODE: "Response Code",
-  RESPONSE_HEADERS: "Response Headers",
-  RESPONSE_DATA: "Response Data"
-}
+  RESPONSE_CODE: 'Response Code',
+  RESPONSE_HEADERS: 'Response Headers',
+  RESPONSE_DATA: 'Response Data',
+};
 
 export const EXTRACT_TYPE = {
-  REGEX: "Regex",
-  JSON_PATH: "JSONPath",
-  XPATH: "XPath"
-}
+  REGEX: 'Regex',
+  JSON_PATH: 'JSONPath',
+  XPATH: 'XPath',
+};
 
 export class BaseConfig {
-
   set(options, notUndefined) {
-    options = this.initOptions(options)
+    options = this.initOptions(options);
     for (let name in options) {
       if (Object.prototype.hasOwnProperty.call(options, name)) {
         if (!(this[name] instanceof Array)) {
@@ -136,13 +134,17 @@ export class BaseConfig {
   }
 
   sets(types, options) {
-    options = this.initOptions(options)
+    options = this.initOptions(options);
     if (types) {
       for (let name in types) {
-        if (options[name] !== null && Object.prototype.hasOwnProperty.call(types, name) && Object.prototype.hasOwnProperty.call(options, name)) {
-          options[name].forEach(o => {
+        if (
+          options[name] !== null &&
+          Object.prototype.hasOwnProperty.call(types, name) &&
+          Object.prototype.hasOwnProperty.call(options, name)
+        ) {
+          options[name].forEach((o) => {
             this[name].push(new types[name](o));
-          })
+          });
         }
       }
     }
@@ -160,7 +162,7 @@ export class BaseConfig {
 export class Test extends BaseConfig {
   constructor(options) {
     super();
-    this.type = "MS API CONFIG";
+    this.type = 'MS API CONFIG';
     this.version = '1.4.0';
     this.id = uuid();
     this.name = undefined;
@@ -180,21 +182,21 @@ export class Test extends BaseConfig {
     if (!this.projectId) {
       return {
         isValid: false,
-        info: 'api_test.select_project'
-      }
+        info: 'api_test.select_project',
+      };
     } else if (!this.name) {
       return {
         isValid: false,
-        info: 'api_test.input_name'
-      }
+        info: 'api_test.input_name',
+      };
     }
-    return {isValid: true};
+    return { isValid: true };
   }
 
   toJMX() {
     return {
       name: this.name + '.jmx',
-      xml: new JMXGenerator(this).toXML()
+      xml: new JMXGenerator(this).toXML(),
     };
   }
 }
@@ -204,7 +206,7 @@ export class ScenarioObj extends BaseConfig {
     super();
     this.id = undefined;
     this.name = undefined;
-    this.type = "scenario";
+    this.type = 'scenario';
     this.hashTree = [];
   }
 }
@@ -226,12 +228,15 @@ export class Scenario extends BaseConfig {
     this.databaseConfigs = [];
     this.tcpConfig = undefined;
     this.set(options);
-    this.sets({
-      variables: KeyValue,
-      headers: KeyValue,
-      requests: RequestFactory,
-      databaseConfigs: DatabaseConfig
-    }, options);
+    this.sets(
+      {
+        variables: KeyValue,
+        headers: KeyValue,
+        requests: RequestFactory,
+        databaseConfigs: DatabaseConfig,
+      },
+      options
+    );
   }
 
   initOptions(options = {}) {
@@ -258,19 +263,19 @@ export class Scenario extends BaseConfig {
         }
       }
     }
-    return {isValid: true};
+    return { isValid: true };
   }
 
   isReference() {
-    return this.id.indexOf("#") !== -1
+    return this.id.indexOf('#') !== -1;
   }
 }
 
 class DubboConfig extends BaseConfig {
   constructor(options = {}) {
     super();
-    this.configCenter = new ConfigCenter(options.configCenter)
-    this.registryCenter = new RegistryCenter(options.registryCenter)
+    this.configCenter = new ConfigCenter(options.configCenter);
+    this.registryCenter = new RegistryCenter(options.registryCenter);
     if (options.consumerAndService === undefined) {
       options.consumerAndService = {
         timeout: undefined,
@@ -280,23 +285,23 @@ class DubboConfig extends BaseConfig {
         group: undefined,
         connections: undefined,
         async: undefined,
-        loadBalance: undefined
-      }
+        loadBalance: undefined,
+      };
     }
-    this.consumerAndService = new ConsumerAndService(options.consumerAndService)
+    this.consumerAndService = new ConsumerAndService(options.consumerAndService);
   }
 }
 
 export class RequestFactory {
   static TYPES = {
-    HTTP: "HTTP",
-    DUBBO: "DUBBO",
-    SQL: "SQL",
-    TCP: "TCP",
-  }
+    HTTP: 'HTTP',
+    DUBBO: 'DUBBO',
+    SQL: 'SQL',
+    TCP: 'TCP',
+  };
 
   constructor(options = {}) {
-    options.type = options.type || RequestFactory.TYPES.HTTP
+    options.type = options.type || RequestFactory.TYPES.HTTP;
     switch (options.type) {
       case RequestFactory.TYPES.DUBBO:
         return new DubboRequest(options);
@@ -312,14 +317,14 @@ export class RequestFactory {
 
 export class ResponseFactory {
   static TYPES = {
-    HTTP: "HTTP",
-    DUBBO: "DUBBO",
-    SQL: "SQL",
-    TCP: "TCP",
-  }
+    HTTP: 'HTTP',
+    DUBBO: 'DUBBO',
+    SQL: 'SQL',
+    TCP: 'TCP',
+  };
 
   constructor(options = {}) {
-    options.type = options.type || ResponseFactory.TYPES.HTTP
+    options.type = options.type || ResponseFactory.TYPES.HTTP;
     switch (options.type) {
       case RequestFactory.TYPES.DUBBO:
         return new DubboRequest(options);
@@ -353,7 +358,7 @@ export class Request extends BaseConfig {
   }
 
   showMethod() {
-    return "";
+    return '';
   }
 }
 
@@ -362,10 +367,10 @@ export class HttpRequest extends Request {
     super(RequestFactory.TYPES.HTTP, options);
     this.url = options.url;
     this.path = options.path;
-    this.method = options.method || "GET";
+    this.method = options.method || 'GET';
     this.parameters = [];
     this.rest = [];
-    this.authConfig = {verification: "No Auth", isEncrypt: false};
+    this.authConfig = { verification: 'No Auth', isEncrypt: false };
     this.headers = [];
     this.body = new Body(options.body);
     this.environment = options.environment;
@@ -376,7 +381,7 @@ export class HttpRequest extends Request {
     this.responseTimeout = options.responseTimeout || 10 * 1000;
     this.followRedirects = options.followRedirects === undefined ? true : options.followRedirects;
 
-    this.sets({parameters: KeyValue, rest: KeyValue, headers: KeyValue}, options);
+    this.sets({ parameters: KeyValue, rest: KeyValue, headers: KeyValue }, options);
   }
 
   isValid(environmentId, environment) {
@@ -385,35 +390,35 @@ export class HttpRequest extends Request {
         if (!environmentId) {
           return {
             isValid: false,
-            info: 'api_test.request.please_configure_environment_in_scenario'
-          }
+            info: 'api_test.request.please_configure_environment_in_scenario',
+          };
         }
         if (!environment.config.httpConfig.socket) {
           return {
             isValid: false,
-            info: 'api_test.request.please_configure_socket_in_environment'
-          }
+            info: 'api_test.request.please_configure_socket_in_environment',
+          };
         }
       } else {
         if (!this.url) {
           return {
             isValid: false,
-            info: 'api_test.request.input_url'
-          }
+            info: 'api_test.request.input_url',
+          };
         }
         try {
-          new URL(this.url)
+          new URL(this.url);
         } catch (e) {
           return {
             isValid: false,
-            info: 'api_test.request.url_invalid'
-          }
+            info: 'api_test.request.url_invalid',
+          };
         }
       }
     }
     return {
-      isValid: true
-    }
+      isValid: true,
+    };
   }
 
   showType() {
@@ -423,9 +428,7 @@ export class HttpRequest extends Request {
   showMethod() {
     return this.method.toUpperCase();
   }
-
 }
-
 
 export class Response extends BaseConfig {
   constructor(type, options = {}) {
@@ -441,22 +444,21 @@ export class Response extends BaseConfig {
   }
 }
 
-
 export class HttpResponse extends Response {
   constructor(options) {
     super(ResponseFactory.TYPES.HTTP, options);
     this.headers = [];
     this.body = new Body(options.body);
     this.statusCode = [];
-    this.sets({statusCode: KeyValue, headers: KeyValue}, options);
+    this.sets({ statusCode: KeyValue, headers: KeyValue }, options);
   }
 }
 
 export class DubboRequest extends Request {
   static PROTOCOLS = {
-    DUBBO: "dubbo://",
-    RMI: "rmi://",
-  }
+    DUBBO: 'dubbo://',
+    RMI: 'rmi://',
+  };
 
   constructor(options = {}) {
     super(RequestFactory.TYPES.DUBBO, options);
@@ -472,7 +474,7 @@ export class DubboRequest extends Request {
     this.dubboConfig = undefined;
     this.debugReport = undefined;
 
-    this.sets({args: KeyValue, attachmentArgs: KeyValue}, options);
+    this.sets({ args: KeyValue, attachmentArgs: KeyValue }, options);
   }
 
   isValid() {
@@ -480,35 +482,35 @@ export class DubboRequest extends Request {
       if (!this.interface) {
         return {
           isValid: false,
-          info: 'api_test.request.dubbo.input_interface'
-        }
+          info: 'api_test.request.dubbo.input_interface',
+        };
       }
       if (!this.method) {
         return {
           isValid: false,
-          info: 'api_test.request.dubbo.input_method'
-        }
+          info: 'api_test.request.dubbo.input_method',
+        };
       }
       if (!this.registryCenter.isValid()) {
         return {
           isValid: false,
-          info: 'api_test.request.dubbo.input_registry_center'
-        }
+          info: 'api_test.request.dubbo.input_registry_center',
+        };
       }
       if (!this.consumerAndService.isValid()) {
         return {
           isValid: false,
-          info: 'api_test.request.dubbo.input_consumer_service'
-        }
+          info: 'api_test.request.dubbo.input_consumer_service',
+        };
       }
     }
     return {
-      isValid: true
-    }
+      isValid: true,
+    };
   }
 
   showType() {
-    return "RPC";
+    return 'RPC';
   }
 
   showMethod() {
@@ -522,7 +524,6 @@ export class DubboRequest extends Request {
 }
 
 export class SqlRequest extends Request {
-
   constructor(options = {}) {
     super(RequestFactory.TYPES.SQL, options);
     this.useEnvironment = options.useEnvironment;
@@ -535,7 +536,7 @@ export class SqlRequest extends Request {
     // this.queryType = options.queryType;
     this.queryTimeout = options.queryTimeout || 60000;
 
-    this.sets({args: KeyValue, attachmentArgs: KeyValue, variables: KeyValue}, options);
+    this.sets({ args: KeyValue, attachmentArgs: KeyValue, variables: KeyValue }, options);
   }
 
   isValid() {
@@ -543,27 +544,27 @@ export class SqlRequest extends Request {
       if (!this.name) {
         return {
           isValid: false,
-          info: 'api_test.request.sql.name_cannot_be_empty'
-        }
+          info: 'api_test.request.sql.name_cannot_be_empty',
+        };
       }
       if (!this.dataSource) {
         return {
           isValid: false,
-          info: 'api_test.request.sql.dataSource_cannot_be_empty'
-        }
+          info: 'api_test.request.sql.dataSource_cannot_be_empty',
+        };
       }
     }
     return {
-      isValid: true
-    }
+      isValid: true,
+    };
   }
 
   showType() {
-    return "SQL";
+    return 'SQL';
   }
 
   showMethod() {
-    return "SQL";
+    return 'SQL';
   }
 
   clone() {
@@ -572,7 +573,7 @@ export class SqlRequest extends Request {
 }
 
 export class TCPConfig extends BaseConfig {
-  static CLASSES = ["TCPClientImpl", "BinaryTCPClientImpl", "LengthPrefixedBinaryTCPClientImpl"]
+  static CLASSES = ['TCPClientImpl', 'BinaryTCPClientImpl', 'LengthPrefixedBinaryTCPClientImpl'];
 
   constructor(options = {}) {
     super();
@@ -602,23 +603,23 @@ export class TCPRequest extends Request {
 
     //设置TCPConfig的属性
     this.set(new TCPConfig(options));
-    this.sets({parameters: KeyValue}, options);
+    this.sets({ parameters: KeyValue }, options);
 
     this.request = options.request;
   }
 
   isValid() {
     return {
-      isValid: true
-    }
+      isValid: true,
+    };
   }
 
   showType() {
-    return "TCP";
+    return 'TCP';
   }
 
   showMethod() {
-    return "TCP";
+    return 'TCP';
   }
 
   clone() {
@@ -626,9 +627,8 @@ export class TCPRequest extends Request {
   }
 }
 
-
 export class ConfigCenter extends BaseConfig {
-  static PROTOCOLS = ["zookeeper", "nacos", "apollo"];
+  static PROTOCOLS = ['zookeeper', 'nacos', 'apollo'];
 
   constructor(options) {
     super();
@@ -644,12 +644,25 @@ export class ConfigCenter extends BaseConfig {
   }
 
   isValid() {
-    return !!this.protocol || !!this.group || !!this.namespace || !!this.username || !!this.address || !!this.password || !!this.timeout;
+    return (
+      !!this.protocol ||
+      !!this.group ||
+      !!this.namespace ||
+      !!this.username ||
+      !!this.address ||
+      !!this.password ||
+      !!this.timeout
+    );
   }
 }
 
 export class DatabaseConfig extends BaseConfig {
-  static DRIVER_CLASS = ["com.mysql.jdbc.Driver", "com.microsoft.sqlserver.jdbc.SQLServerDriver", "org.postgresql.Driver", "oracle.jdbc.OracleDriver"];
+  static DRIVER_CLASS = [
+    'com.mysql.jdbc.Driver',
+    'com.microsoft.sqlserver.jdbc.SQLServerDriver',
+    'org.postgresql.Driver',
+    'oracle.jdbc.OracleDriver',
+  ];
 
   constructor(options) {
     super();
@@ -671,12 +684,20 @@ export class DatabaseConfig extends BaseConfig {
   }
 
   isValid() {
-    return !!this.name || !!this.poolMax || !!this.timeout || !!this.driver || !!this.dbUrl || !!this.username || !!this.password;
+    return (
+      !!this.name ||
+      !!this.poolMax ||
+      !!this.timeout ||
+      !!this.driver ||
+      !!this.dbUrl ||
+      !!this.username ||
+      !!this.password
+    );
   }
 }
 
 export class RegistryCenter extends BaseConfig {
-  static PROTOCOLS = ["none", "zookeeper", "nacos", "apollo", "multicast", "redis", "simple"];
+  static PROTOCOLS = ['none', 'zookeeper', 'nacos', 'apollo', 'multicast', 'redis', 'simple'];
 
   constructor(options) {
     super();
@@ -696,44 +717,53 @@ export class RegistryCenter extends BaseConfig {
 }
 
 export class ConsumerAndService extends BaseConfig {
-  static ASYNC_OPTIONS = ["sync", "async"];
-  static LOAD_BALANCE_OPTIONS = ["random", "roundrobin", "leastactive", "consistenthash"];
+  static ASYNC_OPTIONS = ['sync', 'async'];
+  static LOAD_BALANCE_OPTIONS = ['random', 'roundrobin', 'leastactive', 'consistenthash'];
 
   constructor(options) {
     super();
-    this.timeout = "1000";
-    this.version = "1.0";
-    this.retries = "0";
-    this.cluster = "failfast";
+    this.timeout = '1000';
+    this.version = '1.0';
+    this.retries = '0';
+    this.cluster = 'failfast';
     this.group = undefined;
-    this.connections = "100";
-    this.async = "sync";
-    this.loadBalance = "random";
+    this.connections = '100';
+    this.async = 'sync';
+    this.loadBalance = 'random';
 
     this.set(options);
   }
 
   isValid() {
-    return !!this.timeout || !!this.version || !!this.retries || !!this.cluster || !!this.group || !!this.connections || !!this.async || !!this.loadBalance;
+    return (
+      !!this.timeout ||
+      !!this.version ||
+      !!this.retries ||
+      !!this.cluster ||
+      !!this.group ||
+      !!this.connections ||
+      !!this.async ||
+      !!this.loadBalance
+    );
   }
 }
 
 export class Body extends BaseConfig {
   constructor(options) {
     super();
-    this.type = "KeyValue";
+    this.type = 'KeyValue';
     this.raw = undefined;
     this.kvs = [];
     this.binary = [];
     this.set(options);
-    this.sets({kvs: KeyValue}, {binary: KeyValue}, options);
+    this.sets({ kvs: KeyValue }, { binary: KeyValue }, options);
   }
 
   isValid() {
     if (this.isKV()) {
-      return this.kvs.some(kv => {
+      return this.kvs.some((kv) => {
         return kv.isValid();
-      })
+      });
     } else {
       return !!this.raw;
     }
@@ -774,7 +804,7 @@ export class Assertions extends BaseConfig {
   constructor(options) {
     super();
     this.resourceId = uuid();
-    this.type = "Assertions";
+    this.type = 'Assertions';
     this.text = [];
     this.regex = [];
     this.jsonPath = [];
@@ -782,9 +812,22 @@ export class Assertions extends BaseConfig {
     this.xpath2 = [];
     this.duration = undefined;
     this.enable = true;
-    this.document = {type: "JSON", data: {xmlFollowAPI: false, jsonFollowAPI: false, json: [], xml: []}, enable: true};
+    this.document = {
+      type: 'JSON',
+      data: { xmlFollowAPI: false, jsonFollowAPI: false, json: [], xml: [] },
+      enable: true,
+    };
     this.set(options);
-    this.sets({text: Text, regex: Regex, jsonPath: JSONPath, jsr223: AssertionJSR223, xpath2: XPath2}, options);
+    this.sets(
+      {
+        text: Text,
+        regex: Regex,
+        jsonPath: JSONPath,
+        jsr223: AssertionJSR223,
+        xpath2: XPath2,
+      },
+      options
+    );
   }
 
   initOptions(options) {
@@ -798,17 +841,17 @@ export class AssertionDocument extends BaseConfig {
   constructor(options) {
     super();
     this.id = uuid();
-    this.name = "root";
+    this.name = 'root';
     this.status = true;
-    this.groupId = "";
+    this.groupId = '';
     this.rowspan = 1;
     this.include = false;
     this.typeVerification = false;
-    this.type = "object";
+    this.type = 'object';
     this.enable = true;
     this.arrayVerification = false;
-    this.contentVerifications = "none";
-    this.expectedOutcome = "";
+    this.contentVerifications = 'none';
+    this.expectedOutcome = '';
     this.children = [];
     this.set(options);
   }
@@ -837,7 +880,7 @@ export class AssertionJSR223 extends AssertionType {
     this.enable = true;
     this.name = undefined;
     this.script = undefined;
-    this.scriptLanguage = "beanshell";
+    this.scriptLanguage = 'beanshell';
     this.set(options);
   }
 
@@ -857,7 +900,6 @@ export class Text extends AssertionType {
   }
 }
 
-
 export class BeanShellProcessor extends BaseConfig {
   constructor(options) {
     super();
@@ -866,16 +908,15 @@ export class BeanShellProcessor extends BaseConfig {
   }
 }
 
-
 export class JSR223Processor extends BaseConfig {
   constructor(options) {
     super();
     this.resourceId = uuid();
     this.active = false;
-    this.type = "JSR223Processor";
-    this.label = "";
+    this.type = 'JSR223Processor';
+    this.label = '';
     this.script = undefined;
-    this.scriptLanguage = "beanshell";
+    this.scriptLanguage = 'beanshell';
     this.enable = true;
     this.hashTree = [];
     this.set(options);
@@ -887,15 +928,14 @@ export class JDBCProcessor extends BaseConfig {
     super();
     this.resourceId = uuid();
     this.active = false;
-    this.type = "JDBCProcessor";
+    this.type = 'JDBCProcessor';
     this.enable = true;
     this.variables = [];
-    this.dataSourceId = "";
+    this.dataSourceId = '';
     this.hashTree = [];
     this.set(options);
   }
 }
-
 
 export class Regex extends AssertionType {
   constructor(options) {
@@ -925,7 +965,7 @@ export class JSONPath extends AssertionType {
   }
 
   setJSONPathDescription() {
-    this.description = this.expression + " expect: " + (this.expect ? this.expect : '');
+    this.description = this.expression + ' expect: ' + (this.expect ? this.expect : '');
   }
 
   isValid() {
@@ -947,7 +987,6 @@ export class XPath2 extends AssertionType {
   }
 }
 
-
 export class Duration extends AssertionType {
   constructor(options) {
     super(ASSERTION_TYPE.DURATION);
@@ -965,7 +1004,7 @@ export class Extract extends BaseConfig {
   constructor(options) {
     super();
     this.resourceId = uuid();
-    this.type = "Extract";
+    this.type = 'Extract';
     this.xpathType = 'html';
     this.regex = [];
     this.json = [];
@@ -975,8 +1014,8 @@ export class Extract extends BaseConfig {
     let types = {
       json: ExtractJSONPath,
       xpath: ExtractXPath,
-      regex: ExtractRegex
-    }
+      regex: ExtractRegex,
+    };
     this.sets(types, options);
   }
 }
@@ -993,7 +1032,7 @@ export class ExtractCommon extends ExtractType {
     super(type);
     this.variable = undefined;
     this.useHeaders = undefined;
-    this.value = ""; // ${variable}
+    this.value = ''; // ${variable}
     this.expression = undefined;
     this.description = undefined;
     this.multipleMatching = undefined;
@@ -1025,12 +1064,12 @@ export class ExtractXPath extends ExtractCommon {
 
 export class Controller extends BaseConfig {
   static TYPES = {
-    IF_CONTROLLER: "If Controller",
-  }
+    IF_CONTROLLER: 'If Controller',
+  };
 
   constructor(type, options = {}) {
     super();
-    this.type = type
+    this.type = type;
     options.id = options.id || uuid();
     options.resourceId = options.resourceId || uuid();
     options.enable = options.enable === undefined ? true : options.enable;
@@ -1040,7 +1079,7 @@ export class Controller extends BaseConfig {
 export class IfController extends Controller {
   constructor(options = {}) {
     super(Controller.TYPES.IF_CONTROLLER, options);
-    this.type = "IfController";
+    this.type = 'IfController';
     this.variable;
     this.operator;
     this.value;
@@ -1049,7 +1088,7 @@ export class IfController extends Controller {
   }
 
   isValid() {
-    if (!!this.operator && this.operator.indexOf("empty") > 0) {
+    if (!!this.operator && this.operator.indexOf('empty') > 0) {
       return !!this.variable && !!this.operator;
     }
     return !!this.variable && !!this.operator && !!this.value;
@@ -1058,18 +1097,18 @@ export class IfController extends Controller {
   label() {
     if (this.isValid()) {
       let label = this.variable;
-      if (this.operator) label += " " + this.operator;
-      if (this.value) label += " " + this.value;
+      if (this.operator) label += ' ' + this.operator;
+      if (this.value) label += ' ' + this.value;
       return label;
     }
-    return "";
+    return '';
   }
 }
 
 export class PluginController extends BaseConfig {
   constructor(options = {}) {
-    super("Plugin", options);
-    this.type = "Plugin";
+    super('Plugin', options);
+    this.type = 'Plugin';
     this.active = false;
     this.enable = true;
     this.hashTree = [];
@@ -1077,7 +1116,7 @@ export class PluginController extends BaseConfig {
   }
 
   isValid() {
-    if (!!this.operator && this.operator.indexOf("empty") > 0) {
+    if (!!this.operator && this.operator.indexOf('empty') > 0) {
       return !!this.variable && !!this.operator;
     }
     return !!this.variable && !!this.operator && !!this.value;
@@ -1086,29 +1125,45 @@ export class PluginController extends BaseConfig {
   label() {
     if (this.isValid()) {
       let label = this.variable;
-      if (this.operator) label += " " + this.operator;
-      if (this.value) label += " " + this.value;
+      if (this.operator) label += ' ' + this.operator;
+      if (this.value) label += ' ' + this.value;
       return label;
     }
-    return "";
+    return '';
   }
 }
 
 export class LoopController extends Controller {
   constructor(options = {}) {
-    super("LoopController", options);
-    this.type = "LoopController";
+    super('LoopController', options);
+    this.type = 'LoopController';
     this.active = false;
-    this.loopType = "LOOP_COUNT";
-    this.countController = {loops: 0, interval: 0, proceed: true, requestResult: {}};
-    this.forEachController = {inputVal: "", returnVal: "", interval: 0, requestResult: {}};
-    this.whileController = {variable: "", operator: "", value: "", timeout: 0, requestResult: {}};
+    this.loopType = 'LOOP_COUNT';
+    this.countController = {
+      loops: 0,
+      interval: 0,
+      proceed: true,
+      requestResult: {},
+    };
+    this.forEachController = {
+      inputVal: '',
+      returnVal: '',
+      interval: 0,
+      requestResult: {},
+    };
+    this.whileController = {
+      variable: '',
+      operator: '',
+      value: '',
+      timeout: 0,
+      requestResult: {},
+    };
     this.hashTree = [];
     this.set(options);
   }
 
   isValid() {
-    if (!!this.operator && this.operator.indexOf("empty") > 0) {
+    if (!!this.operator && this.operator.indexOf('empty') > 0) {
       return !!this.variable && !!this.operator;
     }
     return !!this.variable && !!this.operator && !!this.value;
@@ -1117,18 +1172,18 @@ export class LoopController extends Controller {
   label() {
     if (this.isValid()) {
       let label = this.variable;
-      if (this.operator) label += " " + this.operator;
-      if (this.value) label += " " + this.value;
+      if (this.operator) label += ' ' + this.operator;
+      if (this.value) label += ' ' + this.value;
       return label;
     }
-    return "";
+    return '';
   }
 }
 
 export class TransactionController extends Controller {
   constructor(options = {}) {
-    super("TransactionController", options);
-    this.type = "TransactionController";
+    super('TransactionController', options);
+    this.type = 'TransactionController';
     this.name;
     this.hashTree = [];
     this.generateParentSample = true;
@@ -1138,7 +1193,7 @@ export class TransactionController extends Controller {
   }
 
   isValid() {
-    if (!!this.operator && this.operator.indexOf("empty") > 0) {
+    if (!!this.operator && this.operator.indexOf('empty') > 0) {
       return !!this.variable && !!this.operator;
     }
     return !!this.variable && !!this.operator && !!this.value;
@@ -1147,20 +1202,19 @@ export class TransactionController extends Controller {
   label() {
     if (this.isValid()) {
       let label = this.$t('api_test.automation.transaction_controller');
-      if (this.name != null && this.name !== "") {
+      if (this.name != null && this.name !== '') {
         label = this.name;
       }
       return label;
     }
-    return "";
+    return '';
   }
 }
 
-
 export class Timer extends BaseConfig {
   static TYPES = {
-    CONSTANT_TIMER: "Constant Timer",
-  }
+    CONSTANT_TIMER: 'Constant Timer',
+  };
 
   constructor(type, options = {}) {
     super();
@@ -1175,7 +1229,7 @@ export class ConstantTimer extends Timer {
   constructor(options = {}) {
     super(Timer.TYPES.CONSTANT_TIMER, options);
     this.delay;
-    this.type = "ConstantTimer";
+    this.type = 'ConstantTimer';
     this.hashTree = [];
     this.set(options);
   }
@@ -1186,9 +1240,9 @@ export class ConstantTimer extends Timer {
 
   label() {
     if (this.isValid()) {
-      return this.delay + " ms";
+      return this.delay + ' ms';
     }
-    return "";
+    return '';
   }
 }
 
@@ -1199,8 +1253,8 @@ const JMX_ASSERTION_CONDITION = {
   NOT: 1 << 2,
   EQUALS: 1 << 3,
   SUBSTRING: 1 << 4,
-  OR: 1 << 5
-}
+  OR: 1 << 5,
+};
 
 class JMXHttpRequest {
   constructor(request, environment) {
@@ -1208,20 +1262,23 @@ class JMXHttpRequest {
       this.useEnvironment = request.useEnvironment;
       this.method = request.method;
       if (!request.useEnvironment) {
-        if (!request.url.startsWith("http://") && !request.url.startsWith("https://")) {
+        if (!request.url.startsWith('http://') && !request.url.startsWith('https://')) {
           request.url = 'http://' + request.url;
         }
         let url = new URL(request.url);
         this.domain = decodeURIComponent(url.hostname);
         this.port = url.port;
-        this.protocol = url.protocol.split(":")[0];
+        this.protocol = url.protocol.split(':')[0];
         this.path = this.getPostQueryParameters(request, decodeURIComponent(url.pathname));
       } else {
         this.domain = environment.config.httpConfig.domain;
         this.port = environment.config.httpConfig.port;
         this.protocol = environment.config.httpConfig.protocol;
-        let url = new URL(environment.config.httpConfig.protocol + "://" + environment.config.httpConfig.socket);
-        this.path = this.getPostQueryParameters(request, decodeURIComponent(url.pathname + (request.path ? request.path : '')));
+        let url = new URL(environment.config.httpConfig.protocol + '://' + environment.config.httpConfig.socket);
+        this.path = this.getPostQueryParameters(
+          request,
+          decodeURIComponent(url.pathname + (request.path ? request.path : ''))
+        );
       }
       this.connectTimeout = request.connectTimeout;
       this.responseTimeout = request.responseTimeout;
@@ -1231,9 +1288,9 @@ class JMXHttpRequest {
   }
 
   getPostQueryParameters(request, path) {
-    if (this.method.toUpperCase() !== "GET") {
+    if (this.method.toUpperCase() !== 'GET') {
       let parameters = [];
-      request.parameters.forEach(parameter => {
+      request.parameters.forEach((parameter) => {
         if (parameter.name && parameter.value && parameter.enable === true) {
           parameters.push(parameter);
         }
@@ -1243,7 +1300,7 @@ class JMXHttpRequest {
       }
       for (let i = 0; i < parameters.length; i++) {
         let parameter = parameters[i];
-        path += (parameter.name + '=' + parameter.value);
+        path += parameter.name + '=' + parameter.value;
         if (i !== parameters.length - 1) {
           path += '&';
         }
@@ -1258,10 +1315,10 @@ class JMXDubboRequest {
     // Request 复制
     let obj = request.clone();
     // 去掉无效的kv
-    obj.args = obj.args.filter(arg => {
+    obj.args = obj.args.filter((arg) => {
       return arg.isValid();
     });
-    obj.attachmentArgs = obj.attachmentArgs.filter(arg => {
+    obj.attachmentArgs = obj.attachmentArgs.filter((arg) => {
       return arg.isValid();
     });
     return obj;
@@ -1301,7 +1358,9 @@ class JMXTCPRequest {
 class JMeterTestPlan extends Element {
   constructor() {
     super('jmeterTestPlan', {
-      version: "1.2", properties: "5.0", jmeter: "5.2.1"
+      version: '1.2',
+      properties: '5.0',
+      jmeter: '5.2.1',
     });
 
     this.add(new HashTree());
@@ -1326,23 +1385,22 @@ class JMXGenerator {
   }
 
   addScenarios(testPlan, testId, request) {
-
-    let threadGroup = new ThreadGroup(request.name || "");
+    let threadGroup = new ThreadGroup(request.name || '');
 
     if (!request.isValid()) return;
     let sampler;
     if (request instanceof DubboRequest) {
-      sampler = new DubboSample(request.name || "", new JMXDubboRequest(request));
+      sampler = new DubboSample(request.name || '', new JMXDubboRequest(request));
     } else if (request instanceof HttpRequest) {
-      sampler = new HTTPSamplerProxy(request.name || "", new JMXHttpRequest(request, false));
+      sampler = new HTTPSamplerProxy(request.name || '', new JMXHttpRequest(request, false));
       this.addRequestHeader(sampler, request);
       this.addRequestArguments(sampler, request);
       this.addRequestBody(sampler, request, testId);
     } else if (request instanceof SqlRequest) {
-      sampler = new JDBCSampler(request.name || "", request);
+      sampler = new JDBCSampler(request.name || '', request);
       this.addRequestVariables(sampler, request);
     } else if (request instanceof TCPRequest) {
-      sampler = new TCPSampler(request.name || "", new JMXTCPRequest(request));
+      sampler = new TCPSampler(request.name || '', new JMXTCPRequest(request));
     }
 
     this.addDNSCacheManager(sampler, false, request.useEnvironment);
@@ -1368,18 +1426,18 @@ class JMXGenerator {
 
   addEnvironments(environments, target) {
     let keys = new Set();
-    target.forEach(item => {
+    target.forEach((item) => {
       keys.add(item.name);
     });
     let envArray = environments;
     if (!(envArray instanceof Array)) {
       envArray = JSON.parse(environments);
     }
-    envArray.forEach(item => {
+    envArray.forEach((item) => {
       if (item.name && !keys.has(item.name)) {
-        target.push(new KeyValue({name: item.name, value: item.value}));
+        target.push(new KeyValue({ name: item.name, value: item.value }));
       }
-    })
+    });
   }
 
   addScenarioVariables(threadGroup, scenario) {
@@ -1388,17 +1446,17 @@ class JMXGenerator {
       if (!(scenario.environment.config instanceof Object)) {
         config = JSON.parse(scenario.environment.config);
       }
-      this.addEnvironments(config.commonConfig.variables, scenario.variables)
+      this.addEnvironments(config.commonConfig.variables, scenario.variables);
     }
     let args = this.filterKV(scenario.variables);
     if (args.length > 0) {
-      let name = scenario.name + " Variables";
+      let name = scenario.name + ' Variables';
       threadGroup.put(new Arguments(name, args));
     }
   }
 
   addRequestVariables(httpSamplerProxy, request) {
-    let name = request.name + " Variables";
+    let name = request.name + ' Variables';
     let variables = this.filterKV(request.variables);
     if (variables && variables.length > 0) {
       httpSamplerProxy.put(new Arguments(name, variables));
@@ -1416,13 +1474,13 @@ class JMXGenerator {
       let commonConfig = environment.config.commonConfig;
       let hosts = commonConfig.hosts;
       if (commonConfig.enableHost && hosts.length > 0) {
-        let name = " DNSCacheManager";
+        let name = ' DNSCacheManager';
         // 强化判断，如果未匹配到合适的host则不开启DNSCache
         let domain = environment.config.httpConfig.domain;
         let validHosts = [];
-        hosts.forEach(item => {
+        hosts.forEach((item) => {
           if (item.domain && domain) {
-            let d = item.domain.trim().replace("http://", "").replace("https://", "");
+            let d = item.domain.trim().replace('http://', '').replace('https://', '');
             if (d === domain.trim()) {
               item.domain = d; // 域名去掉协议
               validHosts.push(item);
@@ -1439,8 +1497,8 @@ class JMXGenerator {
   addJDBCDataSources(threadGroup, scenario) {
     let names = new Set();
     let databaseConfigMap = new Map();
-    scenario.databaseConfigs.forEach(config => {
-      let name = config.name + "JDBCDataSource";
+    scenario.databaseConfigs.forEach((config) => {
+      let name = config.name + 'JDBCDataSource';
       threadGroup.put(new JDBCDataSource(name, config));
       names.add(name);
       databaseConfigMap.set(config.id, config.name);
@@ -1450,9 +1508,9 @@ class JMXGenerator {
       if (!(scenario.environment.config instanceof Object)) {
         config = JSON.parse(scenario.environment.config);
       }
-      config.databaseConfigs.forEach(config => {
+      config.databaseConfigs.forEach((config) => {
         if (!names.has(config.name)) {
-          let name = config.name + "JDBCDataSource";
+          let name = config.name + 'JDBCDataSource';
           threadGroup.put(new JDBCDataSource(name, config));
           databaseConfigMap.set(config.id, config.name);
         }
@@ -1467,17 +1525,17 @@ class JMXGenerator {
       if (!(scenario.environment.config instanceof Object)) {
         config = JSON.parse(scenario.environment.config);
       }
-      this.addEnvironments(config.httpConfig.headers, scenario.headers)
+      this.addEnvironments(config.httpConfig.headers, scenario.headers);
     }
     let headers = this.filterKV(scenario.headers);
     if (headers.length > 0) {
-      let name = scenario.name + " Headers";
+      let name = scenario.name + ' Headers';
       threadGroup.put(new HeaderManager(name, headers));
     }
   }
 
   addRequestHeader(httpSamplerProxy, request) {
-    let name = request.name + " Headers";
+    let name = request.name + ' Headers';
     this.addBodyFormat(request);
     let headers = this.filterKV(request.headers);
     if (headers.length > 0) {
@@ -1505,28 +1563,28 @@ class JMXGenerator {
     if (request.controller.isValid() && request.controller.enable) {
       if (request.controller instanceof IfController) {
         let name = request.controller.label();
-        let variable = "\"" + request.controller.variable + "\"";
+        let variable = '"' + request.controller.variable + '"';
         let operator = request.controller.operator;
-        let value = "\"" + request.controller.value + "\"";
+        let value = '"' + request.controller.value + '"';
 
-        if (operator === "=~" || operator === "!~") {
-          value = "\".*" + request.controller.value + ".*\"";
+        if (operator === '=~' || operator === '!~') {
+          value = '".*' + request.controller.value + '.*"';
         }
 
-        if (operator === "is empty") {
-          variable = "empty(" + variable + ")";
-          operator = "";
-          value = "";
+        if (operator === 'is empty') {
+          variable = 'empty(' + variable + ')';
+          operator = '';
+          value = '';
         }
 
-        if (operator === "is not empty") {
-          variable = "!empty(" + variable + ")";
-          operator = "";
-          value = "";
+        if (operator === 'is not empty') {
+          variable = '!empty(' + variable + ')';
+          operator = '';
+          value = '';
         }
 
-        let condition = "${__jexl3(" + variable + operator + value + ")}";
-        let controller = new JMXIfController(name, {condition: condition});
+        let condition = '${__jexl3(' + variable + operator + value + ')}';
+        let controller = new JMXIfController(name, { condition: condition });
         controller.put(sampler);
         return controller;
       }
@@ -1561,7 +1619,7 @@ class JMXGenerator {
         }
       }
     }
-    request.headers.push(new KeyValue({name: 'Content-Type', value: type}));
+    request.headers.push(new KeyValue({ name: 'Content-Type', value: type }));
   }
 
   addRequestArguments(httpSamplerProxy, request) {
@@ -1578,7 +1636,12 @@ class JMXGenerator {
       this.addRequestBodyFile(httpSamplerProxy, request, testId);
     } else {
       httpSamplerProxy.boolProp('HTTPSampler.postBodyRaw', true);
-      body.push({name: '', value: request.body.raw, encode: false, enable: true});
+      body.push({
+        name: '',
+        value: request.body.raw,
+        encode: false,
+        enable: true,
+      });
     }
 
     if (request.method !== 'GET') {
@@ -1589,9 +1652,9 @@ class JMXGenerator {
   addRequestBodyFile(httpSamplerProxy, request, testId) {
     let files = [];
     let kvs = this.filterKVFile(request.body.kvs);
-    kvs.forEach(kv => {
-      if ((kv.enable !== false) && kv.files) {
-        kv.files.forEach(file => {
+    kvs.forEach((kv) => {
+      if (kv.enable !== false && kv.files) {
+        kv.files.forEach((file) => {
           let arg = {};
           arg.name = kv.name;
           arg.value = BODY_FILE_DIR + '/' + testId + '/' + file.id + '_' + file.name;
@@ -1605,19 +1668,19 @@ class JMXGenerator {
   addRequestAssertion(httpSamplerProxy, request) {
     let assertions = request.assertions;
     if (assertions.regex.length > 0) {
-      assertions.regex.filter(this.filter).forEach(regex => {
+      assertions.regex.filter(this.filter).forEach((regex) => {
         httpSamplerProxy.put(this.getResponseAssertion(regex));
-      })
+      });
     }
 
     if (assertions.jsonPath.length > 0) {
-      assertions.jsonPath.filter(this.filter).forEach(item => {
+      assertions.jsonPath.filter(this.filter).forEach((item) => {
         httpSamplerProxy.put(this.getJSONPathAssertion(item));
-      })
+      });
     }
 
     if (assertions.duration.isValid()) {
-      let name = "Response In Time: " + assertions.duration.value
+      let name = 'Response In Time: ' + assertions.duration.value;
       httpSamplerProxy.put(new DurationAssertion(name, assertions.duration.value));
     }
   }
@@ -1645,21 +1708,21 @@ class JMXGenerator {
   addRequestExtractor(httpSamplerProxy, request) {
     let extract = request.extract;
     if (extract.regex.length > 0) {
-      extract.regex.filter(this.filter).forEach(regex => {
+      extract.regex.filter(this.filter).forEach((regex) => {
         httpSamplerProxy.put(this.getExtractor(regex));
-      })
+      });
     }
 
     if (extract.json.length > 0) {
-      extract.json.filter(this.filter).forEach(json => {
+      extract.json.filter(this.filter).forEach((json) => {
         httpSamplerProxy.put(this.getExtractor(json));
-      })
+      });
     }
 
     if (extract.xpath.length > 0) {
-      extract.xpath.filter(this.filter).forEach(xpath => {
+      extract.xpath.filter(this.filter).forEach((xpath) => {
         httpSamplerProxy.put(this.getExtractor(xpath));
-      })
+      });
     }
   }
 
@@ -1667,20 +1730,20 @@ class JMXGenerator {
     let props = {
       name: extractCommon.variable,
       expression: extractCommon.expression,
-      match: extractCommon.multipleMatching ? -1 : undefined
-    }
-    let testName = props.name
+      match: extractCommon.multipleMatching ? -1 : undefined,
+    };
+    let testName = props.name;
     switch (extractCommon.type) {
       case EXTRACT_TYPE.REGEX:
-        testName += " RegexExtractor";
+        testName += ' RegexExtractor';
         props.headers = extractCommon.useHeaders; // 对应jMeter body
-        props.template = "$1$";
+        props.template = '$1$';
         return new RegexExtractor(testName, props);
       case EXTRACT_TYPE.JSON_PATH:
-        testName += " JSONExtractor";
+        testName += ' JSONExtractor';
         return new JSONPostProcessor(testName, props);
       case EXTRACT_TYPE.XPATH:
-        testName += " XPath2Evaluator";
+        testName += ' XPath2Evaluator';
         return new XPath2Extractor(testName, props);
     }
   }
@@ -1694,7 +1757,7 @@ class JMXGenerator {
   }
 
   filterKVFile(kvs) {
-    return kvs.filter(kv => {
+    return kvs.filter((kv) => {
       return kv.isFile();
     });
   }
@@ -1705,5 +1768,3 @@ class JMXGenerator {
     return xml;
   }
 }
-
-

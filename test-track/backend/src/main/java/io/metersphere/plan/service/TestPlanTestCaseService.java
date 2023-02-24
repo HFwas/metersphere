@@ -8,6 +8,7 @@ import io.metersphere.base.mapper.TestPlanMapper;
 import io.metersphere.base.mapper.TestPlanTestCaseMapper;
 import io.metersphere.base.mapper.ext.ExtTestPlanTestCaseMapper;
 import io.metersphere.commons.constants.IssueRefType;
+import io.metersphere.commons.constants.MicroServiceName;
 import io.metersphere.commons.constants.ProjectApplicationType;
 
 import io.metersphere.commons.exception.MSException;
@@ -32,13 +33,11 @@ import io.metersphere.plan.utils.TestPlanStatusCalculator;
 import io.metersphere.request.OrderRequest;
 import io.metersphere.request.ResetOrderRequest;
 import io.metersphere.request.member.QueryMemberRequest;
-import io.metersphere.service.BaseProjectApplicationService;
-import io.metersphere.service.BaseUserService;
-import io.metersphere.service.FunctionCaseExecutionInfoService;
-import io.metersphere.service.ServiceUtils;
+import io.metersphere.service.*;
 import io.metersphere.dto.*;
 import io.metersphere.request.testcase.TrackCount;
 import io.metersphere.request.testreview.SaveCommentRequest;
+import io.metersphere.utils.DiscoveryUtil;
 import io.metersphere.xpack.track.dto.IssuesDao;
 import io.metersphere.xpack.version.service.ProjectVersionService;
 import org.apache.commons.collections.CollectionUtils;
@@ -89,6 +88,8 @@ public class TestPlanTestCaseService {
     private BaseProjectApplicationService baseProjectApplicationService;
     @Resource
     private FunctionCaseExecutionInfoService functionCaseExecutionInfoService;
+    @Resource
+    private CustomFieldTestCaseService customFieldTestCaseService;
 
     private static final String CUSTOM_NUM = "custom_num";
     private static final String NUM = "num";
@@ -105,6 +106,9 @@ public class TestPlanTestCaseService {
 
     public List<TestPlanCaseDTO> list(QueryTestPlanCaseRequest request) {
         List<TestPlanCaseDTO> list = extTestPlanTestCaseMapper.list(request);
+        Map<String, List<CustomFieldDao>> fieldMap =
+                customFieldTestCaseService.getMapByResourceIds(list.stream().map(TestPlanCaseDTO::getCaseId).collect(Collectors.toList()));
+        list.forEach(i -> i.setFields(fieldMap.get(i.getCaseId())));
         if (CollectionUtils.isNotEmpty(list)) {
             // 设置版本信息
             ServiceUtils.buildVersionInfo(list);
@@ -178,6 +182,17 @@ public class TestPlanTestCaseService {
             //记录功能用例执行信息
             functionCaseExecutionInfoService.insertExecutionInfo(testPlanTestCase.getId(), testPlanTestCase.getStatus());
         }
+        setUpdateCaseExecutor(testPlanTestCase);
+
+        testPlanTestCase.setUpdateTime(System.currentTimeMillis());
+        testPlanTestCase.setRemark(null);
+        testPlanTestCaseMapper.updateByPrimaryKeySelective(testPlanTestCase);
+        testCaseService.updateLastExecuteStatus(testPlanTestCase.getCaseId(), testPlanTestCase.getStatus());
+
+        saveComment(testPlanTestCase);
+    }
+
+    private void setUpdateCaseExecutor(TestPlanTestCaseWithBLOBs testPlanTestCase) {
         if (StringUtils.isNotBlank(testPlanTestCase.getStatus())) {
             TestPlanTestCaseWithBLOBs originData = testPlanTestCaseMapper.selectByPrimaryKey(testPlanTestCase.getId());
             if (!StringUtils.equals(originData.getStatus(), testPlanTestCase.getStatus())) {
@@ -185,12 +200,6 @@ public class TestPlanTestCaseService {
                 testPlanTestCase.setExecutor(SessionUtils.getUser().getId());
             }
         }
-        testPlanTestCase.setUpdateTime(System.currentTimeMillis());
-        testPlanTestCase.setRemark(null);
-        testPlanTestCaseMapper.updateByPrimaryKeySelective(testPlanTestCase);
-        testCaseService.updateLastExecuteStatus(testPlanTestCase.getCaseId(), testPlanTestCase.getStatus());
-
-        saveComment(testPlanTestCase);
     }
 
     private void saveComment(TestPlanFuncCaseEditRequest testPlanTestCase) {
@@ -234,7 +243,13 @@ public class TestPlanTestCaseService {
         testPlanTestCaseMapper.updateByExampleSelective(
                 testPlanTestCase,
                 testPlanTestCaseExample);
-
+        if (StringUtils.isNotBlank(testPlanTestCase.getStatus()) &&
+                !StringUtils.equals(TestPlanTestCaseStatus.Prepare.name(), testPlanTestCase.getStatus())) {
+            //记录功能用例执行信息
+            request.getIds().forEach(caseId -> {
+                functionCaseExecutionInfoService.insertExecutionInfo(caseId, testPlanTestCase.getStatus());
+            });
+        }
         if (StringUtils.isNotBlank(request.getStatus())) {
             List<String> caseIds = extTestPlanTestCaseMapper.getCaseIdsByIds(request.getIds());
             testCaseService.updateLastExecuteStatus(caseIds, request.getStatus());
@@ -291,33 +306,43 @@ public class TestPlanTestCaseService {
         TestPlanCaseDTO testPlanCaseDTO = extTestPlanTestCaseMapper.get(id);
         ServiceUtils.buildCustomNumInfo(testPlanCaseDTO);
         List<TestCaseTestDTO> testCaseTestDTOS = extTestPlanTestCaseMapper.listTestCaseTest(testPlanCaseDTO.getCaseId());
-        testCaseTestDTOS.forEach(dto -> {
-            setTestName(dto);
-        });
+        testCaseTestDTOS.forEach(this::setTestName);
         testPlanCaseDTO.setList(testCaseTestDTOS);
+        buildCustomField(testPlanCaseDTO);
         return testPlanCaseDTO;
+    }
+
+    private void buildCustomField(TestPlanCaseDTO data) {
+        data.setFields(testCaseService.getCustomFieldByCaseId(data.getCaseId()));
     }
 
     private void setTestName(TestCaseTestDTO dto) {
         String type = dto.getTestType();
         String id = dto.getTestId();
+        Set<String> serviceIdSet = DiscoveryUtil.getServiceIdSet();
         switch (type) {
             case "performance":
-                LoadTest loadTest = planPerformanceTestService.get(id);
-                if (loadTest != null) {
-                    dto.setTestName(loadTest.getName());
+                if (serviceIdSet.contains(MicroServiceName.PERFORMANCE_TEST)) {
+                    LoadTest loadTest = planPerformanceTestService.get(id);
+                    if (loadTest != null) {
+                        dto.setTestName(loadTest.getName());
+                    }
                 }
                 break;
             case "testcase":
-                ApiTestCaseWithBLOBs apiTestCaseWithBLOBs = planApiTestCaseService.get(id);
-                if (apiTestCaseWithBLOBs != null) {
-                    dto.setTestName(apiTestCaseWithBLOBs.getName());
+                if (serviceIdSet.contains(MicroServiceName.API_TEST)) {
+                    ApiTestCaseWithBLOBs apiTestCaseWithBLOBs = planApiTestCaseService.get(id);
+                    if (apiTestCaseWithBLOBs != null) {
+                        dto.setTestName(apiTestCaseWithBLOBs.getName());
+                    }
                 }
                 break;
             case "automation":
-                ApiScenarioWithBLOBs apiScenarioWithBLOBs = panApiAutomationService.get(id);
-                if (apiScenarioWithBLOBs != null) {
-                    dto.setTestName(apiScenarioWithBLOBs.getName());
+                if (serviceIdSet.contains(MicroServiceName.API_TEST)) {
+                    ApiScenarioWithBLOBs apiScenarioWithBLOBs = panApiAutomationService.get(id);
+                    if (apiScenarioWithBLOBs != null) {
+                        dto.setTestName(apiScenarioWithBLOBs.getName());
+                    }
                 }
                 break;
             default:
@@ -431,6 +456,7 @@ public class TestPlanTestCaseService {
     public void editTestCaseForMinder(List<TestPlanTestCaseWithBLOBs> testPlanTestCases) {
         testPlanTestCases.forEach(item -> {
             item.setUpdateTime(System.currentTimeMillis());
+            setUpdateCaseExecutor(item);
             testPlanTestCaseMapper.updateByPrimaryKeySelective(item);
             testCaseService.updateLastExecuteStatus(item.getCaseId(), item.getStatus());
         });

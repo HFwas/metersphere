@@ -22,15 +22,6 @@ public class IssuesUpdateRequest extends IssuesWithBLOBs {
     private List<CustomFieldResourceDTO> addFields;
     private List<CustomFieldResourceDTO> editFields;
     private List<CustomFieldItemDTO> requestFields;
-    /**
-     * zentao bug 处理人
-     */
-    private String zentaoUser;
-    private String zentaoAssigned;
-    /**
-     * zentao bug 影响版本
-     */
-    private List<String> zentaoBuilds;
     private boolean thirdPartPlatform;
 
     private List<String> follows;
@@ -66,4 +57,8 @@ public class IssuesUpdateRequest extends IssuesWithBLOBs {
      * 取消关联文件应用ID
      */
     private List<String> unRelateFileMetaIds = new ArrayList<>();
+
+    private List<String> batchDeleteIds;
+
+    private Boolean batchDeleteAll;
 }

@@ -30,6 +30,7 @@ import io.metersphere.xpack.quota.service.QuotaService;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.ListUtils;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.redisson.api.RLock;
 import org.redisson.api.RedissonClient;
@@ -320,11 +321,17 @@ public class PerformanceTestService {
             loadTest.setCreateUser(SessionUtils.getUserId());
             loadTest.setOrder(oldLoadTest.getOrder());
             loadTest.setRefId(oldLoadTest.getRefId());
+            if (oldLoadTest.getLatest()) {
+                loadTest.setLatest(false);
+            }
             //插入文件
             copyLoadTestFiles(testId, loadTest.getId());
             loadTestMapper.insertSelective(loadTest);
         }
-        checkAndSetLatestVersion(loadTest.getRefId());
+        String defaultVersion = baseProjectVersionMapper.getDefaultVersion(request.getProjectId());
+        if (StringUtils.equalsIgnoreCase(request.getVersionId(), defaultVersion)) {
+            checkAndSetLatestVersion(loadTest.getRefId());
+        }
         return loadTest;
     }
 
@@ -594,7 +601,7 @@ public class PerformanceTestService {
         request.setProjectId(copy.getProjectId());
         checkQuota(request, true);
         // copy test
-        String copyName = copy.getName() + " Copy";
+        String copyName = copy.getName() + "_" + RandomStringUtils.randomAlphanumeric(5);
 
         if (StringUtils.length(copyName) > 30) {
             MSException.throwException(Translator.get("load_test_name_length"));
@@ -835,7 +842,7 @@ public class PerformanceTestService {
         try {
             LoadTestReportWithBLOBs report = loadTestReportMapper.selectByPrimaryKey(reportId);
             Map advancedConfig = JSON.parseObject(report.getAdvancedConfiguration(), Map.class);
-            if (advancedConfig.get("granularity") != null) {
+            if (advancedConfig.get("granularity") != null && StringUtils.isNotEmpty(advancedConfig.get("granularity").toString())) {
                 return (int) advancedConfig.get("granularity") * 1000;// 单位是ms
             }
             AtomicReference<Integer> maxDuration = new AtomicReference<>(0);

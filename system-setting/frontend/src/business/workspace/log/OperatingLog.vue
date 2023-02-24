@@ -109,13 +109,13 @@
             <span>{{ scope.row.operTime | datetimeFormat }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="userName" width="200" :label="$t('operating_log.user')" show-overflow-tooltip/>
+        <el-table-column prop="userName" width="110" :label="$t('operating_log.user')" show-overflow-tooltip/>
         <el-table-column prop="workspaceName" v-if="isSystem"
                          :label="$t('commons.workspace')"
                          show-overflow-tooltip
-                         width="200"/>
-        <el-table-column prop="projectName" :label="$t('commons.project')" width="200" show-overflow-tooltip/>
-        <el-table-column prop="operType" :label="$t('operating_log.type')" width="150" show-overflow-tooltip>
+                         width="150"/>
+        <el-table-column prop="projectName" :label="$t('commons.project')" width="140" show-overflow-tooltip/>
+        <el-table-column prop="operType" :label="$t('operating_log.type')" width="90" show-overflow-tooltip>
           <template v-slot="scope">
             <span>{{ getType(scope.row.operType) }}</span>
           </template>
@@ -321,6 +321,7 @@ export default {
       } else {
         this.condition.workspaceIds = [];
       }
+      this.condition.level = 'workspace';
       this.loading = getOperatingLogPages(this.currentPage, this.pageSize, this.condition).then(res => {
         let {listObject, itemCount} = res.data;
         this.tableData = listObject;

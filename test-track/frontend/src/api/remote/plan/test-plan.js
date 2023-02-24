@@ -52,6 +52,10 @@ export function testPlanRunSave(param) {
   return post(BASE_URL + 'run/save', param);
 }
 
+export function testPlanRun(param) {
+  return post(BASE_URL + 'run', param);
+}
+
 export function testPlanHaveUiCase(id) {
   return get(BASE_URL + `have/ui/case/${id}`);
 }
@@ -273,6 +277,10 @@ export function updateBatchScheduleEnable(param) {
   return post(BASE_URL + 'schedule/Batch/updateEnable', param);
 }
 
+export function batchDeletePlan(param) {
+  return post(BASE_URL + 'delete/batch', param);
+}
+
 export function createSchedule(param){
   return post(BASE_URL + 'schedule/create',param);
 }
@@ -281,12 +289,16 @@ export function updateSchedule(param){
   return post(BASE_URL + 'schedule/update',param);
 }
 
-export function getApiScenarioEnv(param){
-  return post(BASE_URL + 'api/scenario/env',param);
+export function getApiScenarioEnv(param) {
+  return post(BASE_URL + 'api/scenario/env', param);
 }
 
-export function getPlanCaseEnv(param){
-  return post(BASE_URL + 'case/env',param);
+export function getPlanCaseEnv(param) {
+  return post(BASE_URL + 'case/env', param);
+}
+
+export function getPlanCaseProjectIds(param) {
+  return post(BASE_URL + 'case/relevance/project/ids', param);
 }
 
 export function run(testId, reportId) {
@@ -299,5 +311,25 @@ export function reportSocket(reportId) {
 
 export function testPlanLoadCaseEditStatus(planId) {
   return post(BASE_URL + `edit/status/${planId}`, new Promise(() => {}));
+}
+
+export function getTestPlanExtReport(planId, reportId) {
+  if (reportId) {
+    return get(BASE_URL + 'ext/report/' + reportId);
+  } else if (planId) {
+    return get(BASE_URL + 'ext/plan/' + planId);
+  } else {
+    return new Promise(() => {});
+  }
+}
+
+export function getShareTestPlanExtReport(shareId, planId, reportId) {
+  if (reportId) {
+    return get('/share' + BASE_URL + `ext/report/${shareId}/${reportId}`);
+  } else if (planId) {
+    return get('/share' + BASE_URL + `ext/plan/${shareId}/${planId}`);
+  } else {
+    return new Promise(() => {});
+  }
 }
 

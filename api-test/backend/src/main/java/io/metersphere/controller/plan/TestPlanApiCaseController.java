@@ -2,10 +2,13 @@ package io.metersphere.controller.plan;
 
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
+import io.metersphere.api.dto.QueryReferenceRequest;
+import io.metersphere.api.dto.automation.TestPlanDTO;
+import io.metersphere.api.dto.automation.TestPlanFailureApiDTO;
 import io.metersphere.api.dto.definition.*;
 import io.metersphere.api.dto.plan.TestPlanApiCaseBatchRequest;
-import io.metersphere.api.dto.automation.TestPlanFailureApiDTO;
-import io.metersphere.service.plan.TestPlanApiCaseService;
+import io.metersphere.base.domain.ApiDefinitionExecResultWithBLOBs;
+import io.metersphere.base.domain.ApiScenarioReportWithBLOBs;
 import io.metersphere.commons.constants.OperLogConstants;
 import io.metersphere.commons.constants.OperLogModule;
 import io.metersphere.commons.constants.PermissionConstants;
@@ -15,6 +18,7 @@ import io.metersphere.dto.MsExecResponseDTO;
 import io.metersphere.dto.RunModeConfigDTO;
 import io.metersphere.log.annotation.MsAuditLog;
 import io.metersphere.request.ResetOrderRequest;
+import io.metersphere.service.plan.TestPlanApiCaseService;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.web.bind.annotation.*;
 
@@ -155,6 +159,11 @@ public class TestPlanApiCaseController {
         return testPlanApiCaseService.getApiCaseEnv(planId);
     }
 
+    @GetMapping("/get/project/ids/{planId}")
+    public List<String> getApiCaseProjectIds(@PathVariable("planId") String planId) {
+        return testPlanApiCaseService.getApiCaseProjectIds(planId);
+    }
+
     @GetMapping("/is/executing/{planId}")
     public Boolean isExecuting(@PathVariable("planId") String planId) {
         return testPlanApiCaseService.isExecuting(planId);
@@ -185,4 +194,21 @@ public class TestPlanApiCaseController {
         testPlanApiCaseService.buildApiResponse(cases);
         return cases;
     }
+
+    @PostMapping("/get-reference/{goPage}/{pageSize}")
+    public Pager<List<TestPlanDTO>> getReference(@PathVariable int goPage, @PathVariable int pageSize, @RequestBody QueryReferenceRequest request) {
+        Page<Object> page = PageHelper.startPage(goPage, pageSize, true);
+        return PageUtils.setPageInfo(page, testPlanApiCaseService.getReference(request));
+    }
+
+    @GetMapping("/get/report/ext/{planId}")
+    public List<ApiDefinitionExecResultWithBLOBs> selectExtForPlanReport(@PathVariable("planId") String planId) {
+        return testPlanApiCaseService.selectExtForPlanReport(planId);
+    }
+
+    @GetMapping("/get/report/scenario/ext/{planId}")
+    public List<ApiScenarioReportWithBLOBs> selectExtForPlanScenarioReport(@PathVariable("planId") String planId) {
+        return testPlanApiCaseService.selectExtForPlanScenarioReport(planId);
+    }
+
 }

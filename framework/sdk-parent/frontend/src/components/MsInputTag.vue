@@ -3,7 +3,7 @@
     class="el-input-tag input-tag-wrapper"
     :class="[size ? 'el-input-tag--' + size : '']"
     style="height: auto"
-    @click="foucusTagInput">
+    @click="focusTagInput">
 
     <el-tag
       class="ms-top"
@@ -15,7 +15,14 @@
       :closable="!readOnly"
       :disable-transitions="false"
       @close="remove(idx)">
-      {{ tag && tag.length > 10 ? tag.substring(0, 10) + "..." : tag }}
+      <span v-if="tag && tag.length > 10">
+        <el-tooltip class="item" effect="light" :content="tag" placement="top" :enterable="false">
+          <span>{{ tag && tag.length > 10 ? tag.substring(0, 10) + "..." : tag }}</span>
+        </el-tooltip>
+      </span>
+      <span v-else>
+        {{ tag }}
+      </span>
     </el-tag>
     <input
       :disabled="readOnly"
@@ -69,6 +76,7 @@ export default {
   watch: {
     innerTags() {
       this.currentScenario[this.prop] = this.innerTags;
+      this.tagChange();
     },
     'currentScenario.tags'() {
       if (this.prop === 'tags') {
@@ -82,7 +90,7 @@ export default {
     },
   },
   methods: {
-    foucusTagInput() {
+    focusTagInput() {
       if (!this.readOnly && this.$el.querySelector('.tag-input')) {
         this.$el.querySelector('.tag-input').focus()
       }
@@ -95,19 +103,19 @@ export default {
         e.stopPropagation()
         e.preventDefault()
       }
-      let addSuucess = false
+      let addSuccess = false
       if (this.newTag.includes(',')) {
         this.newTag.split(',').forEach(item => {
           if (this.addTag(item.trim())) {
-            addSuucess = true
+            addSuccess = true
           }
         })
       } else {
         if (this.addTag(this.newTag.trim())) {
-          addSuucess = true
+          addSuccess = true
         }
       }
-      if (addSuucess) {
+      if (addSuccess) {
         this.tagChange()
         this.newTag = ''
       }

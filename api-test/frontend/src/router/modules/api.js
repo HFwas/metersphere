@@ -1,49 +1,54 @@
-import Layout from "metersphere-frontend/src/business/app-layout";
+import Layout from 'metersphere-frontend/src/business/app-layout';
 
 export default {
-  path: "/api",
-  name: "api",
-  redirect: "/api/home",
+  path: '/api',
+  name: 'api',
+  redirect: '/api/home',
   component: Layout,
   children: [
     {
       path: 'home',
       name: 'fucHome',
-      component: () => import('@/business/home/ApiTestHome'),
+      component: () => import('@/business/home/ApiHome'),
     },
     {
-      path: "automation/report",
-      name: "ApiReportList",
+      path: 'automation/report',
+      name: 'ApiReportList',
       component: () => import('@/business/automation/report/ApiReportList'),
     },
     {
-      path: "automation/report/view/:reportId",
-      name: "ApiScenarioReportView",
+      path: 'automation/report/view/:reportId',
+      name: 'ApiScenarioReportView',
       component: () => import('@/business/automation/report/ApiReportView'),
     },
     {
-      path: "definition/report/view/:reportId",
-      name: "ApiReportView",
+      path: 'automation/:versionId?/report/:redirectID?/:dataType?/:dataSelectRange',
+      name: 'ApiReportListWithQuery',
+      component: () => import('@/business/automation/report/ApiReportList'),
+    },
+    {
+      path: 'definition/report/view/:reportId',
+      name: 'ApiReportView',
       component: () => import('@/business/definition/components/response/ApiResponseView'),
     },
     {
-      path: "definition",
-      name: "ApiDefinition",
+      path: 'definition',
+      name: 'ApiDefinition',
       component: () => import('@/business/definition/ApiDefinition'),
     },
     {
-      path: "definition/:redirectID?/:dataType?/:dataSelectRange?/:projectId?/:type?/:workspaceId?",
-      name: "ApiDefinitionWithQuery",
+      path: 'definition/:versionId?/:redirectID?/:dataType?/:dataSelectRange?/:projectId?/:type?/:workspaceId?',
+      name: 'ApiDefinitionWithQuery',
       component: () => import('@/business/definition/ApiDefinition'),
     },
     {
-      path: "automation/:redirectID?/:dataType?/:dataSelectRange?/:projectId?/:workspaceId?",
-      name: "ApiAutomationWithQuery",
+      path: 'automation/:versionId?/:redirectID?/:dataType?/:dataSelectRange?/:projectId?/:workspaceId?',
+      name: 'ApiAutomationWithQuery',
       component: () => import('@/business/automation/ApiAutomation'),
     },
     {
-      path: "automation",
-      name: "ApiAutomation",
+      path: 'automation',
+      name: 'ApiAutomation',
       component: () => import('@/business/automation/ApiAutomation'),
     },
     {
@@ -51,6 +56,5 @@ export default {
       name: 'editCompleteContainer',
       component: () => import('@/business/definition/ApiDefinition'),
     },
-  ]
+  ],
 };
-

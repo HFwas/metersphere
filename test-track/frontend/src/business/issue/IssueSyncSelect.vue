@@ -25,17 +25,21 @@
         <el-date-picker
           v-model="form.createTime"
           type="datetime"
+          @change="changeSyncTime"
           placeholder="选择日期时间">
         </el-date-picker>
       </el-form-item>
       <el-form-item class="tips-item">
         <span class="tips">{{ $t('custom_field.sync_issue_tips') }}</span>
       </el-form-item>
-      <el-form-item class="btn-group">
+    </el-form>
+
+    <template v-slot:footer>
+      <div class="dialog-footer">
         <el-button size="small" @click="cancel">{{ $t('commons.cancel') }}</el-button>
         <el-button type="primary" size="small" @click="save">{{ $t('commons.confirm') }}</el-button>
-      </el-form-item>
-    </el-form>
+      </div>
+    </template>
   </el-dialog>
 </template>
 
@@ -62,6 +66,10 @@ export default {
   methods: {
     open() {
       this.visible = true;
+      let syncTime = localStorage.getItem("ISSUE_SYNC_TIME");
+      if (syncTime) {
+        this.form.createTime = new Date(syncTime);
+      }
     },
     save() {
       this.$refs['form'].validate((valid) => {
@@ -75,7 +83,11 @@ export default {
     },
     cancel() {
       this.visible = false;
-      this.$refs.form.resetFields();
+    },
+    changeSyncTime() {
+      if (this.form.createTime) {
+        localStorage.setItem("ISSUE_SYNC_TIME", this.form.createTime);
+      }
     }
   }
 };

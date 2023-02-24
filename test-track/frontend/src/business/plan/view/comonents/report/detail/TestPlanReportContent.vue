@@ -1,10 +1,10 @@
 <template>
   <ms-container>
-    <ms-main-container class="report-content">
+    <ms-main-container class="report-content" :class="isShare || isTemplate? 'full-screen-container' : 'with-header-container'" id = "planReportContainer">
       <el-card v-loading="loading">
         <test-plan-report-buttons :is-db="isDb" :plan-id="planId" :is-share="isShare" :report="report"
                                   v-if="!isTemplate && !isShare"/>
-        <test-plan-overview-report v-if="overviewEnable" :report="report"/>
+        <test-plan-overview-report v-if="overviewEnable" :report="report" :run-mode="runMode" :resource-pool="resourcePool"/>
         <test-plan-summary-report v-if="summaryEnable" :is-db="isDb" :is-template="isTemplate" :is-share="isShare"
                                   :report="report" :plan-id="planId"/>
         <test-plan-functional-report v-if="functionalEnable" :is-db="isDb" :share-id="shareId" :is-share="isShare"
@@ -35,7 +35,8 @@ import {
   getShareTestPlanReport,
   getShareTestPlanReportContent,
   getTestPlanReport,
-  getTestPlanReportContent
+  getTestPlanReportContent,
+  getTestPlanExtReport, getShareTestPlanExtReport
 } from "@/api/remote/plan/test-plan";
 import TestPlanApiReport from "@/business/plan/view/comonents/report/detail/TestPlanApiReport";
 import TestPlanUiReport from "@/business/plan/view/comonents/report/detail/TestPlanUiReport";
@@ -75,6 +76,8 @@ export default {
   data() {
     return {
       report: {},
+      runMode: '',
+      resourcePool: '',
       loading: false,
       shareUrl: ''
     };
@@ -136,6 +139,8 @@ export default {
     getReport() {
       if (this.isTemplate) {
         this.report = "#report";
+        this.runMode = this.report.runMode;
+        this.resourcePool = this.report.resourcePool;
         if (this.report.lang) {
           this.$setLang(this.report.lang);
         }
@@ -148,6 +153,8 @@ export default {
             .then((r) => {
               this.loading = false;
               this.report = r.data;
+              this.runMode = r.data.runMode;
+              this.resourcePool = r.data.resourcePool;
               this.report.config = this.getDefaultConfig(this.report);
             });
         } else {
@@ -178,6 +185,23 @@ export default {
               this.report = r.data;
               this.report.config = this.getDefaultConfig(this.report);
             });
+        }
+      }
+      if (!this.isTemplate) {
+        if (this.isShare) {
+          getShareTestPlanExtReport(this.shareId, this.planId, this.reportId).then((response) => {
+            if (response.data) {
+              this.runMode = response.data.runMode;
+              this.resourcePool = response.data.resourcePool;
+            }
+          });
+        } else {
+          getTestPlanExtReport(this.planId, this.reportId).then((response) => {
+            if (response.data) {
+              this.runMode = response.data.runMode;
+              this.resourcePool = response.data.resourcePool;
+            }
+          });
         }
       }
     },
@@ -316,8 +340,15 @@ export default {
 
 <style scoped>
 
+.with-header-container {
+  height: calc(100vh - 60px);
+}
+
+.full-screen-container {
+  height: calc(100vh - 10px);
+}
+
 .el-card {
-  /*width: 95% !important;*/
   padding: 15px;
 }
 

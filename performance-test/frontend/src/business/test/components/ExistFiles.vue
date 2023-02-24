@@ -24,7 +24,7 @@
         <el-upload
           v-else
           style="margin-bottom: 10px"
-          accept=".jar,.csv,.json,.pdf,.jpg,.png,.jpeg,.doc,.docx,.xlsx,.txt,.der,.cer,.pem,.crt,.pfx,.p12,.jks"
+          accept=".jar,.csv,.json,.pdf,.jpg,.png,.jpeg,.doc,.docx,.xlsx,.txt,.der,.cer,.pem,.crt,.pfx,.p12,.jks,.dcm"
           action=""
           multiple
           :show-file-list="false"
@@ -39,12 +39,13 @@
       </template>
     </ms-table-header>
     <el-table v-loading="loading"
+              row-key="id"
               class="basic-config"
               :data="existFiles"
               @select-all="handleSelectAll"
               @select="handleSelectionChange">
 
-      <el-table-column type="selection"/>
+      <el-table-column type="selection" reserve-selection/>
       <el-table-column
         prop="name"
         :label="$t('load_test.file_name')">
@@ -64,7 +65,7 @@
         <template v-slot:default="scope">
           <el-upload
             style="width: 38px; float: left;"
-            accept=".jmx,.jar,.csv,.json,.pdf,.jpg,.png,.jpeg,.doc,.docx,.xlsx,.txt,.der,.cer,.pem,.crt,.pfx,.p12,.jks"
+            accept=".jmx,.jar,.csv,.json,.pdf,.jpg,.png,.jpeg,.doc,.docx,.xlsx,.txt,.der,.cer,.pem,.crt,.pfx,.p12,.jks,.dcm"
             action=""
             :show-file-list="false"
             :before-upload="beforeUpdateUploadFile"
@@ -101,11 +102,19 @@
 import MsDialogFooter from "metersphere-frontend/src/components/MsDialogFooter";
 import MsTablePagination from "metersphere-frontend/src/components/pagination/TablePagination";
 import {getCurrentProjectID} from "metersphere-frontend/src/utils/token";
-import {findThreadGroup} from "../../../business/test/model/ThreadGroup";
+import {findThreadGroup} from "@/business/test/model/ThreadGroup";
 import MsTableButton from "metersphere-frontend/src/components/MsTableButton";
 import MsTableHeader from "metersphere-frontend/src/components/MsTableHeader";
 import MsTableOperatorButton from "metersphere-frontend/src/components/MsTableOperatorButton";
-import {checkFileIsRelated, deleteFile, getJmxContents, getProjectFileByName, getProjectFiles, updateFile, uploadFiles} from "../../../api/performance";
+import {
+  checkFileIsRelated,
+  deleteFile,
+  getJmxContents,
+  getProjectFileByName,
+  getProjectFiles,
+  updateFile,
+  uploadFiles
+} from "@/api/performance";
 
 export default {
   name: "ExistFiles",
@@ -116,6 +125,7 @@ export default {
     uploadList: Array,
     scenarios: Array,
     isReadOnly: Boolean,
+    testId: String
   },
   inject: [
     'reload'
@@ -130,6 +140,7 @@ export default {
       loadType: 'jmx',
       existFiles: [],
       selectIds: new Set,
+      selectFiles: [],
       condition: {},
       projectId: getCurrentProjectID()
     };
@@ -143,16 +154,23 @@ export default {
     close() {
       this.loadFileVisible = false;
       this.selectIds.clear();
+      this.selectFiles = [];
     },
     handleSelectAll(selection) {
       if (selection.length > 0) {
         this.existFiles.forEach(item => {
           this.selectIds.add(item.id);
+          this.selectFiles.push(item);
         });
       } else {
         this.existFiles.forEach(item => {
           if (this.selectIds.has(item.id)) {
             this.selectIds.delete(item.id);
+            for (let i = 0; i < this.selectFiles.length - 1; i++) {
+              if (this.selectFiles[i].id === item.id) {
+                this.selectFiles.splice(i, 1);
+              }
+            }
           }
         });
       }
@@ -160,11 +178,21 @@ export default {
     handleSelectionChange(selection, row) {
       if (this.selectIds.has(row.id)) {
         this.selectIds.delete(row.id);
+        for (let i = 0; i < this.selectFiles.length - 1; i++) {
+          if (this.selectFiles[i].id === row.id) {
+            this.selectFiles.splice(i, 1);
+          }
+        }
       } else {
         this.selectIds.add(row.id);
+        this.selectFiles.push(row);
       }
     },
     getProjectFiles() {
+      if (this.testId) {
+        this.condition.ids = [];
+        this.condition.ids.push(this.testId);
+      }
       this.loading = getProjectFiles(this.loadType, this.projectId, this.currentPage, this.pageSize, this.condition)
         .then(res => {
           let data = res.data;
@@ -175,6 +203,7 @@ export default {
     handleImport(file) {
       if (file) { // 接口测试创建的性能测试
         this.selectIds.add(file.id);
+        this.selectFiles.push(file)
         this.getJmxContents();
         return;
       }
@@ -182,11 +211,9 @@ export default {
         this.loadFileVisible = false;
         return;
       }
-
-      let rows = this.existFiles.filter(f => this.selectIds.has(f.id));
       let jmxIds = [];
-      for (let i = 0; i < rows.length; i++) {
-        let row = rows[i];
+      for (let i = 0; i < this.selectFiles.length; i++) {
+        let row = this.selectFiles[i];
         if (this.tableData.filter(f => f.name === row.name).length > 0) {
           setTimeout(() => {
             this.$warning(this.$t('load_test.delete_file') + 'name: ' + row.name);

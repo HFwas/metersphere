@@ -26,10 +26,16 @@
       </el-radio>
     </el-radio-group>
     <div v-if="body.type == 'Form Data' || body.type == 'WWW_FORM'">
-      <el-row v-if="body.type == 'Form Data' || body.type == 'WWW_FORM'">
-        <el-link class="ms-el-link" @click="batchAdd"> {{ $t("commons.batch_add") }}</el-link>
+      <el-row v-if="body.type == 'Form Data' || body.type == 'WWW_FORM'" class="ms-el-link">
+        <el-link style="margin-right: 5px" @click="batchAdd"> {{ $t('commons.batch_add') }}</el-link>
+        <api-params-config
+          v-if="apiParamsConfigFields"
+          @refresh="refreshApiParamsField"
+          :storage-key="storageKey"
+          :api-params-config-fields="apiParamsConfigFields" />
       </el-row>
       <ms-api-variable
+        :param-type="bodyType"
         :with-more-setting="true"
         :is-read-only="isReadOnly"
         :parameters="body.kvs"
@@ -38,18 +44,25 @@
         :scenario-definition="scenarioDefinition"
         :id="id"
         @editScenarioAdvance="editScenarioAdvance"
-        type="body"/>
+        v-if="reloadedApiVariable"
+        type="body" />
     </div>
     <div v-if="body.type == 'JSON'">
       <div style="padding: 10px">
-        <el-switch active-text="JSON-SCHEMA" v-model="body.format" @change="formatChange" active-value="JSON-SCHEMA"/>
+        <el-switch
+          active-text="JSON-SCHEMA"
+          v-model="body.format"
+          @change="formatChange"
+          active-value="JSON-SCHEMA"
+          :disabled="isReadOnly" />
       </div>
       <ms-json-code-edit
-        v-if="body.format==='JSON-SCHEMA'"
+        v-if="body.format === 'JSON-SCHEMA'"
         :body="body"
         :scenario-definition="scenarioDefinition"
         @editScenarioAdvance="editScenarioAdvance"
-        ref="jsonCodeEdit"/>
+        :is-read-only="isReadOnly"
+        ref="jsonCodeEdit" />
       <ms-code-edit
         v-else-if="codeEditActive"
         :read-only="isReadOnly"
@@ -57,24 +70,15 @@
         :modes="modes"
         :mode="'json'"
         height="400px"
-        ref="codeEdit"/>
+        ref="codeEdit" />
     </div>
 
     <div class="ms-body" v-if="body.type == 'XML'">
-      <ms-code-edit
-        :read-only="isReadOnly"
-        :data.sync="body.raw"
-        :modes="modes"
-        :mode="'text'"
-        ref="codeEdit"/>
+      <ms-code-edit :read-only="isReadOnly" :data.sync="body.raw" :modes="modes" :mode="'text'" ref="codeEdit" />
     </div>
 
     <div class="ms-body" v-if="body.type == 'Raw'">
-      <ms-code-edit
-        :read-only="isReadOnly"
-        :data.sync="body.raw"
-        :modes="modes"
-        ref="codeEdit"/>
+      <ms-code-edit :read-only="isReadOnly" :data.sync="body.raw" :modes="modes" ref="codeEdit" />
     </div>
 
     <ms-api-binary-variable
@@ -82,26 +86,27 @@
       :parameters="body.binary"
       :isShowEnable="isShowEnable"
       type="body"
-      v-if="body.type == 'BINARY'"/>
-    <batch-add-parameter @batchSave="batchSave" ref="batchAddParameter"/>
+      v-if="body.type == 'BINARY'" />
+    <batch-add-parameter @batchSave="batchSave" ref="batchAddParameter" />
   </div>
 </template>
 
 <script>
-import MsApiKeyValue from "../ApiKeyValue";
-import {BODY_TYPE, KeyValue} from "../../model/ApiTestModel";
-import MsCodeEdit from "metersphere-frontend/src/components/MsCodeEdit";
-import MsJsonCodeEdit from "@/business/commons/json-schema/JsonSchemaEditor";
-import MsDropdown from "@/business/commons/MsDropdown";
-import MsApiVariable from "../ApiVariable";
-import MsApiBinaryVariable from "./ApiBinaryVariable";
-import MsApiFromUrlVariable from "./ApiFromUrlVariable";
-import BatchAddParameter from "../basis/BatchAddParameter";
-import Convert from "@/business/commons/json-schema/convert/convert";
-
+import MsApiKeyValue from '../ApiKeyValue';
+import { BODY_TYPE, KeyValue } from '../../model/ApiTestModel';
+import MsCodeEdit from 'metersphere-frontend/src/components/MsCodeEdit';
+import MsJsonCodeEdit from '@/business/commons/json-schema/JsonSchemaEditor';
+import MsDropdown from '@/business/commons/MsDropdown';
+import MsApiVariable from '../ApiVariable';
+import MsApiBinaryVariable from './ApiBinaryVariable';
+import MsApiFromUrlVariable from './ApiFromUrlVariable';
+import BatchAddParameter from '../basis/BatchAddParameter';
+import Convert from '@/business/commons/json-schema/convert/convert';
+import { getApiParamsConfigFields } from 'metersphere-frontend/src/utils/custom_field';
+import ApiParamsConfig from '@/business/definition/components/request/components/ApiParamsConfig';
 
 export default {
-  name: "MsApiBody",
+  name: 'MsApiBody',
   components: {
     MsApiVariable,
     MsDropdown,
@@ -110,7 +115,8 @@ export default {
     MsApiBinaryVariable,
     MsApiFromUrlVariable,
     MsJsonCodeEdit,
-    BatchAddParameter
+    BatchAddParameter,
+    ApiParamsConfig,
   },
   props: {
     body: {
@@ -121,41 +127,54 @@ export default {
           kV: false,
           kvs: [],
           oldKV: false,
-          type: "JSON",
+          type: 'JSON',
           valid: false,
-          xml: false
-        }
-      }
+          xml: false,
+        };
+      },
+    },
+    bodyType: {
+      type: String,
+      default: 'request',
     },
     headers: Array,
     isReadOnly: {
       type: Boolean,
-      default: false
+      default: false,
     },
     isShowEnable: {
       type: Boolean,
-      default: true
+      default: true,
     },
     scenarioDefinition: Array,
     id: String,
   },
   data() {
     return {
+      reloadedApiVariable: true,
+      apiParamsConfigFields: getApiParamsConfigFields(this),
       type: BODY_TYPE,
       modes: ['text', 'json', 'xml', 'html'],
-      jsonSchema: "JSON",
+      jsonSchema: 'JSON',
       codeEditActive: true,
       hasOwnProperty: Object.prototype.hasOwnProperty,
       propIsEnumerable: Object.prototype.propertyIsEnumerable,
+      storageKey: 'API_PARAMS_SHOW_FIELD',
     };
   },
-
   watch: {
     'body.typeChange'() {
       this.reloadCodeEdit();
     },
   },
   methods: {
+    refreshApiParamsField() {
+      this.reloadedApiVariable = false;
+      this.$nextTick(() => {
+        this.reloadedApiVariable = true;
+      });
+    },
+
     isObj(x) {
       let type = typeof x;
       return x !== null && (type === 'object' || type === 'function');
@@ -169,6 +188,9 @@ export default {
     },
 
     assignKey(to, from, key) {
+      if (key === 'type') {
+        return;
+      }
       let val = from[key];
       if (val === undefined || val === null) {
         return;
@@ -190,10 +212,19 @@ export default {
           this.assignKey(to, from, key);
         }
       }
+      //判断null
+      if (to.type && from.type) {
+        to.type = from.type;
+        if (from.type === 'null') {
+          this.assign(Object(to.mock), { mock: '' });
+        }
+      }
+
+      let property = ['description', 'maxLength', 'minLength', 'pattern', 'format', 'enum', 'default'];
       // 清除多出部分属性
       for (let key in to) {
-        if (!this.hasOwnProperty.call(from, key) && key !== 'description') {
-          delete to[key]
+        if (!this.hasOwnProperty.call(from, key) && property.indexOf(key) === -1) {
+          delete to[key];
         }
       }
       if (Object.getOwnPropertySymbols) {
@@ -221,7 +252,6 @@ export default {
       });
     },
     formatChange() {
-
       const MsConvert = new Convert();
       if (this.body.format === 'JSON-SCHEMA') {
         if (this.body.raw) {
@@ -230,6 +260,9 @@ export default {
               this.body.jsonSchema = MsConvert.format(JSON.parse(this.body.raw));
             } else {
               let data = MsConvert.format(JSON.parse(this.body.raw));
+              if (!this.body.jsonSchema.type) {
+                this.body.jsonSchema.type = data.type;
+              }
               this.body.jsonSchema = this.deepAssign(this.body.jsonSchema, data);
             }
           } catch (e) {
@@ -248,18 +281,18 @@ export default {
     },
     modeChange(mode) {
       switch (this.body.type) {
-        case "JSON":
-          this.setContentType("application/json");
+        case 'JSON':
+          this.setContentType('application/json');
           break;
-        case "XML":
-          this.setContentType("text/xml");
+        case 'XML':
+          this.setContentType('text/xml');
           break;
-        case "WWW_FORM":
-          this.setContentType("application/x-www-form-urlencoded");
+        case 'WWW_FORM':
+          this.setContentType('application/x-www-form-urlencoded');
           break;
         // todo from data
-        case "BINARY":
-          this.setContentType("application/octet-stream");
+        case 'BINARY':
+          this.setContentType('application/octet-stream');
           break;
         default:
           this.removeContentType();
@@ -268,25 +301,25 @@ export default {
     },
     setContentType(value) {
       let isType = false;
-      this.headers.forEach(item => {
-        if (item.name === "Content-Type" || item.name == "contentType") {
+      this.headers.forEach((item) => {
+        if (item.name === 'Content-Type' || item.name == 'contentType') {
           item.value = value;
           isType = true;
         }
-      })
-      if (this.body && this.body.kvs && value === "application/x-www-form-urlencoded") {
-        this.body.kvs.forEach(item => {
+      });
+      if (this.body && this.body.kvs && value === 'application/x-www-form-urlencoded') {
+        this.body.kvs.forEach((item) => {
           item.urlEncode = true;
         });
       }
       if (!isType) {
-        this.headers.unshift(new KeyValue({name: "Content-Type", value: value}));
+        this.headers.unshift(new KeyValue({ name: 'Content-Type', value: value }));
         this.$emit('headersChange');
       }
     },
     removeContentType() {
       for (let index in this.headers) {
-        if (this.headers[index].name === "Content-Type") {
+        if (this.headers[index].name === 'Content-Type') {
           this.headers.splice(index, 1);
           this.$emit('headersChange');
           return;
@@ -307,37 +340,44 @@ export default {
           }
         }
         if (isAdd) {
-          this.body.kvs.splice(this.body.kvs.indexOf(kv => !kv.name), 0, obj);
+          this.body.kvs.splice(
+            this.body.kvs.indexOf((kv) => !kv.name),
+            0,
+            obj
+          );
         }
       }
     },
     batchSave(data) {
       if (data) {
-        let params = data.split("\n");
+        let params = data.split('\n');
         let keyValues = [];
-        params.forEach(item => {
+        params.forEach((item) => {
           if (item) {
             let line = [];
-            line[0] = item.substring(0, item.indexOf(":"));
-            line[1] = item.substring(item.indexOf(":") + 1, item.length);
+            line[0] = item.substring(0, item.indexOf(':'));
+            line[1] = item.substring(item.indexOf(':') + 1, item.length);
             let required = false;
-            keyValues.push(new KeyValue({
-              name: line[0],
-              required: required,
-              value: line[1],
-              description: line[2],
-              type: "text",
-              valid: false,
-              file: false,
-              encode: true,
-              enable: true,
-              contentType: "text/plain"
-            }));
+            keyValues.push(
+              new KeyValue({
+                name: line[0],
+                required: required,
+                value: line[1],
+                description: line[2],
+                type: 'text',
+                valid: false,
+                file: false,
+                encode: true,
+                enable: true,
+                isEdit: false,
+                contentType: 'text/plain',
+              })
+            );
           }
-        })
-        keyValues.forEach(item => {
+        });
+        keyValues.forEach((item) => {
           this.format(this.body.kvs, item);
-        })
+        });
       }
     },
     editScenarioAdvance(data) {
@@ -345,19 +385,21 @@ export default {
     },
   },
   created() {
+    if (this.bodyType === 'response') {
+      this.storageKey = 'API_RESPONSE_PARAMS_SHOW_FIELD';
+    }
     if (!this.body.type) {
       this.body.type = BODY_TYPE.FORM_DATA;
     }
     if (this.body.kvs) {
-      this.body.kvs.forEach(param => {
+      this.body.kvs.forEach((param) => {
         if (!param.type) {
           param.type = 'text';
         }
       });
     }
-
-  }
-}
+  },
+};
 </script>
 
 <style scoped>

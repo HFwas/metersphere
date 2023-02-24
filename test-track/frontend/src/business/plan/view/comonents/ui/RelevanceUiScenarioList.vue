@@ -1,5 +1,21 @@
 <template>
   <div v-loading="loading">
+    <env-group-popover
+      :env-map="projectEnvMap"
+      :project-ids="projectIds"
+      :show-env-group="false"
+      @setProjectEnvMap="setProjectEnvMap"
+      :environment-type.sync="environmentType"
+      :group-id="envGroupId"
+      :is-scenario="false"
+      @setEnvGroup="setEnvGroup"
+      :show-config-button-with-out-permission="
+        showConfigButtonWithOutPermission
+      "
+      :project-list="projectList"
+      ref="envPopover"
+      class="env-popover"
+    />
 
     <ms-table-adv-search-bar :condition.sync="condition" class="adv-search-bar"
                              v-if="condition.components !== undefined && condition.components.length > 0"
@@ -22,37 +38,38 @@
               :disable-header-config="true"
               @selectCountChange="selectCountChange">
 
-      <el-table-column v-if="!customNum" prop="num" label="ID" sortable="custom"
+      <ms-table-column v-if="!customNum" prop="num" label="ID" sortable="custom"
                        show-overflow-tooltip>
-      </el-table-column>
-      <el-table-column v-if="customNum" prop="customNum" label="ID" sortable="custom"
+      </ms-table-column>
+      <ms-table-column v-if="customNum" prop="customNum" label="ID" sortable="custom"
                        show-overflow-tooltip>
-      </el-table-column>
-      <el-table-column prop="name" :label="$t('api_test.automation.scenario_name')" sortable="custom" min-width="120px"
+      </ms-table-column>
+
+      <ms-table-column :fields-width="fieldsWidth" prop="name" :label="$t('api_test.automation.scenario_name')" sortable="custom" min-width="120px"
                        show-overflow-tooltip/>
 
-      <el-table-column prop="level" :label="$t('api_test.automation.case_level')" sortable="custom" min-width="120px"
+      <ms-table-column prop="level" :label="$t('api_test.automation.case_level')" sortable="custom" min-width="120px"
                        show-overflow-tooltip>
         <template v-slot:default="scope">
           <priority-table-item :value="scope.row.level" ref="level"/>
         </template>
 
-      </el-table-column>
-      <el-table-column prop="tagNames" :label="$t('api_test.automation.tag')" min-width="100">
+      </ms-table-column>
+      <ms-table-column prop="tagNames" :label="$t('api_test.automation.tag')" min-width="100">
         <template v-slot:default="scope">
           <ms-tag v-for="itemName in scope.row.tags" :key="itemName" type="success" effect="plain" :content="itemName"
                   style="margin-left: 0px; margin-right: 2px"/>
         </template>
-      </el-table-column>
-      <el-table-column prop="userId" :label="$t('api_test.automation.creator')" show-overflow-tooltip sortable="custom"
+      </ms-table-column>
+      <ms-table-column prop="userId" :label="$t('api_test.automation.creator')" show-overflow-tooltip sortable="custom"
                        min-width="100px"/>
-      <el-table-column prop="updateTime" :label="$t('commons.update_time')" width="180" sortable="custom">
+      <ms-table-column prop="updateTime" :label="$t('commons.update_time')" width="180" sortable="custom">
         <template v-slot:default="scope">
           <span>{{ scope.row.updateTime | datetimeFormat }}</span>
         </template>
-      </el-table-column>
-      <el-table-column prop="stepTotal" :label="$t('api_test.automation.step')" show-overflow-tooltip/>
-      <el-table-column prop="lastResult" :label="$t('api_test.automation.last_result')" sortable="custom"
+      </ms-table-column>
+      <ms-table-column prop="stepTotal" :label="$t('api_test.automation.step')" show-overflow-tooltip/>
+      <ms-table-column prop="lastResult" :label="$t('api_test.automation.last_result')" sortable="custom"
                        min-width="120px">
         <template v-slot:default="{row}">
           <el-link type="success" @click="showReport(row)" v-if="row.lastResult === 'Success' || row.lastResult === 'SUCCESS'">
@@ -71,8 +88,8 @@
             {{ $t('Pending') }}
           </el-link>
         </template>
-      </el-table-column>
-      <el-table-column prop="passRate" :label="$t('api_test.automation.passing_rate')"
+      </ms-table-column>
+      <ms-table-column prop="passRate" :label="$t('api_test.automation.passing_rate')"
                        show-overflow-tooltip/>
     </ms-table>
     <ms-table-pagination :change="search" :current-page.sync="currentPage" :page-size.sync="pageSize"
@@ -94,6 +111,13 @@ import MsTable from "metersphere-frontend/src/components/table/MsTable";
 import {getOwnerProjects, getVersionFilters} from "@/business/utils/sdk-utils";
 import {getProjectApplicationConfig} from "@/api/project-application";
 import {testPlanUiScenarioRelevanceList} from "@/api/remote/ui/test-plan-ui-scenario-case";
+import {
+  getCustomTableWidth
+} from "metersphere-frontend/src/utils/tableUtils";
+import MsTableColumn from "metersphere-frontend/src/components/table/MsTableColumn";
+import EnvGroupPopover from "@/business/plan/env/EnvGroupPopover";
+import {getApiScenarioEnvByProjectId} from "@/api/remote/api/api-automation";
+import {getUiScenarioEnvByProjectId} from "@/api/remote/ui/ui-automation";
 
 export default {
   name: "RelevanceUiScenarioList",
@@ -106,6 +130,8 @@ export default {
     MsTableHeader,
     MsTag,
     MsTableAdvSearchBar,
+    MsTableColumn,
+    EnvGroupPopover,
   },
   props: {
     referenced: {
@@ -140,6 +166,8 @@ export default {
       environmentType: ENV_TYPE.JSON,
       envGroupId: "",
       versionFilters: [],
+      fieldsWidth: getCustomTableWidth('TEST_PLAN_UI_SCENARIO_CASE'),
+      projectIds: new Set()
     };
   },
   computed: {
@@ -174,7 +202,6 @@ export default {
       if (!this.projectId) {
         return;
       }
-      this.getProject(this.projectId);
       this.selectRows = new Set();
       if (this.condition.filters) {
         this.condition.filters.status = ["Prepare", "Underway", "Completed"];
@@ -223,19 +250,6 @@ export default {
           this.projectList = res.data;
         });
     },
-    getProject(projectId) {
-      if (projectId) {
-        getProjectApplicationConfig('SCENARIO_CUSTOM_NUM')
-          .then(result => {
-            let data = result.data;
-            if (data && data.typeValue === 'true') {
-              this.customNum = true;
-            } else {
-              this.customNum = false;
-            }
-          });
-      }
-    },
     changeVersion(currentVersion) {
       this.condition.versionId = currentVersion || null;
       this.search();
@@ -251,9 +265,24 @@ export default {
     selectCountChange(data) {
       this.selectRows = this.$refs.scenarioTable.selectRows;
       this.$emit("selectCountChange", data);
+      this.initProjectIds();
     },
     showReport() {
 
+    },
+    initProjectIds() {
+      this.projectIds.clear();
+      // this.map.clear();
+      this.selectRows.forEach((row) => {
+        getUiScenarioEnvByProjectId(row.id).then((res) => {
+          let data = res.data;
+          data.projectIds.forEach((d) => this.projectIds.add(d));
+          // this.map.set(row.id, data.projectIds);
+        });
+      });
+    },
+    closeEnv(){
+      this.$refs.envPopover.close();
     }
   }
 };

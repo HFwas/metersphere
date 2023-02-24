@@ -5,7 +5,7 @@ pipeline {
         }
     }
     triggers {
-        pollSCM('0 3 * * *')
+        pollSCM('0 1 * * *')
     }
     environment {
         IMAGE_PREFIX = 'registry.cn-qingdao.aliyuncs.com/metersphere'
@@ -63,7 +63,7 @@ pipeline {
                         export PATH=$JAVA_HOME/bin:$PATH
                         java -version
                         ./mvnw install -N -Drevision=${REVISION} --settings ./settings.xml
-                        ./mvnw clean install -Drevision=${REVISION} -pl framework,framework/sdk-parent,framework/sdk-parent/domain,framework/sdk-parent/sdk,framework/sdk-parent/xpack-interface --settings ./settings.xml
+                        ./mvnw clean install -Drevision=${REVISION} -pl framework,framework/sdk-parent,framework/sdk-parent/domain,framework/sdk-parent/sdk,framework/sdk-parent/xpack-interface,framework/sdk-parent/jmeter --settings ./settings.xml
 
                         # 复制前端代码
                         if [ -n "${FRONTEND_LINK}" ]; then
@@ -97,7 +97,7 @@ pipeline {
 
                         LOCAL_REPOSITORY=$(./mvnw help:evaluate -Dexpression=settings.localRepository --settings ./settings.xml -q -DforceStdout)
 
-                        libraries=('api-test' 'performance-test' 'project-management' 'system-setting' 'test-track' 'report-stat')
+                        libraries=('api-test' 'performance-test' 'project-management' 'system-setting' 'test-track' 'report-stat' 'workstation')
                         for library in "${libraries[@]}";
                         do
                             mkdir -p $library/backend/target/dependency && (cd $library/backend/target/dependency; jar -xf ../*.jar; cp $LOCAL_REPOSITORY/io/metersphere/metersphere-xpack/${REVISION}/metersphere-xpack-${REVISION}.jar ./BOOT-INF/lib/)
@@ -119,7 +119,7 @@ pipeline {
                         try {
                             sh '''#!/bin/bash -xe
                             cd ${WORKSPACE}
-                            libraries=('framework/eureka' 'framework/gateway' 'api-test' 'performance-test' 'project-management' 'report-stat' 'system-setting' 'test-track')
+                            libraries=('framework/eureka' 'framework/gateway' 'api-test' 'performance-test' 'project-management' 'report-stat' 'system-setting' 'test-track' 'workstation')
                             for library in "${libraries[@]}";
                             do
                                 IMAGE_NAME=${library#*/}

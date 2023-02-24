@@ -8,7 +8,7 @@
            background-color="rgba(0,0,0,0)"
            @select="handleSelect"
            router>
-    <el-menu-item index="/workstation" v-xpack v-if="check('workstation')">
+    <el-menu-item index="/workstation" v-if="check('workstation')">
       <div>
         <svg-icon iconClass="workstation" class-name="ms-menu-img"/>
         <span slot="title" class="ms-menu-item-title">{{ $t('commons.my_workstation') }}</span>
@@ -156,10 +156,16 @@ export default {
       if (!hasLicense()) {
         return;
       }
-      ModuleEvent.$on(MODULE_CHANGE, (key, status) => {
-        getModuleList().then(() => {
-          this.menuKey++;
+      getModuleList()
+        .then(response => {
+          response.data.forEach(m => {
+            this.modules[m.key] = m.status;
+          });
+          localStorage.setItem('modules', JSON.stringify(this.modules));
+        })
+        .catch(() => {
         });
+      ModuleEvent.$on(MODULE_CHANGE, (key, status) => {
         this.$set(this.modules, key, status);
         this.menuKey++;
       });
