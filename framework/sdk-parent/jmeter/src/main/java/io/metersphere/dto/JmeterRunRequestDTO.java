@@ -6,6 +6,7 @@ import lombok.Data;
 import org.apache.jorphan.collections.HashTree;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @Data
@@ -89,6 +90,12 @@ public class JmeterRunRequestDTO {
 
     // 失败重试次数
     private long retryNum;
+
+    //MinIO配置和系统插件信息
+    private PluginConfigDTO pluginConfigDTO;
+
+    //自定义jar信息
+    private Map<String, List<ProjectJarConfig>> customJarInfo;
 
     public JmeterRunRequestDTO() {
     }

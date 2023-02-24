@@ -13,7 +13,7 @@
       <div v-show="loadError"
            style="width: 100%; height: 300px; display: flex; flex-direction: column; justify-content: center;align-items: center">
         <img style="height: 100px;width: 100px;"
-             src="/assets/figma/icon_load_error.svg"/>
+             src="/assets/module/figma/icon_load_error.svg"/>
         <span class="addition-info-title" style="color: #646A73">{{ $t("home.dashboard.public.load_error") }}</span>
       </div>
       <div v-show="!loadError">
@@ -52,9 +52,9 @@
             show-overflow-tooltip
             width="350px">
             <template v-slot:default="scope">
-              <el-tooltip :content="getResultTip(scope.row.total, scope.row.reviewed, scope.row.pass)"
+              <el-tooltip :content="getResultTip(scope.row)"
                           placement="top" :enterable="false" class="item" effect="dark">
-                <yan-progress :total="scope.row.total" :done="scope.row.reviewed" :modify="scope.row.pass" :tip="tip"/>
+                <yan-progress :total="scope.row.caseCount" :done="getResultCount(scope.row, 'Pass')" :modify="getResultCount(scope.row, 'UnPass')" :tip="tip"/>
               </el-tooltip>
             </template>
           </el-table-column>
@@ -62,7 +62,7 @@
             <div
               style="width: 100%;height: 238px;display: flex;flex-direction: column;justify-content: center;align-items: center">
               <img style="height: 100px;width: 100px;margin-bottom: 8px"
-                   src="/assets/figma/icon_none.svg"/>
+                   src="/assets/module/figma/icon_none.svg"/>
               <span class="addition-info-title">{{ $t("home.dashboard.public.no_data") }}</span>
             </div>
           </template>
@@ -142,8 +142,33 @@ export default {
       }
       this.search();
     },
-    getResultTip(total, reviewed, pass) {
-      return '通过: ' + pass + '; ' + '未通过: ' + (reviewed - pass) + '; ' + '未评审: ' + (total - reviewed);
+    getNotDoneResultCount(row) {
+      return this.getResultCount(row, 'Underway') + this.getResultCount(row, 'Again')
+    },
+    getResultCount(row, status) {
+      if (row.statusCountItems) {
+        let result = row.statusCountItems.filter(item => status === item.key);
+        if (result && result.length > 0) {
+          return result[0].value;
+        }
+      }
+      return 0;
+    },
+    getResultTip(row) {
+      if (row.statusCountItems) {
+        let statusMap = {
+          'Prepare': this.$t('test_track.review.prepare'),
+          'Again': this.$t('test_track.review.again'),
+          'Pass': this.$t('test_track.review.pass'),
+          'UnPass': this.$t('test_track.review.un_pass'),
+          'Underway': this.$t('test_track.review.underway'),
+        }
+        let tip = '';
+        row.statusCountItems.forEach(item => {
+          tip += statusMap[item.key] + item.value + ';';
+        });
+        return tip;
+      }
     }
   }
 }

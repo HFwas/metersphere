@@ -147,6 +147,14 @@ export default {
           this.openLdap = response.data;
         });
     }
+    getModuleList()
+      .then(response => {
+        let modules = {};
+        response.data.forEach(m => {
+          modules[m.key] = m.status;
+        });
+        localStorage.setItem('modules', JSON.stringify(modules));
+      });
     //
     checkLicense()
       .then(() => {
@@ -174,13 +182,6 @@ export default {
               this.shortcutIcon();
             }
           })
-        getModuleList().then(response => {
-          let modules = {};
-          response.data.forEach(m => {
-            modules[m.key] = m.status;
-          });
-          localStorage.setItem('modules', JSON.stringify(modules));
-        });
       })
 
 

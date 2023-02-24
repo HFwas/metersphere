@@ -16,6 +16,8 @@ import io.metersphere.constants.RunModeConstants;
 import io.metersphere.dto.RequestResult;
 import io.metersphere.dto.RunModeConfigDTO;
 import io.metersphere.service.BaseTestResourcePoolService;
+import io.metersphere.service.MsHashTreeService;
+import jakarta.annotation.Resource;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.BooleanUtils;
@@ -26,7 +28,6 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.annotation.Resource;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
@@ -159,6 +160,10 @@ public class ApiScenarioReportStructureService {
     public static StepTreeDTO dataFormatting(String id, String name, String scenarioDefinition, String reportType) {
         JSONObject element = JSONUtil.parseObject(scenarioDefinition);
         if (element != null && element.getBoolean(ENABLE)) {
+            //保证场景的步骤是最新的（比如场景中包含引用场景）
+            MsHashTreeService hashTreeService = CommonBeanFactory.getBean(MsHashTreeService.class);
+            assert hashTreeService != null;
+            hashTreeService.dataFormatting(element);
             String resourceId = combinationResourceId(element, reportType, id);
             StepTreeDTO dto = new StepTreeDTO(name, resourceId, element.optString(TYPE), resourceId, 1);
             dto.setAllIndex(null);
@@ -562,7 +567,7 @@ public class ApiScenarioReportStructureService {
         if (CollectionUtils.isNotEmpty(reportStructureWithBLOBs) && CollectionUtils.isNotEmpty(reportResults)) {
             ApiScenarioReportStructureWithBLOBs scenarioReportStructure = reportStructureWithBLOBs.get(0);
             List<StepTreeDTO> stepList = JSON.parseArray(new String(scenarioReportStructure.getResourceTree(), StandardCharsets.UTF_8), StepTreeDTO.class);
-            //判断是否含有全局前后置脚本，如果有的话需要将脚本内容添加到stepDTO中
+            //过滤掉前后置脚本。否则会影响到下面几行的统计数据。
             reportResults = this.filterProcessResult(reportResults);
 
             reportDTO.setTotal(reportResults.size());

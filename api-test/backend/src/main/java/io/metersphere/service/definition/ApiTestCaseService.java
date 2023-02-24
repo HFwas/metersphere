@@ -54,7 +54,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
+import java.io.File;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -737,7 +738,7 @@ public class ApiTestCaseService {
                 JSONObject element = JSONUtil.parseObject(apiTestCase.getRequest());
                 ElementUtil.dataFormatting(element);
                 MsHTTPSamplerProxy req = JSON.parseObject(element.toString(), MsHTTPSamplerProxy.class);
-                if (element != null && StringUtils.isNotEmpty(element.optString(ElementConstants.HASH_TREE))) {
+                if (StringUtils.isNotEmpty(element.optString(ElementConstants.HASH_TREE))) {
                     req.setHashTree(JSONUtil.readValue(element.optString(ElementConstants.HASH_TREE)));
                 }
                 if (StringUtils.isNotBlank(method)) {
@@ -751,11 +752,17 @@ public class ApiTestCaseService {
                 ApiCaseBatchSyncService apiCaseBatchSyncService = CommonBeanFactory.getBean(ApiCaseBatchSyncService.class);
                 if (apiCaseBatchSyncService != null) {
                     apiCaseBatchSyncService.oneClickSyncCase(apiUpdateRule, test, apiTestCase);
+                    // 存储附件关系
+                    JSONObject requestCase = JSONUtil.parseObject(apiTestCase.getRequest());
+                    ElementUtil.dataFormatting(requestCase);
+                    MsHTTPSamplerProxy caseProxy = JSON.parseObject(requestCase.toString(), MsHTTPSamplerProxy.class);
+                    extFileAssociationService.saveApi(apiTestCase.getId(), caseProxy, FileAssociationTypeEnums.CASE.name());
                 }
                 batchMapper.updateByPrimaryKeySelective(apiTestCase);
+
             });
             sqlSession.flushStatements();
-            if (sqlSession != null && sqlSessionFactory != null) {
+            if (sqlSessionFactory != null) {
                 SqlSessionUtils.closeSqlSession(sqlSession, sqlSessionFactory);
             }
         }

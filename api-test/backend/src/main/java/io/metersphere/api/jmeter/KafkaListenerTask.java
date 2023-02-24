@@ -2,11 +2,13 @@ package io.metersphere.api.jmeter;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import io.metersphere.api.exec.queue.PoolExecBlockingQueueUtil;
+import io.metersphere.api.jmeter.utils.JmxFileUtil;
 import io.metersphere.commons.constants.ApiRunMode;
 import io.metersphere.commons.constants.ExtendedParameter;
 import io.metersphere.commons.utils.JSON;
 import io.metersphere.dto.ResultDTO;
 import io.metersphere.service.ApiExecutionQueueService;
+import io.metersphere.service.RedisTemplateService;
 import io.metersphere.service.TestResultService;
 import io.metersphere.utils.LoggerUtil;
 import lombok.Data;
@@ -22,6 +24,9 @@ public class KafkaListenerTask implements Runnable {
     private ConsumerRecord<?, String> record;
     private ApiExecutionQueueService apiExecutionQueueService;
     private TestResultService testResultService;
+
+    private RedisTemplateService redisTemplateService;
+
     private static final Map<String, String> RUN_MODE_MAP = new HashMap<String, String>() {{
         this.put(ApiRunMode.SCHEDULE_API_PLAN.name(), "schedule-task");
         this.put(ApiRunMode.JENKINS_API_PLAN.name(), "schedule-task");
@@ -53,6 +58,8 @@ public class KafkaListenerTask implements Runnable {
             if (dto == null) {
                 return;
             }
+            redisTemplateService.delete(JmxFileUtil.getExecuteFileKeyInRedis(dto.getReportId()));
+
             if (dto.getArbitraryData() != null && dto.getArbitraryData().containsKey(ExtendedParameter.TEST_END)
                     && (Boolean) dto.getArbitraryData().get(ExtendedParameter.TEST_END)) {
                 resultDTOS.add(dto);

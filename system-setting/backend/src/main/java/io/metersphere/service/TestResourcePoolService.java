@@ -19,16 +19,16 @@ import io.metersphere.log.utils.ReflexObjectUtil;
 import io.metersphere.log.vo.DetailColumn;
 import io.metersphere.log.vo.OperatingLogDetails;
 import io.metersphere.log.vo.system.SystemReference;
+import io.metersphere.quota.service.BaseQuotaService;
 import io.metersphere.request.resourcepool.QueryResourcePoolRequest;
-import io.metersphere.xpack.quota.service.QuotaService;
 import io.metersphere.xpack.resourcepool.engine.KubernetesResourcePoolService;
+import jakarta.annotation.Resource;
 import org.apache.commons.beanutils.BeanUtils;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.annotation.Resource;
 import java.lang.reflect.InvocationTargetException;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -52,6 +52,8 @@ public class TestResourcePoolService {
     private BaseTaskMapper baseTaskMapper;
     @Resource
     private MicroService microService;
+    @Resource
+    private BaseQuotaService baseQuotaService;
 
     public TestResourcePoolDTO addTestResourcePool(TestResourcePoolDTO testResourcePool) {
         checkTestResourcePool(testResourcePool);
@@ -198,45 +200,10 @@ public class TestResourcePoolService {
         return nodeResourcePoolService.validate(testResourcePool);
     }
 
-    public TestResourcePool getResourcePool(String resourcePoolId) {
-        return testResourcePoolMapper.selectByPrimaryKey(resourcePoolId);
-    }
-
     public List<TestResourcePoolDTO> listValidResourcePools() {
         QueryResourcePoolRequest request = new QueryResourcePoolRequest();
-        List<TestResourcePoolDTO> testResourcePools = listResourcePools(request);
-        // 重新校验 pool
-        for (TestResourcePoolDTO pool : testResourcePools) {
-            // 手动设置成无效的, 排除
-            if (INVALID.name().equals(pool.getStatus())) {
-                continue;
-            }
-            try {
-                validateTestResourcePool(pool);
-            } catch (Throwable e) {
-                LogUtil.error(e.getMessage(), e);
-                pool.setStatus(INVALID.name());
-                pool.setUpdateTime(System.currentTimeMillis());
-                testResourcePoolMapper.updateByPrimaryKeySelective(pool);
-            }
-        }
         request.setStatus(VALID.name());
         return listResourcePools(request);
-    }
-
-    public List<TestResourcePoolDTO> listValidQuotaResourcePools() {
-        return filterQuota(listValidResourcePools());
-    }
-
-    private List<TestResourcePoolDTO> filterQuota(List<TestResourcePoolDTO> list) {
-        QuotaService quotaService = CommonBeanFactory.getBean(QuotaService.class);
-        if (quotaService != null) {
-            Set<String> pools = quotaService.getQuotaResourcePools();
-            if (!pools.isEmpty()) {
-                return list.stream().filter(pool -> pools.contains(pool.getId())).collect(Collectors.toList());
-            }
-        }
-        return list;
     }
 
     public String getLogDetails(String id) {
@@ -285,13 +252,10 @@ public class TestResourcePoolService {
     }
 
     public List<TestResourcePoolDTO> listWsValidQuotaResourcePools(String workspaceId) {
-        QuotaService quotaService = CommonBeanFactory.getBean(QuotaService.class);
         List<TestResourcePoolDTO> list = listValidResourcePools();
-        if (quotaService != null) {
-            Set<String> pools = quotaService.getQuotaWsResourcePools(workspaceId);
-            if (!pools.isEmpty()) {
-                return list.stream().filter(pool -> pools.contains(pool.getId())).collect(Collectors.toList());
-            }
+        Set<String> pools = baseQuotaService.getQuotaWsResourcePools(workspaceId);
+        if (!pools.isEmpty()) {
+            return list.stream().filter(pool -> pools.contains(pool.getId())).collect(Collectors.toList());
         }
         return list;
     }

@@ -40,7 +40,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -96,7 +96,7 @@ public class TestCaseNodeService extends NodeTreeService<TestCaseNodeDTO> {
             throw new RuntimeException(Translator.get("test_case_node_level_tip")
                     + TestCaseConstants.MAX_NODE_DEPTH + Translator.get("test_case_node_level"));
         }
-        checkTestCaseNodeExist(node);
+        this.checkTestCaseNodeExist(node);
     }
 
     private void checkTestCaseNodeExist(TestCaseNode node) {
@@ -166,7 +166,6 @@ public class TestCaseNodeService extends NodeTreeService<TestCaseNodeDTO> {
 
     public int editNode(DragNodeRequest request) {
         request.setUpdateTime(System.currentTimeMillis());
-        checkTestCaseNodeExist(request);
         if (!CollectionUtils.isEmpty(request.getNodeIds())) {
             List<TestCaseDTO> testCases = extTestCaseMapper.getForNodeEdit(request.getNodeIds());
             testCases.forEach(testCase -> {

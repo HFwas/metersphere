@@ -1,21 +1,35 @@
 package io.metersphere.service;
 
+import groovy.lang.Lazy;
 import io.metersphere.api.dto.BodyFileRequest;
 import io.metersphere.api.dto.EnvironmentType;
 import io.metersphere.api.dto.definition.request.ElementUtil;
 import io.metersphere.api.dto.definition.request.MsTestPlan;
 import io.metersphere.api.exec.api.ApiCaseSerialService;
+import io.metersphere.api.jmeter.utils.JmxFileUtil;
 import io.metersphere.base.domain.*;
 import io.metersphere.base.mapper.ApiExecutionQueueDetailMapper;
 import io.metersphere.base.mapper.ApiScenarioMapper;
+import io.metersphere.base.mapper.PluginMapper;
 import io.metersphere.base.mapper.plan.TestPlanApiScenarioMapper;
 import io.metersphere.commons.constants.ApiRunMode;
+import io.metersphere.commons.constants.PluginScenario;
 import io.metersphere.commons.utils.*;
+import io.metersphere.dto.AttachmentBodyFile;
+import io.metersphere.dto.FileInfoDTO;
 import io.metersphere.dto.JmeterRunRequestDTO;
+import io.metersphere.dto.ProjectJarConfig;
 import io.metersphere.environment.service.BaseEnvGroupProjectService;
+import io.metersphere.metadata.service.FileCenter;
 import io.metersphere.metadata.service.FileMetadataService;
+import io.metersphere.metadata.vo.FileRequest;
+import io.metersphere.metadata.vo.RemoteFileAttachInfo;
 import io.metersphere.request.BodyFile;
+import io.metersphere.utils.JsonUtils;
 import io.metersphere.utils.LoggerUtil;
+import io.metersphere.utils.TemporaryFileUtil;
+import io.metersphere.vo.BooleanPool;
+import jakarta.annotation.Resource;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.ArrayUtils;
@@ -23,7 +37,6 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.jorphan.collections.HashTree;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
@@ -45,9 +58,14 @@ public class ApiJMeterFileService {
     @Resource
     private TestPlanApiScenarioMapper testPlanApiScenarioMapper;
     @Resource
-    private PluginService pluginService;
-    @Resource
     private FileMetadataService fileMetadataService;
+    @Resource
+    private PluginMapper pluginMapper;
+    @Resource
+    private RedisTemplateService redisTemplateService;
+    @Lazy
+    @Resource
+    private TemporaryFileUtil temporaryFileUtil;
 
     // 接口测试 用例/接口
     private static final List<String> CASE_MODES = new ArrayList<>() {{
@@ -64,6 +82,9 @@ public class ApiJMeterFileService {
         JmeterRunRequestDTO runRequest = new JmeterRunRequestDTO(remoteTestId, reportId, runMode);
         runRequest.setReportType(reportType);
         runRequest.setQueueId(queueId);
+        BooleanPool booleanPool = new BooleanPool();
+        booleanPool.setK8s(true);
+        runRequest.setPool(booleanPool);
 
         ApiScenarioWithBLOBs scenario = null;
         if (StringUtils.equalsAny(runMode, ApiRunMode.SCENARIO_PLAN.name(), ApiRunMode.JENKINS_SCENARIO_PLAN.name(), ApiRunMode.SCHEDULE_SCENARIO_PLAN.name())) {
@@ -130,74 +151,76 @@ public class ApiJMeterFileService {
         if (hashTree != null) {
             ElementUtil.coverArguments(hashTree);
         }
-        return zipFilesToByteArray((reportId + "_" + remoteTestId), hashTree);
+        return zipFilesToByteArray((reportId + "_" + remoteTestId), reportId, hashTree);
     }
 
-    public byte[] downloadJmeterJar() {
+    public byte[] downloadJmeterJar(Map<String, List<ProjectJarConfig>> map) {
         Map<String, byte[]> files = new HashMap<>();
-        // 获取JAR
-        Map<String, byte[]> jarFiles = this.getJar(null);
-        if (!MapUtils.isEmpty(jarFiles)) {
-            for (String k : jarFiles.keySet()) {
-                byte[] v = jarFiles.get(k);
-                files.put(k, v);
-            }
-        }
-        return listBytesToZip(files);
-    }
+        if (MapUtils.isNotEmpty(map)) {
+            //获取文件内容
+            FileMetadataService fileMetadataService = CommonBeanFactory.getBean(FileMetadataService.class);
+            map.forEach((key, value) -> {
+                //历史数据
+                value.stream().filter(s -> s.isHasFile()).forEach(s -> {
+                    //获取文件内容 兼容历史数据
+                    byte[] bytes = fileMetadataService.getContent(s.getId());
+                    files.put(StringUtils.join(
+                            key,
+                            File.separator,
+                            s.getId(),
+                            File.separator,
+                            String.valueOf(s.getUpdateTime()), ".jar"), bytes);
+                });
+                // 获取文件服务器的数据
+                value.stream().filter(s -> !s.isHasFile()).forEach(s -> {
+                    //获取文件内容;
+                    try {
+                        FileRequest fileRequest = new FileRequest();
+                        if (StringUtils.isNotBlank(s.getAttachInfo())) {
+                            fileRequest.setFileAttachInfo(JsonUtils.parseObject(s.getAttachInfo(), RemoteFileAttachInfo.class));
+                        }
+                        fileRequest.setProjectId(key);
+                        fileRequest.setFileName(s.getName());
+                        fileRequest.setStorage(s.getStorage());
+                        LoggerUtil.info("开始下载服务器中的Jar包，文件名：" + s.getName());
+                        byte[] gitFiles = FileCenter.getRepository(s.getStorage()).getFile(fileRequest);
+                        files.put(StringUtils.join(
+                                key,
+                                File.separator,
+                                s.getId(),
+                                File.separator,
+                                String.valueOf(s.getUpdateTime()), ".jar"), gitFiles);
+                    } catch (Exception e) {
+                        LoggerUtil.error(e.getMessage(), e);
+                        LoggerUtil.error("Jar包下载失败，不存在Git仓库中");
+                    }
+                });
 
-    public byte[] downloadJmeterJar(String projectId) {
-        Map<String, byte[]> files = new HashMap<>();
-        // 获取JAR
-        Map<String, byte[]> jarFiles = this.getJar(projectId);
-        if (!MapUtils.isEmpty(jarFiles)) {
-            for (String k : jarFiles.keySet()) {
-                byte[] v = jarFiles.get(k);
-                files.put(k, v);
-            }
-        }
-        return listBytesToZip(files);
-    }
-
-    public byte[] downloadPlugJar() {
-        Map<String, byte[]> files = new HashMap<>();
-        // 获取JAR
-        Map<String, byte[]> jarFiles = this.getPlugJar();
-        if (MapUtils.isNotEmpty(jarFiles)) {
-            for (String k : jarFiles.keySet()) {
-                byte[] v = jarFiles.get(k);
-                files.put(k, v);
-            }
-        }
-        return listBytesToZip(files);
-    }
-
-    private Map<String, byte[]> getJar(String projectId) {
-        Map<String, byte[]> jarFiles = new LinkedHashMap<>();
-        FileMetadataService jarConfigService = CommonBeanFactory.getBean(FileMetadataService.class);
-        if (jarConfigService != null) {
-            List<String> files = jarConfigService.getJar(new ArrayList<>() {{
-                this.add(projectId);
-            }});
-            files.forEach(path -> {
-                File file = new File(path);
-                if (file.isDirectory() && !path.endsWith("/")) {
-                    file = new File(path + "/");
-                }
-                byte[] fileByte = FileUtils.fileToByte(file);
-                if (fileByte != null) {
-                    jarFiles.put(file.getName(), fileByte);
-                }
             });
-            return jarFiles;
-        } else {
-            return new HashMap<>();
         }
+        return listBytesToZip(files);
     }
 
-    private Map<String, byte[]> getPlugJar() {
+    public byte[] downloadPluginJar(List<String> pluginIds) {
+        Map<String, byte[]> files = new HashMap<>();
+        if (CollectionUtils.isNotEmpty(pluginIds)) {
+            // 获取JAR
+            Map<String, byte[]> jarFiles = this.getPluginJar(pluginIds);
+            if (MapUtils.isNotEmpty(jarFiles)) {
+                for (String k : jarFiles.keySet()) {
+                    byte[] v = jarFiles.get(k);
+                    files.put(k, v);
+                }
+            }
+        }
+        return listBytesToZip(files);
+    }
+
+    public Map<String, byte[]> getPluginJar(List<String> pluginIds) {
         Map<String, byte[]> jarFiles = new LinkedHashMap<>();
-        List<Plugin> plugins = pluginService.list();
+        PluginExample example = new PluginExample();
+        example.createCriteria().andPluginIdIn(pluginIds).andScenarioNotEqualTo(PluginScenario.platform.name());
+        List<Plugin> plugins = pluginMapper.selectByExample(example);
         if (CollectionUtils.isNotEmpty(plugins)) {
             plugins = plugins.stream().collect(Collectors.collectingAndThen(Collectors.toCollection(() ->
                     new TreeSet<>(Comparator.comparing(Plugin::getPluginId))), ArrayList::new));
@@ -215,15 +238,6 @@ public class ApiJMeterFileService {
         return jarFiles;
     }
 
-    private Map<String, byte[]> getMultipartFiles(String reportId, HashTree hashTree) {
-        Map<String, byte[]> multipartFiles = new LinkedHashMap<>();
-        // 获取附件
-        List<BodyFile> files = new LinkedList<>();
-        ApiFileUtil.getExecuteFiles(hashTree, reportId, files);
-        HashTreeUtil.downFile(files, multipartFiles, fileMetadataService);
-        return multipartFiles;
-    }
-
     private String replaceJmx(String jmx) {
         jmx = StringUtils.replace(jmx, "<DubboSample", "<io.github.ningyu.jmeter.plugin.dubbo.sample.DubboSample");
         jmx = StringUtils.replace(jmx, "</DubboSample>", "</io.github.ningyu.jmeter.plugin.dubbo.sample.DubboSample>");
@@ -233,12 +247,24 @@ public class ApiJMeterFileService {
         return jmx;
     }
 
-    private byte[] zipFilesToByteArray(String testId, HashTree hashTree) {
-        String bodyFilePath = FileUtils.BODY_FILE_DIR;
+    private byte[] zipFilesToByteArray(String testId, String reportId, HashTree hashTree) {
         String fileName = testId + ".jmx";
 
-        // 获取JMX使用到的附件
-        Map<String, byte[]> multipartFiles = this.getMultipartFiles(testId, hashTree);
+        /*
+            v2.7版本修改jmx附件逻辑：
+            在node执行机器设置临时文件目录。这里只提供jmx
+            node拿到jmx后解析jmx中包含的附件信息。附件通过以下流程来获取：
+              1 从node执行机的临时文件夹
+              2 临时文件夹中未找到的文件，根据文件类型来判断是否从minio/git下载，然后缓存到临时文件夹。
+              3 MinIO、Git中依然未能找到的文件（主要是Local文件），通过主工程下载，然后缓存到临时文件夹
+            所以这里不再使用以下方法来获取附件内容
+            Map<String, byte[]> multipartFiles = this.getMultipartFiles(testId, hashTree);
+            转为解析jmx中附件节点，赋予相关信息(例如文件关联类型、路径、更新时间等),并将文件信息存储在redis中，为了进行连接ms下载时的安全校验
+         */
+        List<AttachmentBodyFile> attachmentBodyFileList = ApiFileUtil.getExecuteFile(hashTree, reportId, false);
+        if (CollectionUtils.isNotEmpty(attachmentBodyFileList)) {
+            redisTemplateService.setIfAbsent(JmxFileUtil.getExecuteFileKeyInRedis(reportId), JmxFileUtil.getRedisJmxFileString(attachmentBodyFileList));
+        }
 
         String jmx = new MsTestPlan().getJmx(hashTree);
         // 处理dubbo请求生成jmx文件
@@ -249,17 +275,6 @@ public class ApiJMeterFileService {
         //  每个测试生成一个文件夹
         files.put(fileName, jmx.getBytes(StandardCharsets.UTF_8));
 
-        if (multipartFiles != null && !multipartFiles.isEmpty()) {
-            for (String k : multipartFiles.keySet()) {
-                byte[] v = multipartFiles.get(k);
-                if (k.startsWith(bodyFilePath)) {
-                    files.put(StringUtils.substringAfter(k, bodyFilePath), v);
-                } else {
-                    LogUtil.error("WARNING:Attachment path is not in body_file_path: " + k);
-                    files.put(k, v);
-                }
-            }
-        }
         return listBytesToZip(files);
     }
 
@@ -281,28 +296,89 @@ public class ApiJMeterFileService {
         }
     }
 
-    public byte[] zipFilesToByteArray(BodyFileRequest request) {
+    /**
+     * 打包ms本地文件
+     *
+     * @param request
+     * @return
+     */
+    public byte[] zipLocalFilesToByteArray(BodyFileRequest request) {
+
+        LogUtil.info("开始下载执行报告为[" + request.getReportId() + "]的文件。");
         Map<String, byte[]> files = new LinkedHashMap<>();
         if (CollectionUtils.isNotEmpty(request.getBodyFiles())) {
-            LoggerUtil.info("开始从三方仓库下载文件");
-            HashTreeUtil.downFile(request.getBodyFiles(), files, fileMetadataService);
-            LoggerUtil.info("从三方仓库下载文件");
-            for (BodyFile bodyFile : request.getBodyFiles()) {
-                File file = new File(bodyFile.getName());
-                if (!file.exists()) {
-                    // 从MinIO下载
-                    ApiFileUtil.downloadFile(bodyFile.getId(), bodyFile.getName());
-                    file = new File(bodyFile.getName());
-                }
-                if (file != null && file.exists()) {
-                    byte[] fileByte = FileUtils.fileToByte(file);
-                    if (fileByte != null) {
-                        files.put(file.getAbsolutePath(), fileByte);
+            //获取要下载的合法文件
+            List<BodyFile> legalFiles = this.getLegalFiles(request);
+            if (CollectionUtils.isNotEmpty(legalFiles)) {
+                //区分本地文件和文件库文件
+                List<BodyFile> localFile = new ArrayList<>();
+                List<String> remoteFileIdList = new ArrayList<>();
+                legalFiles.forEach(file -> {
+                    if (StringUtils.isNotEmpty(file.getRefResourceId())) {
+                        remoteFileIdList.add(file.getRefResourceId());
+                    } else {
+                        localFile.add(file);
                     }
+                });
+
+                //下载本地文件
+                if (CollectionUtils.isNotEmpty(localFile)) {
+                    HashTreeUtil.downFile(localFile, files, fileMetadataService);
+                }
+                //下载文件库文件
+                if (CollectionUtils.isNotEmpty(remoteFileIdList)) {
+                    LogUtil.info("开始下载执行报告为[" + request.getReportId() + "]的文件库文件。");
+                    List<FileInfoDTO> gitFileList = fileMetadataService.downloadApiExecuteFilesByIds(remoteFileIdList);
+                    gitFileList.forEach(fileInfoDTO ->
+                            files.put(
+                                    StringUtils.join(
+                                            temporaryFileUtil.generateRelativeDir(fileInfoDTO.getProjectId(), fileInfoDTO.getId(), fileInfoDTO.getFileLastUpdateTime()),
+                                            File.separator,
+                                            fileInfoDTO.getFileName()
+                                    ), fileInfoDTO.getFileByte()));
+                    LogUtil.info("下载到执行报告为[" + request.getReportId() + "]的文件库文件。共下载到【" + gitFileList.size() + "】个");
                 }
             }
         }
-        return listBytesToZip(files);
+
+        Map<String, byte[]> zipFiles = new LinkedHashMap<>();
+        for (Map.Entry<String, byte[]> entry : files.entrySet()) {
+            String filePath = entry.getKey();
+            if (StringUtils.startsWith(filePath, FileUtils.BODY_FILE_DIR + File.separator)) {
+                //如果路径是以bodyFileDir开头的旧文件，需要去除文件路径前的body路径，并放入默认文件夹中。这样可以直接在/node根目录解压，不用再区分是git文件还是local文件。
+                filePath = StringUtils.substring(filePath, FileUtils.BODY_FILE_DIR.length() + 1);
+                filePath = TemporaryFileUtil.DEFAULT_FILE_FOLDER + File.separator + filePath;
+            }
+            zipFiles.put(filePath, entry.getValue());
+        }
+        LogUtil.info("下载执行报告为[" + request.getReportId() + "]的文件结束。");
+        return listBytesToZip(zipFiles);
+    }
+
+    private List<BodyFile> getLegalFiles(BodyFileRequest request) {
+        List<BodyFile> returnList = new ArrayList<>();
+
+        Object jmxFileInfoObj = redisTemplateService.get(JmxFileUtil.getExecuteFileKeyInRedis(request.getReportId()));
+        List<AttachmentBodyFile> fileInJmx = JmxFileUtil.formatRedisJmxFileString(jmxFileInfoObj);
+        redisTemplateService.delete(JmxFileUtil.getExecuteFileKeyInRedis(request.getReportId()));
+
+        if (CollectionUtils.isNotEmpty(request.getBodyFiles())) {
+            request.getBodyFiles().forEach(attachmentBodyFile -> {
+                for (AttachmentBodyFile jmxFile : fileInJmx) {
+                    if (StringUtils.isBlank(attachmentBodyFile.getRefResourceId())) {
+                        if (StringUtils.equals(attachmentBodyFile.getName(), jmxFile.getFilePath())
+                                && StringUtils.equals(attachmentBodyFile.getName(), jmxFile.getName())) {
+                            returnList.add(attachmentBodyFile);
+                        }
+                    } else {
+                        if (StringUtils.equals(attachmentBodyFile.getRefResourceId(), jmxFile.getFileMetadataId())) {
+                            returnList.add(attachmentBodyFile);
+                        }
+                    }
+                }
+            });
+        }
+        return returnList;
     }
 
 }

@@ -33,9 +33,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -164,9 +164,24 @@ public class TestCaseController {
         return testCaseService.getTestCase(testCaseId);
     }
 
+    @GetMapping("/get/version/{refId}/{versionId}")
+    public TestCaseDTO getTestCaseByVersion(@PathVariable String refId, @PathVariable String versionId) {
+        return testCaseService.getTestCaseByVersion(refId, versionId);
+    }
+
     @GetMapping("/get/step/{testCaseId}")
     public TestCaseWithBLOBs getTestCaseStep(@PathVariable String testCaseId) {
         return testCaseService.getTestCaseStep(testCaseId);
+    }
+
+    @GetMapping("/get/simple/{testCaseId}")
+    public TestCaseWithBLOBs getSimpleCase(@PathVariable String testCaseId) {
+        return testCaseService.getSimpleCase(testCaseId);
+    }
+
+    @GetMapping("/get/edit/simple/{testCaseId}")
+    public TestCaseWithBLOBs getSimpleCaseForEdit(@PathVariable String testCaseId) {
+        return testCaseService.getSimpleCaseForEdit(testCaseId);
     }
 
     @GetMapping("/project/{testCaseId}")
@@ -322,7 +337,6 @@ public class TestCaseController {
     }
 
     @PostMapping("/batch/movePublic/deleteToGc")
-    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_CASE_READ_DELETE)
     @MsAuditLog(module = OperLogModule.TRACK_TEST_CASE, type = OperLogConstants.BATCH_DEL, beforeEvent = "#msClass.getLogDetails(#request.ids)", msClass = TestCaseService.class)
     @SendNotice(taskType = NoticeConstants.TaskType.TRACK_TEST_CASE_TASK, target = "#targetClass.findByBatchRequest(#request)", targetClass = TestCaseService.class,
             event = NoticeConstants.Event.DELETE, subject = "测试用例通知")

@@ -603,7 +603,6 @@ export default {
     if (!this.projectName || this.projectName === "") {
       this.getProjectName();
     }
-    /*this.condition.orders = getLastTableSortField(this.tableHeaderKey);*/
     if (this.isFocus) {
       if (this.condition.filters) {
         delete this.condition.filters['user_id']

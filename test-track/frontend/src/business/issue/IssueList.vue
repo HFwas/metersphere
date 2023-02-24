@@ -98,6 +98,10 @@
                  {{ scope.row.createTime | datetimeFormat }}
               </span>
 
+              <span v-else-if="item.id === 'updateTime'">
+                 {{ scope.row.updateTime | datetimeFormat }}
+              </span>
+
               <span v-else-if="item.id === 'caseCount'">
                  <router-link
                    :to="scope.row.caseCount > 0 ? {name: 'testCase', params: { projectId: 'all', ids: scope.row.caseIds }} : {}">
@@ -181,6 +185,7 @@ import {
 import MsMarkDownText from "metersphere-frontend/src/components/MsMarkDownText";
 import {hasLicense} from "metersphere-frontend/src/utils/permission";
 import MsReviewTableItem from "@/business/issue/MsReviewTableItem";
+import {setIssuePlatformComponent} from "@/business/issue/issue";
 
 export default {
   name: "IssueList",
@@ -268,6 +273,10 @@ export default {
           sortable: true,
           minWidth: 180
         },
+        updateTime: {
+          sortable: true,
+          minWidth: 180
+        },
         caseCount: {}
       }
     };
@@ -293,6 +302,8 @@ export default {
           });
           getIssuePartTemplateWithProject((template) => {
             this.initFields(template);
+          }, () => {
+            this.loading = false;
           });
         });
       this.getIssues();
@@ -301,6 +312,7 @@ export default {
     getPlatformOption()
       .then((r) => {
         this.platformOptions = r.data;
+        setIssuePlatformComponent(this.platformOptions, this.page.condition.components);
       });
 
     this.hasLicense = hasLicense();
@@ -550,10 +562,13 @@ export default {
             checkSyncIssues(this.loading);
           } else {
             this.$success(this.$t('test_track.issue.sync_complete'));
-            this.loading = false;
+
             this.getIssues();
           }
-        });
+        })
+      .catch(() => {
+        this.loading = false;
+      });
     },
     syncIssues() {
       this.loading = true;
@@ -566,6 +581,8 @@ export default {
             this.loading = false;
             this.getIssues();
           }
+        }).catch(() => {
+          this.loading = false;
         });
     },
     editParam() {

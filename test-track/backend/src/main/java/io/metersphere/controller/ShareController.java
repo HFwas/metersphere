@@ -2,6 +2,7 @@ package io.metersphere.controller;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import io.metersphere.commons.utils.HttpHeaderUtils;
+import io.metersphere.commons.utils.SessionUtils;
 import io.metersphere.dto.TestPlanCaseDTO;
 import io.metersphere.plan.dto.TestPlanExtReportDTO;
 import io.metersphere.plan.dto.TestPlanSimpleReportDTO;
@@ -13,8 +14,8 @@ import io.metersphere.service.ShareInfoService;
 import io.metersphere.xpack.track.dto.IssuesDao;
 import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.Resource;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.UnsupportedEncodingException;
 import java.util.List;
 
@@ -68,7 +69,9 @@ public class ShareController {
     @GetMapping("test/plan/ext/report/{shareId}/{reportId}")
     public TestPlanExtReportDTO getExtReport(@PathVariable String shareId, @PathVariable String reportId) throws JsonProcessingException {
         shareInfoService.validate(shareId, reportId);
-        HttpHeaderUtils.runAsUser("admin");
+        if (SessionUtils.getUser() == null) {
+            HttpHeaderUtils.runAsUser("admin");
+        }
         TestPlanExtReportDTO reportExtInfo = testPlanService.getExtInfoByReportId(reportId);
         HttpHeaderUtils.clearUser();
         return reportExtInfo;
@@ -77,7 +80,9 @@ public class ShareController {
     @GetMapping("test/plan/ext/plan/{shareId}/{planId}")
     public TestPlanExtReportDTO getExtPlan(@PathVariable String shareId, @PathVariable String planId) throws JsonProcessingException {
         shareInfoService.validate(shareId, planId);
-        HttpHeaderUtils.runAsUser("admin");
+        if (SessionUtils.getUser() == null) {
+            HttpHeaderUtils.runAsUser("admin");
+        }
         TestPlanExtReportDTO reportExtInfo = testPlanService.getExtInfoByPlanId(planId);
         HttpHeaderUtils.clearUser();
         return reportExtInfo;

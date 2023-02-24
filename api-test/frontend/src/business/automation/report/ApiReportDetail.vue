@@ -15,9 +15,9 @@
               :project-env-map="projectEnvMap"
               :mode="mode"
               :pool-name="poolName"
+              :is-share="isShare"
               @reportExport="handleExport"
               @reportSave="handleSave" />
-
             <!-- content -->
             <main v-if="isNotRunning">
               <!-- content header chart -->
@@ -130,6 +130,7 @@ import {
 } from '../../../api/scenario-report';
 import { STEP } from '../../automation/scenario/Setting';
 import MsCodeEdit from 'metersphere-frontend/src/components/MsCodeEdit';
+import print from 'print-js';
 
 export default {
   name: 'MsApiReport',
@@ -234,7 +235,7 @@ export default {
       }
     },
     rerunVerify() {
-      if (hasLicense() && this.fullTreeNodes && this.fullTreeNodes.length > 0 && !this.isShare) {
+      if (this.fullTreeNodes && this.fullTreeNodes.length > 0 && !this.isShare) {
         this.fullTreeNodes.forEach((item) => {
           item.redirect = true;
           if (
@@ -702,15 +703,34 @@ export default {
           }
         }
       }
+      if (this.content.scenarios && this.content.scenarios[0].requestResults) {
+        this.content.scenarios[0].requestResults.push({ responseResult: {} });
+      }
       this.reportExportVisible = true;
       let reset = this.exportReportReset;
       let name = this.report.name;
       name = this.encodeSearchKey(name);
       this.$nextTick(() => {
         setTimeout(() => {
-          downloadPDF(document.getElementById('apiTestReport'), name || 'scenario-report');
+          this.printHTML();
           reset();
         }, 5000);
+      });
+    },
+    printHTML() {
+      function closeFuc() {
+        location.reload();
+      }
+
+      print({
+        printable: 'apiTestReport',
+        type: 'html',
+        maxWidth: 1200,
+        documentTitle: '',
+        scanStyles: true,
+        header: '',
+        targetStyles: ['*'], // 打印内容使用所有HTML样式，没有设置这个属性/值，设置分页打印没有效果
+        onPrintDialogClose: closeFuc,
       });
     },
     // 对报告名称中的特殊字符进行编码

@@ -1,3 +1,4 @@
+SET SESSION innodb_lock_wait_timeout = 7200;
 -- 场景报告状态统一调整
 -- 失败状态
 update api_scenario_report set status ='ERROR' where status in ('Error','Timeout','Fail');
@@ -91,3 +92,5 @@ update test_plan_api_case set `status` ='STOPPED' where `status` = 'STOP';
 update test_plan_api_case set `status` ='FAKE_ERROR' where `status` in ('errorReportResult','errorReport');
 -- 执行中
 update test_plan_api_case set `status` ='RUNNING' where `status` = 'Running';
+
+SET SESSION innodb_lock_wait_timeout = DEFAULT;

@@ -4,6 +4,14 @@ import test_track from "./track/en-US";
 
 const message = {
   commons: {
+    pre_page: 'Pre page',
+    next_page: 'Next page',
+    already_pre_page: 'It\'s already page one',
+    already_next_page: 'It\'s already last page',
+    table_select_row_count: 'Selected {0} Record',
+    header_custom_select_tips: 'Please customize table header by select field',
+    advance_search_total_suffix: 'results',
+    advance_search_clear: 'Reset condition',
     project_permission: 'Please add the project permission first',
     no_permission: 'No permission yet',
     failure_continues: "Failure continues",
@@ -72,6 +80,9 @@ const message = {
     save_as: 'Save as',
     update: 'Update',
     save_success: 'Saved successfully',
+    add_success: 'Add successfully',
+    cancel_add_success: 'Cancel successfully',
+    recover_success: 'Recover successfully',
     warning_module_add: "Tree modules are up to 8 levels deep",
     send_success: 'Send successfully',
     delete_success: 'Deleted successfully',
@@ -130,7 +141,7 @@ const message = {
     system_setting: 'Settings',
     api: 'API',
     encode: 'Encode',
-    view: 'view',
+    view: 'View',
     follow_api: 'Follow API definition',
     response_time_delay: 'Response delay time',
     my_workstation: 'Workstation',
@@ -140,6 +151,7 @@ const message = {
     view_settings: 'View Settings',
     functional: 'Functional test',
     input_content: 'Please enter content',
+    input_un_pass_reason: 'Please enter un pass content',
     create: 'Create',
     edit: 'Edit',
     copy: 'Copy',
@@ -148,6 +160,7 @@ const message = {
     remark: 'Remark',
     delete: 'Delete',
     reduction: 'Reduction',
+    recover: 'Recover',
     not_filled: 'Not filled',
     please_select: 'Please select',
     search_by_name: 'Search by name',
@@ -330,6 +343,7 @@ const message = {
     },
     adv_search: {
       title: 'Advanced Search',
+      new_title: 'Search',
       combine: 'Combined query',
       test: "Test",
       project: "Project",
@@ -369,6 +383,8 @@ const message = {
       select_module: "Select module",
       default_module: "Default module",
     },
+    reviewer: 'Reviewer',
+    append_reviewer: 'Append Reviewer',
     report_statistics: {
       reserved: "Reserved",
       menu: {
@@ -487,7 +503,8 @@ const message = {
       ui_element: 'default',
       ui_scenario: 'default',
       ui_module: "default",
-    }
+    },
+    other: "Other"
   },
   login: {
     normal_Login: "Normal Login",
@@ -542,6 +559,9 @@ const message = {
       performance: 'Performance',
       scenario_case: 'Scenario Case'
     },
+    sync_case_tips: 'Note: After ignoring, the affected use cases will no longer have reminders, please operate with caution',
+    batch_sync_api_tips: 'Batch synchronization, some use case parameters that do not need to be synchronized may also be overwritten, causing the test to fail, please operate with caution',
+    batch_ignore_case_tips: 'Note: After batch ignoring, the affected use cases will no longer have reminders, please operate with caution',
   },
   display: {
     title: 'Theme',
@@ -881,6 +901,8 @@ const message = {
       edit_version: 'Edit version',
       version_closed: 'Closed',
       version_open: 'Open',
+      re_review: 'ReReview',
+      re_review_info: 'Use case under review changes, use case state automatically switches to reReview ',
       publish_time: 'Publish time',
       start_time: 'Start time',
       end_time: 'End time',
@@ -1280,6 +1302,8 @@ const message = {
     batch_menus: {
       select_all_data: "Select all datas({0})",
       select_show_data: "Select show datas({0})",
+      select_current_page: "Select Current",
+      select_all_page: "Select All"
     },
     mock: {
       create_error: "Api info is not saved",
@@ -1337,7 +1361,7 @@ const message = {
       one_click_sync: "One-click sync",
       change_notification: "Change Notification",
       recipient: "Recipient",
-      recipient_tips: "When the API changes, the associated CASE creator and automation scene creator will receive in-site messages",
+      recipient_tips: "When the API changes, the associated CASE creator and automation scene creator will receive in-site messages, can go to",
       select_comp: {
         no_data: "No Data",
         add_data: "Add Data"
@@ -1920,9 +1944,9 @@ const message = {
       no_cover_tip_scenario_1: "1. The same Scenario that already exists in the system will not be changed",
       no_cover_tip_scenario_2: "2. Add Scenario that do not exist in the system",
       import_version: 'Import version',
-      data_update_version: 'The same API is updated to',
-      data_new_version: 'New API created to',
-      latest_version: 'Latest version',
+      data_update_version: 'Api update version',
+      data_new_version: 'Api creation version',
+      latest_version: 'Default to latest version'
     },
     scenario_import: {
       data_update_version: 'The same Scenario is updated to',
@@ -3283,7 +3307,7 @@ const message = {
       api_tip: 'Both the interface definition and the affected interface use cases will enter the to-be-updated list',
       case_tip: 'If the interface use case meets the conditions, it will enter the to-be-updated list',
       update_rule_title: 'Enter the to-be-updated list rule settings',
-      no_show_setting: 'No more setting pop-ups',
+      no_show_setting: 'Do not pop up this popup again',
       api_receiver_tip: "Note: Please confirm that \"API update\" in the API test task notification has been set \"Intra-site message\" message, otherwise, you will not receive message reminders",
       case_receiver_tip: "Note: Please confirm that \"CASE update\" in the API test task notification has been set \"Intra-site message\" message, otherwise, you will not receive message reminders",
       no_show_setting_tip: "After checking, the pop-up window will no longer pop up, and the synchronization and change notification will be performed according to the setting content by default: If you need to change the setting, you can open the setting item in the drop-down option next to the save button。",

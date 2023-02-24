@@ -26,15 +26,21 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 public class FileUtils {
+
+    public static final String ROOT_DIR = "/opt/metersphere/";
     public static final String BODY_FILE_DIR = "/opt/metersphere/data/body";
     public static final String MD_IMAGE_DIR = "/opt/metersphere/data/image/markdown";
     public static final String UI_IMAGE_DIR = "/opt/metersphere/data/image/ui/screenshots";
     public static final String ATTACHMENT_DIR = "/opt/metersphere/data/attachment";
     public static final String ATTACHMENT_TMP_DIR = "/opt/metersphere/data/attachment/tmp";
 
-    public static void validateFileName(String fileName) {
-        if (StringUtils.isNotEmpty(fileName) && StringUtils.contains(fileName, "." + File.separator)) {
-            MSException.throwException(Translator.get("invalid_parameter"));
+    public static void validateFileName(String... fileNames) {
+        if (fileNames != null) {
+            for (String fileName : fileNames) {
+                if (StringUtils.isNotEmpty(fileName) && StringUtils.contains(fileName, "." + File.separator)) {
+                    MSException.throwException(Translator.get("invalid_parameter"));
+                }
+            }
         }
     }
 
@@ -494,6 +500,24 @@ public class FileUtils {
     public static boolean isFolderExists(String requestId) {
         File file = new File(BODY_FILE_DIR + File.separator + requestId);
         return file.isDirectory();
+    }
+
+    public static void deleteBodyTmpFiles(String reportId) {
+        if (StringUtils.isNotEmpty(reportId)) {
+            String executeTmpFolder = StringUtils.join(
+                    BODY_FILE_DIR,
+                    File.separator,
+                    "tmp",
+                    File.separator,
+                    reportId
+            );
+            try {
+                FileUtils.deleteDir(executeTmpFolder);
+            } catch (Exception e) {
+                LoggerUtil.error("删除[" + reportId + "]执行中产生的临时文件失败!", e);
+            }
+
+        }
     }
 
     public List<Object> getZipJar() {

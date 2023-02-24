@@ -273,7 +273,9 @@ export default {
       this.request.projectId = getCurrentProjectID();
     }
     this.request.customizeReq = this.isCustomizeReq;
-    this.request.currentScenarioId = this.currentScenario.id;
+    if (this.currentScenario) {
+      this.request.currentScenarioId = this.currentScenario.id;
+    }
     // 传递场景ID
     if (this.request.hashTree) {
       this.setOwnEnvironment(this.request.hashTree);
@@ -407,87 +409,6 @@ export default {
     copyRow() {
       this.$emit('copyRow', this.request, this.node);
     },
-    setUrl(url) {
-      try {
-        new URL(url);
-        this.request.url = url;
-      } catch (e) {
-        if (url && (!url.startsWith('http://') || !url.startsWith('https://'))) {
-          if (!this.isCustomizeReq) {
-            this.request.path = url;
-            this.request.url = undefined;
-          }
-        }
-      }
-    },
-    mergeHashTree(targetHashTree) {
-      let sourceHashTree = this.request.hashTree;
-      // 历史数据兼容
-      if (sourceHashTree && targetHashTree && sourceHashTree.length < targetHashTree.length) {
-        this.request.hashTree = targetHashTree;
-        return;
-      }
-      let sourceIds = [];
-      let delIds = [];
-      let updateMap = new Map();
-      if (!sourceHashTree || sourceHashTree.length == 0) {
-        if (targetHashTree) {
-          targetHashTree.forEach((item) => {
-            item.disabled = true;
-          });
-          this.request.hashTree = targetHashTree;
-        }
-        return;
-      }
-      if (targetHashTree) {
-        for (let i in targetHashTree) {
-          targetHashTree[i].disabled = true;
-          if (targetHashTree[i].id) {
-            updateMap.set(targetHashTree[i].id, targetHashTree[i]);
-          }
-        }
-      }
-
-      if (sourceHashTree && sourceHashTree.length > 0) {
-        for (let index in sourceHashTree) {
-          let source = sourceHashTree[index];
-          sourceIds.push(source.id);
-          // 历史数据兼容
-          if (source.label !== 'SCENARIO-REF-STEP' && source.id) {
-            if (updateMap.has(source.id)) {
-              Object.assign(sourceHashTree[index], updateMap.get(source.id));
-              sourceHashTree[index].disabled = true;
-              sourceHashTree[index].label = '';
-              sourceHashTree[index].enable = updateMap.get(source.id).enable;
-            } else {
-              delIds.push(source.id);
-            }
-          }
-          // 历史数据兼容
-          if (!source.id && source.label !== 'SCENARIO-REF-STEP' && index < targetHashTree.length) {
-            Object.assign(sourceHashTree[index], targetHashTree[index]);
-            sourceHashTree[index].disabled = true;
-            sourceHashTree[index].label = '';
-            sourceHashTree[index].enable = targetHashTree[index].enable;
-          }
-        }
-      }
-      // 删除多余的步骤
-      delIds.forEach((item) => {
-        const removeIndex = sourceHashTree.findIndex((d) => d.id && d.id === item);
-        sourceHashTree.splice(removeIndex, 1);
-      });
-
-      // 补充新增的源引用步骤
-      if (targetHashTree) {
-        targetHashTree.forEach((item) => {
-          if (sourceIds.indexOf(item.id) === -1) {
-            item.disabled = true;
-            this.request.hashTree.push(item);
-          }
-        });
-      }
-    },
     sort() {
       for (let i in this.request.hashTree) {
         this.request.hashTree[i].index = Number(i) + 1;
@@ -529,7 +450,7 @@ export default {
                 selectEnvId = store.scenarioEnvMap.get(this.currentScenario.id + '_' + this.request.projectId);
                 this.environmentMap = this.envMap;
               }
-              if (!selectEnvId) {
+              if (!selectEnvId && !this.environmentGroupId) {
                 this.$warning(this.$t('api_test.automation.env_message'));
                 return false;
               }
@@ -562,6 +483,7 @@ export default {
             headers: this.currentScenario.headers,
             enableCookieShare: this.enableCookieShare,
             environmentId: selectEnvId,
+            environmentGroupId: this.environmentGroupId,
             hashTree: [this.request],
           };
           // 合并自身依赖场景变量

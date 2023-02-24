@@ -1,7 +1,7 @@
 <template>
   <div>
-    <div v-loading="loading" class="minder" :class="{'full-screen': isFullScreen}">
-      <ms-full-screen-button :is-full-screen.sync="isFullScreen"/>
+    <div v-loading="loading" :class="[isFullScreen ? 'full-screen' : 'minder']">
+      <ms-full-screen-button :is-full-screen.sync="isFullScreen" @toggleMinderFullScreen="toggleMinderFullScreen"/>
       <minder-editor
         v-if="isActive"
         class="minder-container"
@@ -113,12 +113,20 @@ export default {
     }
   },
   created() {
-    this.height = document.body.clientHeight - 285;
+    this.height = document.body.clientHeight - 325;
   },
   destroyed() {
+    if (this.$EventBus) {
+      this.$EventBus.$off("appFixedChange", this.setFullScreenLeft);
+    }
     minderPageInfoMap.clear();
   },
   mounted() {
+    if (this.$EventBus) {
+      // 导出的报告不走这里
+      this.$EventBus.$on("appFixedChange", this.setFullScreenLeft);
+    }
+    this.setFullScreenLeft();
     this.defaultMode = 3;
     if (this.minderKey) {
       let model = localStorage.getItem(this.minderKey + 'minderModel');
@@ -159,6 +167,13 @@ export default {
           this.setExtraNodeCount(countMap, node.children);
         }
       });
+    },
+    setFullScreenLeft() {
+      const root = document.querySelector(':root');
+      // 获取 :root 上 --screen-left 变量的值
+      const left = getComputedStyle(root).getPropertyValue('--screen-left').trim();
+      // 设置 :root 上 --screen-left 变量的值
+      root.style.setProperty('--screen-left', left === '44px' ? '150px' : '44px');
     },
     handleMoldChange(index) {
       if (this.minderKey) {
@@ -298,20 +313,42 @@ export default {
         template: "default"
       };
       return importJson;
+    },
+    toggleMinderFullScreen(isFullScreen) {
+      this.$emit("toggleMinderFullScreen", isFullScreen);
+      this.$EventBus.$emit('toggleFullScreen', isFullScreen);
     }
-  }
+  },
 }
 </script>
 
 <style scoped>
+:root {
+  --screen-left: var(--asideWidth);
+}
+
 .minder-container :deep(.save-btn) {
-  right: 30px;
+  right: 24px;
   bottom: auto;
-  top: 30px;
+  top: 24px;
+  width: 80px;
+  height: 32px;
+  border-radius: 4px;
+}
+
+.minder-container :deep(.save-btn span) {
+  font-family: 'PingFang SC';
+  font-style: normal;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 22px;
+  position: relative;
+  top: -8px;
 }
 
 .minder {
   position: relative;
+  top: 35px
 }
 
 .fulls-screen-btn {
@@ -323,16 +360,18 @@ export default {
 
 .full-screen {
   position: fixed;
-  top: 0px;
-  left: 0px;
-  width: 100%;
-  background: white;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  padding: 12px;
   height: 100vh;
-  z-index: 2;
+  z-index: 1999;
+  max-height: calc(100vh);
 }
 
 .full-screen :deep(.minder-container) {
-  height: calc(100vh - 109px) !important;
+  height: calc(100vh - 149px) !important;
 }
 
 .full-screen .fulls-screen-btn {
@@ -341,5 +380,14 @@ export default {
 
 :deep(*[disabled]) {
   opacity: 0.7 !important;
+}
+
+:deep(.minder-container.km-editor.km-view.focus) {
+  min-height: 422px;
+  background: #F5F6F7!important;
+}
+
+:deep(.menu-container) {
+  height: 60px;
 }
 </style>

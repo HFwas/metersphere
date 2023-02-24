@@ -1,4 +1,5 @@
 import ClickOutside from "element-ui/src/utils/clickoutside";
+import CustomClickOutside from "./click-outside/custom-click-outside";
 import Permission from "./permission";
 import Drag from "./drag";
 import directive from './loading/directive';
@@ -46,7 +47,9 @@ export default {
     Vue.directive('left-to-right-drag', Drag.left2RightDrag);
     Vue.directive('right-to-left-drag', Drag.right2LeftDrag);
     Vue.directive('bottom-to-top-drag', Drag.bottom2TopDrag);
-    //
+    Vue.directive('top-bottom-to-drag', Drag.top2BottomDrag);
+    Vue.directive('vertical-drag', Drag.verticalDrag);
+    Vue.directive('custom-click-outside', CustomClickOutside);
     Vue.use(directive);
     Vue.prototype.$loading = service;
   },

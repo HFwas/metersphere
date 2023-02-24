@@ -23,7 +23,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.time.DateFormatUtils;
 import org.apache.commons.text.StringSubstitutor;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -99,6 +99,9 @@ public abstract class AbstractNoticeSender implements NoticeSender {
                     Map jsonObject = new BeanMap(o);
                     String id = (String) jsonObject.get("id");
                     CustomField customField = baseCustomFieldService.get(id);
+                    if (customField == null) {
+                        continue;
+                    }
                     Object value = jsonObject.get("value");
                     if (value instanceof String && StringUtils.isNotEmpty((String) value)) {
                         String v = StringUtils.unwrap((String) value, "\"");
@@ -143,6 +146,9 @@ public abstract class AbstractNoticeSender implements NoticeSender {
     }
 
     protected List<UserDetail> getUserDetails(List<String> userIds) {
+        if (CollectionUtils.isEmpty(userIds)) {
+            return new ArrayList<>();
+        }
         return baseUserMapper.queryTypeByIds(userIds);
     }
 

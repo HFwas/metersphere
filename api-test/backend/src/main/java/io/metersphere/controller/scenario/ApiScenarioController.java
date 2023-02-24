@@ -34,7 +34,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -328,11 +328,11 @@ public class ApiScenarioController {
             List<TaskRequestDTO> reportIds = new ArrayList<>();
             TaskRequestDTO taskRequest = new TaskRequestDTO();
             taskRequest.setReportId(reportId);
-            taskRequest.setType(ElementConstants.SCENARIO);
+            taskRequest.setType(ElementConstants.SCENARIO_UPPER);
             reportIds.add(taskRequest);
 
             WebSocketUtil.onClose(reportId);
-            apiTaskService.stop(reportIds);
+            apiTaskService.apiStop(reportIds);
         }
     }
 

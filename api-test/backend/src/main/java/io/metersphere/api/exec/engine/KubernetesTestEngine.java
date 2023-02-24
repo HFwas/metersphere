@@ -7,11 +7,12 @@ import io.metersphere.api.dto.definition.request.ElementUtil;
 import io.metersphere.base.domain.TestResource;
 import io.metersphere.commons.constants.ApiRunMode;
 import io.metersphere.commons.constants.ExtendedParameter;
-import io.metersphere.commons.exception.MSException;
+import io.metersphere.commons.utils.CommonBeanFactory;
 import io.metersphere.commons.utils.JSON;
 import io.metersphere.commons.utils.LogUtil;
 import io.metersphere.commons.utils.WebSocketUtil;
 import io.metersphere.dto.JmeterRunRequestDTO;
+import io.metersphere.service.RemakeReportService;
 import io.metersphere.utils.LoggerUtil;
 import io.metersphere.xpack.resourcepool.engine.provider.ClientCredential;
 import io.metersphere.xpack.resourcepool.engine.provider.KubernetesProvider;
@@ -63,6 +64,7 @@ public class KubernetesTestEngine extends AbstractEngine {
                     .append(StringUtils.LF).append("Pod信息：【 ")
                     .append(JSON.toJSONString(pod.getMetadata())).append(" 】");
             LoggerUtil.info(logMsg);
+
             boolean isDebug = runRequest.getHashTree() != null;
             if (isDebug) {
                 ElementUtil.coverArguments(runRequest.getHashTree());
@@ -75,13 +77,14 @@ public class KubernetesTestEngine extends AbstractEngine {
                 LoggerUtil.info("进入DEBUG执行模式", runRequest.getReportId());
             }
             // 拼接CURL执行命令
-            StringBuffer command = new StringBuffer("curl -H \"Accept: application/json\" -H \"Content-type: application/json\" -X POST -d").append(StringUtils.SPACE);
+            StringBuffer command = new StringBuffer("curl -H \"Accept: application/json\" -H \"Content-type: application/json\" -X POST -d");
+            command.append(StringUtils.SPACE);
             command.append("'").append(JSON.toJSONString(runRequest)).append("'"); // 请求参数
             command.append(StringUtils.SPACE).append("--connect-timeout 30");  // 设置连接超时时间为30S
             command.append(StringUtils.SPACE).append("--max-time 120");  // 设置请求超时时间为120S
             command.append(StringUtils.SPACE).append("--retry 3");  // 设置重试次数3次
             command.append(StringUtils.SPACE).append("http://127.0.0.1:8082/jmeter/").append(isDebug ? DEBUG_URL : EXEC_URL);
-            KubernetesApiExec.newExecWatch(client, clientCredential.getNamespace(), pod.getMetadata().getName(), command.toString());
+            KubernetesApiExec.newExecWatch(client, clientCredential.getNamespace(), pod.getMetadata().getName(), command.toString(), runRequest);
         } catch (Exception e) {
             MsgDTO dto = new MsgDTO();
             dto.setExecEnd(false);
@@ -91,13 +94,15 @@ public class KubernetesTestEngine extends AbstractEngine {
             LoggerUtil.debug("send. " + runRequest.getReportId());
             WebSocketUtil.sendMessageSingle(dto);
             WebSocketUtil.onClose(runRequest.getReportId());
+
+            RemakeReportService remake = CommonBeanFactory.getBean(RemakeReportService.class);
+            remake.testEnded(runRequest, StringUtils.join("K8s执行异常：", e.getMessage()));
             LoggerUtil.error("当前报告：【" + runRequest.getReportId() + "】资源：【" + runRequest.getTestId() + "】CURL失败：", e);
-            MSException.throwException(e);
         }
     }
 
     @Override
     public void stop() {
-
+        LoggerUtil.info("K8S执行STOP：", runRequest.getReportId());
     }
 }

@@ -2,6 +2,7 @@ package io.metersphere.api.jmeter;
 
 
 import io.metersphere.api.exec.queue.PoolExecBlockingQueueUtil;
+import io.metersphere.api.jmeter.utils.JmxFileUtil;
 import io.metersphere.api.jmeter.utils.ReportStatusUtil;
 import io.metersphere.commons.constants.CommonConstants;
 import io.metersphere.commons.utils.*;
@@ -11,6 +12,7 @@ import io.metersphere.constants.RunModeConstants;
 import io.metersphere.dto.ResultDTO;
 import io.metersphere.jmeter.JMeterBase;
 import io.metersphere.service.ApiExecutionQueueService;
+import io.metersphere.service.RedisTemplateService;
 import io.metersphere.service.TestResultService;
 import io.metersphere.utils.LoggerUtil;
 import io.metersphere.utils.RetryResultUtil;
@@ -34,6 +36,8 @@ public class MsApiBackendListener extends AbstractBackendListenerClient implemen
     // 当前场景报告/用例结果状态
     private ResultVO resultVO;
 
+    private RedisTemplateService redisTemplateService;
+
     /**
      * 参数初始化方法
      */
@@ -48,6 +52,9 @@ public class MsApiBackendListener extends AbstractBackendListenerClient implemen
         if (testResultService == null) {
             testResultService = CommonBeanFactory.getBean(TestResultService.class);
         }
+        if (redisTemplateService == null) {
+            redisTemplateService = CommonBeanFactory.getBean(RedisTemplateService.class);
+        }
         resultVO = new ResultVO();
         super.setupTest(context);
     }
@@ -58,6 +65,8 @@ public class MsApiBackendListener extends AbstractBackendListenerClient implemen
         if (dto.isRetryEnable()) {
             queues.addAll(sampleResults);
         } else {
+            redisTemplateService.delete(JmxFileUtil.getExecuteFileKeyInRedis(dto.getReportId()));
+
             if (!StringUtils.equals(dto.getReportType(), RunModeConstants.SET_REPORT.toString())) {
                 dto.setConsole(FixedCapacityUtil.getJmeterLogger(getReportId(), false));
             }
@@ -74,6 +83,9 @@ public class MsApiBackendListener extends AbstractBackendListenerClient implemen
     public void teardownTest(BackendListenerContext context) {
         try {
             LoggerUtil.info("进入TEST-END处理报告" + dto.getRunMode(), dto.getReportId());
+
+            redisTemplateService.delete(JmxFileUtil.getExecuteFileKeyInRedis(dto.getReportId()));
+
             super.teardownTest(context);
             // 获取执行日志
             if (!StringUtils.equals(dto.getReportType(), RunModeConstants.SET_REPORT.toString())) {

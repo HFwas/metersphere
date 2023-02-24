@@ -33,7 +33,7 @@ import org.mybatis.spring.SqlSessionUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -96,15 +96,6 @@ public class ApiDefinitionExecResultService {
                     result.setResourceId(dto.getTestId());
                     apiExecutionInfoService.insertExecutionInfo(result);
                     User user = getUser(dto, result);
-                    //如果是测试计划用例，更新接口用例的上次执行结果
-                    TestPlanApiCase testPlanApiCase = testPlanApiCaseMapper.selectByPrimaryKey(dto.getTestId());
-                    if (testPlanApiCase != null) {
-                        ApiTestCaseWithBLOBs apiTestCase = apiTestCaseMapper.selectByPrimaryKey(testPlanApiCase.getApiCaseId());
-                        if (apiTestCase != null) {
-                            apiTestCase.setLastResultId(dto.getReportId());
-                            apiTestCaseMapper.updateByPrimaryKeySelective(apiTestCase);
-                        }
-                    }
                     //如果是测试计划用例，更新接口用例的上次执行结果
                     TestPlanApiCase testPlanApiCase = testPlanApiCaseMapper.selectByPrimaryKey(dto.getTestId());
                     if (testPlanApiCase != null) {

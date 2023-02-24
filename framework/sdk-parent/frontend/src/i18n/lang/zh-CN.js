@@ -4,6 +4,14 @@ import test_track from "./track/zh-CN";
 
 const message = {
   commons: {
+    pre_page: '上一页',
+    next_page: '下一页',
+    already_pre_page: '已经是第一页',
+    already_next_page: '已经是最后一页',
+    table_select_row_count: '已选择 {0} 条',
+    header_custom_select_tips: '请选择列表中要展示的信息',
+    advance_search_total_suffix: '个结果',
+    advance_search_clear: '清空条件',
     project_permission: '请先添加该项目权限',
     no_permission: '暂无权限',
     failure_continues: "失败继续",
@@ -71,6 +79,9 @@ const message = {
     save_as: '另存为',
     update: '更新',
     save_success: '保存成功',
+    add_success: '添加成功',
+    cancel_add_success: '取消添加成功',
+    recover_success: '恢复成功',
     warning_module_add: "模块树深度最大为8层",
     send_success: '发送成功',
     delete_success: '删除成功',
@@ -141,6 +152,7 @@ const message = {
     my_workstation: '工作台',
     ui_test: 'UI测试',
     input_content: '请输入内容',
+    input_un_pass_reason: '请输入不通过原因',
     create: '新建',
     edit: '编辑',
     copy: '复制',
@@ -149,10 +161,11 @@ const message = {
     remark: '备注',
     delete: '删除',
     reduction: '恢复',
+    recover: '恢复',
     not_filled: '未填写',
     please_select: '请选择',
     search_by_name: '根据名称搜索',
-    search_by_name_or_id: '根据 ID/名称 搜索',
+    search_by_name_or_id: '通过ID或名称搜索',
     search_by_id_name_tag_path: '根据 ID/名称/标签/路径 搜索',
     search_by_id_name_tag: '根据 ID/名称/标签 搜索',
     personal_information: '个人信息',
@@ -331,6 +344,7 @@ const message = {
     },
     adv_search: {
       title: '高级搜索',
+      new_title: '筛选',
       combine: '组合查询',
       test: "所属测试",
       project: "所属项目",
@@ -370,6 +384,8 @@ const message = {
       select_module: "选择模块",
       default_module: "默认模块",
     },
+    reviewer: '评审人',
+    append_reviewer: '追加评审人',
     report_statistics: {
       reserved: "预留模块敬请期待",
       menu: {
@@ -492,6 +508,7 @@ const message = {
     },
     template_delete: "模版删除",
     scope: "应用场景",
+    other: "其他"
   },
   login: {
     normal_Login: "普通登录",
@@ -545,9 +562,9 @@ const message = {
       performance: '性能测试',
       scenario_case: '场景用例'
     },
-    apply_tip:'未开启工作台待更新设置',
+    apply_tip: '未开启工作台待更新设置',
     sync_case_tips: '注意: 忽略后，受影响的用例将不再有提醒，请谨慎操作',
-    batch_sync_api_tips: '注意: 批量同步，有可能部分不需要同步的用例参数也被覆盖，导致测试不通过，请谨慎操作',
+    batch_sync_api_tips: '批量同步，有可能部分不需要同步的用例参数也被覆盖，导致测试不通过，请谨慎操作',
     batch_ignore_case_tips: '注意: 批量忽略后，受影响的用例将不再有提醒，请谨慎操作',
   },
   display: {
@@ -597,7 +614,7 @@ const message = {
     system_field: '系统字段',
     scene: '使用场景',
     attribute_type: '属性类型',
-    field_name: '字段名',
+    field_name: '字段名称',
     field: '字段',
     field_remark: '字段备注',
     field_type: '字段类型',
@@ -880,6 +897,8 @@ const message = {
     log_desc: '项目全部操作过程',
     code_segment_desc: '自定义代码片段',
     test_case_custom_id: '测试用例自定义ID',
+    re_review: '重新提审',
+    re_review_info: '评审活动中的用例发生变更，用例状态自动切换为重新提审',
     test_case_custom_id_info: '用例ID默认为系统自增ID',
     scenario_custom_id: '场景自定义ID',
     scenario_custom_id_info: '场景用例ID默认为系统自增ID',
@@ -1291,6 +1310,8 @@ const message = {
     batch_menus: {
       select_all_data: "选择所有数据(共{0}条)",
       select_show_data: "选择可见数据(共{0}条)",
+      select_current_page: "全选当页",
+      select_all_page: "全选所有页"
     },
     mock: {
       create_error: "接口信息未保存",
@@ -1348,7 +1369,7 @@ const message = {
       one_click_sync: "一键同步",
       change_notification: "变更通知",
       recipient: "接收人",
-      recipient_tips: "当API发生变化时，关联的CASE创建人、自动化场景创建人会收到站内消息",
+      recipient_tips: "当API发生变化时，关联的CASE创建人、自动化场景创建人会收到站内消息，可前往",
       select_comp: {
         no_data: "无数据",
         add_data: "去添加"
@@ -1931,7 +1952,7 @@ const message = {
       import_version: '导入版本',
       data_update_version: '同一API更新到',
       data_new_version: '新增API创建到',
-      latest_version: '最新版本',
+      latest_version: '默认最新版本',
     },
     scenario_import: {
       data_update_version: '同一场景更新到',
@@ -2400,7 +2421,7 @@ const message = {
   table: {
     header_display_field: '表头显示字段',
     fields_to_be_selected: '待选字段',
-    selected_fields: '已选字段'
+    selected_fields: '已选字段',
   },
   run_mode: {
     title: "模式",
@@ -3295,7 +3316,7 @@ const message = {
       api_tip: '接口定义和受影响的接口用例都会进入待更新列表',
       case_tip: '接口用例符合条件就会进入待更新列表',
       update_rule_title: '进入待更新列表规则设置',
-      no_show_setting: '不再弹出设置弹窗',
+      no_show_setting: '不再弹出此弹窗',
       api_receiver_tip: "注意：请确认接口测试任务通知中的\"API更新\"已设置\"站内信\"消息，否则，将接收不到消息提醒。",
       case_receiver_tip: "注意：请确认接口测试任务通知中的\"CASE更新\"已设置\"站内信\"消息，否则，将接收不到消息提醒。",
       no_show_setting_tip: "勾选后，不再弹出弹窗，会默认按照设置的内容执行同步和变更通知：如果需要更改设置，可以在保存按钮旁的下拉选项中，打开设置项。",

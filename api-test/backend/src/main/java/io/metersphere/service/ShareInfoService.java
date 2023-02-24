@@ -7,7 +7,7 @@ import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
 import io.metersphere.api.dto.automation.ApiScenarioReportResult;
 import io.metersphere.api.dto.share.*;
-import io.metersphere.api.exec.generator.JSONSchemaGenerator;
+import io.metersphere.api.exec.generator.JSONSchemaParser;
 import io.metersphere.base.domain.*;
 import io.metersphere.base.mapper.ShareInfoMapper;
 import io.metersphere.base.mapper.UserMapper;
@@ -29,7 +29,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -277,7 +277,7 @@ public class ShareInfoService extends BaseShareInfoService {
                                             if (isJsonSchema) {
                                                 jsonSchemaBodyDTO.setJsonSchema(bodyObj.get("jsonSchema"));
                                                 apiInfoDTO.setJsonSchemaBody(jsonSchemaBodyDTO);
-                                                String raw = JSONSchemaGenerator.getJson(JSONUtil.toJSONString(bodyObj.get("jsonSchema")));
+                                                String raw = JSONSchemaParser.schemaToJson(JSONUtil.toJSONString(bodyObj.get("jsonSchema")));
                                                 this.setPreviewData(previewJsonArray, raw);
                                             } else {
                                                 if (bodyObj.has("raw")) {

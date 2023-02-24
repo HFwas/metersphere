@@ -50,6 +50,8 @@ import org.apache.jmeter.config.CSVDataSet;
 import org.apache.jmeter.config.RandomVariableConfig;
 import org.apache.jmeter.modifiers.CounterConfig;
 import org.apache.jmeter.modifiers.UserParameters;
+import org.apache.jmeter.protocol.http.control.Header;
+import org.apache.jmeter.protocol.http.control.HeaderManager;
 import org.apache.jmeter.protocol.http.sampler.HTTPSamplerProxy;
 import org.apache.jmeter.protocol.java.sampler.BeanShellSampler;
 import org.apache.jmeter.protocol.jdbc.AbstractJDBCTestElement;
@@ -68,6 +70,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class ElementUtil {
     private static final String PRE = "PRE";
@@ -402,61 +405,31 @@ public class ElementUtil {
 
     public static void mergeHashTree(MsTestElement element, LinkedList<MsTestElement> targetHashTree) {
         try {
-            LinkedList<MsTestElement> sourceHashTree = element.getHashTree();
-            if (CollectionUtils.isNotEmpty(sourceHashTree) && CollectionUtils.isNotEmpty(targetHashTree) && sourceHashTree.size() < targetHashTree.size()) {
+            if (CollectionUtils.isNotEmpty(element.getHashTree())
+                    && CollectionUtils.isNotEmpty(targetHashTree)
+                    && element.getHashTree().size() == targetHashTree.size()) {
                 element.setHashTree(targetHashTree);
                 return;
             }
-            List<String> sourceIds = new ArrayList<>();
-            List<String> delIds = new ArrayList<>();
-            Map<String, MsTestElement> updateMap = new HashMap<>();
-            if (CollectionUtils.isEmpty(sourceHashTree)) {
-                if (CollectionUtils.isNotEmpty(targetHashTree)) {
-                    element.setHashTree(targetHashTree);
-                }
-                return;
-            }
-            if (CollectionUtils.isNotEmpty(targetHashTree)) {
-                for (MsTestElement item : targetHashTree) {
-                    if (StringUtils.isNotEmpty(item.getId())) {
-                        updateMap.put(item.getId(), item);
-                    }
-                }
-            }
-            // 找出待更新内容和源已经被删除的内容
-            if (CollectionUtils.isNotEmpty(sourceHashTree)) {
-                for (int i = 0; i < sourceHashTree.size(); i++) {
-                    MsTestElement source = sourceHashTree.get(i);
-                    if (source != null) {
-                        sourceIds.add(source.getId());
-                        if (!StringUtils.equals(source.getLabel(), "SCENARIO-REF-STEP") && StringUtils.isNotEmpty(source.getId())) {
-                            if (updateMap.containsKey(source.getId())) {
-                                sourceHashTree.set(i, updateMap.get(source.getId()));
-                            } else {
-                                delIds.add(source.getId());
-                            }
-                        }
-                        // 历史数据兼容
-                        if (StringUtils.isEmpty(source.getId()) && !StringUtils.equals(source.getLabel(), "SCENARIO-REF-STEP") && i < targetHashTree.size()) {
-                            sourceHashTree.set(i, targetHashTree.get(i));
-                        }
-                    }
-                }
-            }
+            // 合并步骤
+            List<MsTestElement> sourceList = Stream.of(element.getHashTree(), targetHashTree)
+                    .flatMap(Collection::stream)
+                    .distinct()
+                    .collect(Collectors.toList());
 
-            // 删除多余的步骤
-            sourceHashTree.removeIf(item -> item != null && delIds.contains(item.getId()));
-            // 补充新增的源引用步骤
-            if (CollectionUtils.isNotEmpty(targetHashTree)) {
-                for (MsTestElement item : targetHashTree) {
-                    if (!sourceIds.contains(item.getId())) {
-                        sourceHashTree.add(item);
-                    }
+            // 历史数据补充id
+            sourceList.forEach(item -> {
+                if (StringUtils.isBlank(item.getId())) {
+                    item.setId(UUID.randomUUID().toString());
                 }
-            }
-            if (CollectionUtils.isNotEmpty(sourceHashTree)) {
-                element.setHashTree(sourceHashTree);
-            }
+            });
+
+            sourceList = sourceList.stream().collect(Collectors
+                    .collectingAndThen(
+                            Collectors.toCollection(() -> new TreeSet<>(Comparator.comparing(MsTestElement::getId))),
+                            ArrayList::new));
+
+            element.setHashTree((LinkedList<MsTestElement>) sourceList);
         } catch (Exception e) {
             element.setHashTree(targetHashTree);
         }
@@ -856,6 +829,7 @@ public class ElementUtil {
         if (StringUtils.isNotEmpty(vo.getScript())) {
             vo.setScript(StringUtils.replace(vo.getScript(), RunningParamKeys.API_ENVIRONMENT_ID, "\"" + RunningParamKeys.RUNNING_PARAMS_PREFIX + vo.getEnvironmentId() + ".\""));
         }
+        testElement.setProperty("cacheKey", false);
         testElement.setProperty(TestElement.TEST_CLASS, testElement.getClass().getSimpleName());
         testElement.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass(TEST_BEAN_GUI));
         String scriptLanguage = vo.getScriptLanguage();
@@ -998,6 +972,44 @@ public class ElementUtil {
             if (node != null) {
                 coverArguments(node, process);
             }
+        }
+    }
+
+    public static void setHeader(HashTree tree, List<KeyValue> headers, String name) {
+        // 合并header
+        HeaderManager headerManager = new HeaderManager();
+        headerManager.setEnabled(true);
+        headerManager.setName(StringUtils.isNotEmpty(name) ? name + "HeaderManager" : "HeaderManager");
+        headerManager.setProperty(TestElement.TEST_CLASS, HeaderManager.class.getName());
+        headerManager.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("HeaderPanel"));
+        boolean isAdd = true;
+        for (Object key : tree.keySet()) {
+            if (key instanceof HeaderManager) {
+                headerManager = (HeaderManager) key;
+                isAdd = false;
+            }
+        }
+        //  header 也支持 mock 参数
+        List<KeyValue> keyValues = headers.stream().filter(KeyValue::isValid).filter(KeyValue::isEnable).collect(Collectors.toList());
+        for (KeyValue keyValue : keyValues) {
+            boolean hasHead = false;
+            //检查是否已经有重名的Head。如果Header重复会导致执行报错
+            if (headerManager.getHeaders() != null) {
+                for (int i = 0; i < headerManager.getHeaders().size(); i++) {
+                    Header header = headerManager.getHeader(i);
+                    String headName = header.getName();
+                    if (StringUtils.equals(headName, keyValue.getName()) && !StringUtils.equals(headName, "Cookie")) {
+                        hasHead = true;
+                        break;
+                    }
+                }
+            }
+            if (!hasHead) {
+                headerManager.add(new Header(keyValue.getName(), ScriptEngineUtils.buildFunctionCallString(keyValue.getValue())));
+            }
+        }
+        if (headerManager.getHeaders().size() > 0 && isAdd) {
+            tree.add(headerManager);
         }
     }
 }

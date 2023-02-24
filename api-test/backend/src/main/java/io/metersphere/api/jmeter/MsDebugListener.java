@@ -62,12 +62,12 @@ public class MsDebugListener extends AbstractListenerElement implements SampleLi
         return clone;
     }
 
-    public void setRunMode(String runMode) {
-        this.runMode = runMode;
-    }
-
     public boolean isErrorLogging() {
         return getPropertyAsBoolean(ERROR_LOGGING);
+    }
+
+    public void setRunMode(String runMode) {
+        this.runMode = runMode;
     }
 
     public final void setSuccessOnlyLogging(boolean value) {
@@ -111,6 +111,8 @@ public class MsDebugListener extends AbstractListenerElement implements SampleLi
         LoggerUtil.debug("send. " + this.getName());
         WebSocketUtil.sendMessageSingle(dto);
         PoolExecBlockingQueueUtil.offer(this.getName());
+        //删除可能出现的临时文件
+        FileUtils.deleteBodyTmpFiles(this.getName());
         JvmUtil.memoryInfo();
     }
 
@@ -158,8 +160,8 @@ public class MsDebugListener extends AbstractListenerElement implements SampleLi
                 dto.setExecEnd(false);
                 dto.setReportId("send." + this.getName());
                 dto.setToReport(this.getName());
-
                 dto.setRunMode(runMode);
+
                 String console = FixedCapacityUtil.getJmeterLogger(this.getName(), false);
                 ApiDefinitionEnvService apiDefinitionEnvService = CommonBeanFactory.getBean(ApiDefinitionEnvService.class);
                 if (StringUtils.isNotEmpty(requestResult.getName()) && requestResult.getName().startsWith("Transaction=")) {

@@ -174,6 +174,8 @@ export default {
   },
   methods: {
     getResource(currentInstance) {
+      this.tableData = [];
+      this.seriesData = [];
       // this.init = true;
       if (this.planReportTemplate) {
         this.instances = this.planReportTemplate.reportResource;

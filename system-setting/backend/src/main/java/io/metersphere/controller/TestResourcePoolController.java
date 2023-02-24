@@ -14,7 +14,7 @@ import io.metersphere.request.resourcepool.QueryResourcePoolRequest;
 import io.metersphere.service.TestResourcePoolService;
 import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.List;
 
 @RequestMapping("testresourcepool")
@@ -62,6 +62,11 @@ public class TestResourcePoolController {
     public Pager<List<TestResourcePoolDTO>> listResourcePools(@PathVariable int goPage, @PathVariable int pageSize, @RequestBody QueryResourcePoolRequest request) {
         Page<Object> page = PageHelper.startPage(goPage, pageSize, true);
         return PageUtils.setPageInfo(page, testResourcePoolService.listResourcePools(request));
+    }
+
+    @GetMapping("/list/quota/ws/valid/{workspaceId}")
+    public List<TestResourcePoolDTO> listWsValidQuotaResourcePools(@PathVariable String workspaceId) {
+        return testResourcePoolService.listWsValidQuotaResourcePools(workspaceId);
     }
 
 }

@@ -1,10 +1,11 @@
 package io.metersphere.sechedule;
 
 import io.metersphere.base.domain.Schedule;
+import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.utils.LogUtil;
 import org.quartz.*;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -81,7 +82,7 @@ public class ScheduleManager {
 
         } catch (Exception e) {
             LogUtil.error(e.getMessage(), e);
-            throw new RuntimeException(e);
+            MSException.throwException("定时任务配置异常: " + e.getMessage());
         }
     }
 

@@ -296,13 +296,25 @@ export function handleCtrlSEvent(event, func) {
 
 export function byteToSize(bytes) {
   if (bytes === 0) {
-    return "0 B";
+    return "0B";
   }
   let k = 1024,
-    sizes = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"],
+    sizeUnits = ["B", "K", "M", "G", "T", "P", "E", "Z", "Y"],
     i = Math.floor(Math.log(bytes) / Math.log(k));
 
-  return (bytes / Math.pow(k, i)).toPrecision(3) + " " + sizes[i];
+  return Math.round(bytes / Math.pow(1024, i)).toFixed(1) + sizeUnits[i];
+}
+
+export function sizeToByte(size) {
+  let k = 1024,
+    sizeUnits = ["B", "K", "M", "G", "T", "P", "E", "Z", "Y"];
+  let i = 1;
+  for (i++; i < sizeUnits.length;) {
+    let unit = sizeUnits[i];
+    if (size.indexOf(unit) !== -1) {
+      return size.toString().replace(unit, "") * Math.pow(k, i)
+    }
+  }
 }
 
 export function getTypeByFileName(filename) {

@@ -224,6 +224,7 @@ public class JMeterBase {
                     String evnStr = result.getResponseDataAsString();
                     environmentList.add(evnStr);
                 } else {
+                    //检查是否有关系到最终执行结果的全局前后置脚本。
                     boolean resultNotFilterOut = ListenerUtil.checkResultIsNotFilterOut(requestResult);
                     if (resultNotFilterOut) {
                         if (StringUtils.isNotEmpty(requestResult.getName()) && requestResult.getName().startsWith("Transaction=")) {

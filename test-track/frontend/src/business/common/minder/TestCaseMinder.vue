@@ -1,5 +1,13 @@
 <template>
   <div>
+    <div class="case-main-layout-left" style="display: inline-block">
+      <ms-table-count-bar :count-content="$t('case.all_case_content') + '(' + caseNum + ')'"></ms-table-count-bar>
+    </div>
+
+    <div class="case-main-layout-right" style="float: right; display: flex">
+      <version-select v-xpack :project-id="projectId" @changeVersion="changeVersion" />
+    </div>
+
     <ms-module-minder
       v-loading="result.loading"
       minder-key="TEST_CASE"
@@ -15,6 +23,7 @@
       :disabled="disabled"
       :get-extra-node-count="getMinderTreeExtraNodeCount()"
       @afterMount="handleAfterMount"
+      @toggleMinderFullScreen="toggleMinderFullScreen"
       @save="save"
       ref="minder"
     />
@@ -71,6 +80,9 @@ import TestPlanIssueEdit from "@/business/case/components/TestPlanIssueEdit";
 import {setPriorityView} from "vue-minder-editor-plus/src/script/tool/utils";
 import IsChangeConfirm from "metersphere-frontend/src/components/IsChangeConfirm";
 import MsModuleMinder from "@/business/common/minder/MsModuleMinder";
+import MsTableCountBar from 'metersphere-frontend/src/components/table/MsTableCountBar';
+import MxVersionSelect from "metersphere-frontend/src/components/version/MxVersionSelect";
+
 
 import {useStore} from "@/store"
 import {mapState} from "pinia";
@@ -80,7 +92,7 @@ import {getIssuesForMinder} from "@/api/issue";
 
 export default {
   name: "TestCaseMinder",
-  components: {MsModuleMinder, IsChangeConfirm, TestPlanIssueEdit, IssueRelateList},
+  components: {MsModuleMinder, IsChangeConfirm, TestPlanIssueEdit, IssueRelateList, MsTableCountBar, 'VersionSelect': MxVersionSelect},
   data() {
     return {
       testCase: [],
@@ -95,7 +107,9 @@ export default {
       saveModuleNodeMap: new Map(),
       deleteNodes: [], // 包含测试模块、用例和临时节点
       saveExtraNode: {},
-      extraNodeChanged: [] // 记录转成用例或模块的临时节点
+      extraNodeChanged: [], // 记录转成用例或模块的临时节点
+      currentVersion: null,
+      caseNum: 0,
     }
   },
   props: {
@@ -105,7 +119,6 @@ export default {
         return []
       }
     },
-    currentVersion: String,
     condition: Object,
     projectId: String,
     activeName: String
@@ -127,11 +140,11 @@ export default {
     workspaceId() {
       return getCurrentWorkspaceId();
     }
-
   },
   watch: {
     selectNode() {
       if (this.$refs.minder) {
+        this.caseNum = this.selectNode.data.caseNum;
         this.$refs.minder.handleNodeSelect(this.selectNode);
       }
     },
@@ -147,6 +160,11 @@ export default {
   },
   mounted() {
     this.setIsChange(false);
+    let moduleNum = 0;
+    this.treeNodes.forEach(node => {
+      moduleNum += node.caseNum;
+    })
+    this.caseNum = moduleNum;
     if (this.selectNode && this.selectNode.data) {
       if (this.$refs.minder) {
         let importJson = this.$refs.minder.getImportJsonBySelectNode(this.selectNode.data);
@@ -155,6 +173,9 @@ export default {
     }
   },
   methods: {
+    changeVersion(currentVersion) {
+      this.currentVersion = currentVersion || null;
+    },
     handleNodeUpdateForMinder() {
       if (this.noRefreshMinder) {
         // 如果是保存触发的刷新模块，则不刷新脑图
@@ -252,6 +273,9 @@ export default {
 
       addIssueHotBox(this);
     },
+    toggleMinderFullScreen(isFullScreen) {
+      this.$emit("toggleMinderFullScreen", isFullScreen)
+    },
     getParam() {
       return {
         request: {
@@ -301,7 +325,7 @@ export default {
       testCaseMinderEdit(param)
         .then(() => {
           this.result.loading = false;
-          this.$success(this.$t('commons.save_success'));
+          this.$success(this.$t('commons.save_success'), false);
           handleAfterSave(window.minder.getRoot());
           this.extraNodeChanged.forEach(item => {
             item.isExtraNode = false;
@@ -319,7 +343,10 @@ export default {
           if (callback && callback instanceof Function) {
             callback();
           }
-        });
+        })
+        .catch(() => {
+          this.result.loading = false;
+         });
     },
     buildSaveParam(root, parent, preNode, nextNode) {
       let data = root.data;
@@ -662,5 +689,9 @@ export default {
 </script>
 
 <style scoped>
-
+:deep(.minder) {
+  max-height: calc(100vh - 218px);
+  position: relative;
+  top: 12px;
+}
 </style>

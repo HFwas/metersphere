@@ -1,11 +1,11 @@
 package io.metersphere.controller.wapper;
 
 import io.metersphere.dto.RelationshipGraphData;
+import io.metersphere.request.GraphBatchRequest;
 import io.metersphere.service.wapper.TrackGraphService;
-import io.metersphere.xpack.graph.request.GraphBatchRequest;
 import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 
 @RequestMapping("/graph")
 @RestController

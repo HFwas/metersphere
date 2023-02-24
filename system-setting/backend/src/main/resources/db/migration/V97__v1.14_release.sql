@@ -1,3 +1,4 @@
+SET SESSION innodb_lock_wait_timeout = 7200;
 ALTER TABLE test_plan
     DROP COLUMN principal;
 
@@ -272,6 +273,15 @@ DELIMITER ;
 CALL test_cursor();
 DROP PROCEDURE IF EXISTS test_cursor;
 
+-- 处理非组织级别非全局用户组
+UPDATE `group`
+SET scope_id = 'global'
+WHERE id IN
+      (SELECT id
+       FROM (SELECT * FROM `group`) AS temp
+       WHERE type != 'ORGANIZATION'
+  AND scope_id IN (SELECT id FROM organization));
+
 -- 工作空间服务集成
 INSERT INTO user_group_permission (id, group_id, permission_id, module_id)
 VALUES (UUID(), 'ws_admin', 'WORKSPACE_SERVICE:READ', 'WORKSPACE_SERVICE');
@@ -530,3 +540,5 @@ WHERE 1;
 UPDATE test_case
 SET status = 'Prepare'
 WHERE status IS NULL;
+
+SET SESSION innodb_lock_wait_timeout = DEFAULT;

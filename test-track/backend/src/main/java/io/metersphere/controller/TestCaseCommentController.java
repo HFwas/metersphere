@@ -14,7 +14,7 @@ import io.metersphere.service.TestCaseService;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.web.bind.annotation.*;
 
-import javax.annotation.Resource;
+import jakarta.annotation.Resource;
 import java.util.List;
 
 @RequestMapping("/test/case/comment")
@@ -36,6 +36,11 @@ public class TestCaseCommentController {
     @GetMapping("/list/{caseId}/{type}")
     public List<TestCaseCommentDTO> getCaseComments(@PathVariable String caseId, @PathVariable String type) {
         return testCaseCommentService.getCaseComments(caseId, type);
+    }
+
+    @GetMapping("/list/{caseId}/{type}/{belongId}")
+    public List<TestCaseCommentDTO> getCaseComments(@PathVariable String caseId, @PathVariable String type, @PathVariable String belongId) {
+        return testCaseCommentService.getCaseComments(caseId, type, belongId);
     }
 
     @GetMapping("/list/{caseId}")

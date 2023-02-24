@@ -68,9 +68,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
@@ -80,6 +80,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @Transactional(rollbackFor = Exception.class)
@@ -260,19 +261,28 @@ public class TestCaseService {
     }
 
     public void addDemandHyperLink(EditTestCaseRequest request, String type) {
+        IssuesRequest updateRequest = getIssuesRequest(request);
+        Project project = baseProjectService.getProjectById(request.getProjectId());
+        if (StringUtils.equals(project.getPlatform(), IssuesManagePlatform.AzureDevops.name())) {
+            doAddDemandHyperLink(request, type, updateRequest, project);
+        }
+    }
+
+    private void doAddDemandHyperLink(EditTestCaseRequest request, String type, IssuesRequest updateRequest, Project project) {
+        updateRequest.setWorkspaceId(project.getWorkspaceId());
+        List<IssuesPlatform> platformList = getAddPlatforms(updateRequest);
+        platformList.forEach(platform -> {
+            platform.updateDemandHyperLink(request, project, type);
+        });
+    }
+
+    private IssuesRequest getIssuesRequest(EditTestCaseRequest request) {
         IssuesRequest updateRequest = new IssuesRequest();
         updateRequest.setId(request.getId());
         updateRequest.setResourceId(request.getDemandId());
         updateRequest.setProjectId(request.getProjectId());
         updateRequest.setTestCaseId(request.getId());
-        Project project = baseProjectService.getProjectById(request.getProjectId());
-        if (StringUtils.equals(project.getPlatform(), IssuesManagePlatform.AzureDevops.name())) {
-            updateRequest.setWorkspaceId(project.getWorkspaceId());
-            List<IssuesPlatform> platformList = getAddPlatforms(updateRequest);
-            platformList.forEach(platform -> {
-                platform.updateDemandHyperLink(request, project, type);
-            });
-        }
+        return updateRequest;
     }
 
     public void addDemandHyperLinkBatch(List<String> testcaseIds, String projectId) {
@@ -292,7 +302,7 @@ public class TestCaseService {
         // AzureDevops 才处理
         if (StringUtils.equals(project.getPlatform(), IssuesManagePlatform.AzureDevops.name())) {
             testcaseIds.forEach(id -> {
-                TestCaseWithBLOBs testCaseWithBLOBs = testCaseMapper.selectByPrimaryKey(testcaseIds.get(0));
+                TestCaseWithBLOBs testCaseWithBLOBs = testCaseMapper.selectByPrimaryKey(id);
                 if (testCaseWithBLOBs != null) {
                     EditTestCaseRequest request = new EditTestCaseRequest();
                     BeanUtils.copyBean(request, testCaseWithBLOBs);
@@ -383,6 +393,7 @@ public class TestCaseService {
     public TestCaseWithBLOBs editTestCase(EditTestCaseRequest testCase) {
         checkTestCustomNum(testCase);
         testCase.setUpdateTime(System.currentTimeMillis());
+        TestCaseWithBLOBs originCase = testCaseMapper.selectByPrimaryKey(testCase.getId());
 
         try {
             // 同步缺陷与需求的关联关系
@@ -413,10 +424,32 @@ public class TestCaseService {
         customFieldTestCaseService.editFields(testCase.getId(), testCase.getEditFields());
         customFieldTestCaseService.addFields(testCase.getId(), testCase.getAddFields());
 
+        // latest 字段 createNewVersionOrNot 已经设置过了，不更新
         testCase.setLatest(null);
 
         testCaseMapper.updateByPrimaryKeySelective(testCase);
-        return testCaseMapper.selectByPrimaryKey(testCase.getId());
+
+        TestCaseWithBLOBs testCaseWithBLOBs = testCaseMapper.selectByPrimaryKey(testCase.getId());
+
+        reReviewTestReviewTestCase(originCase, testCaseWithBLOBs);
+
+        return testCaseWithBLOBs;
+    }
+
+    /**
+     * 如果启用重新提审，并且前置条件或步骤发生变化，则触发重新提审
+     */
+    private void reReviewTestReviewTestCase(TestCaseWithBLOBs originCase, TestCaseWithBLOBs testCase) {
+        ProjectConfig config = baseProjectApplicationService.getProjectConfig(testCase.getProjectId());
+        Boolean reReview = config.getReReview();
+        if (BooleanUtils.isTrue(reReview) && originCase != null) {
+            if (!StringUtils.equals(originCase.getPrerequisite(), testCase.getPrerequisite())   // 前置条件添加发生变化
+            || !StringUtils.equals(originCase.getSteps(), testCase.getSteps())                  // 步骤发生变化
+            || !StringUtils.equals(originCase.getStepDescription(), testCase.getStepDescription())
+            || !StringUtils.equals(originCase.getExpectedResult(), testCase.getExpectedResult())) {
+                testReviewTestCaseService.reReviewByCaseId(testCase.getId());
+            }
+        }
     }
 
     /**
@@ -432,6 +465,10 @@ public class TestCaseService {
         if (!StringUtils.equals(project.getPlatform(), IssuesManagePlatform.AzureDevops.name())) {
             return;
         }
+        doUpdateThirdPartyIssuesLink(testCase, project);
+    }
+
+    private void doUpdateThirdPartyIssuesLink(EditTestCaseRequest testCase, Project project) {
         IssuesRequest issuesRequest = new IssuesRequest();
         if (!issuesService.isThirdPartTemplate(project)) {
             issuesRequest.setDefaultCustomFields(issuesService.getDefaultCustomFields(testCase.getProjectId()));
@@ -453,10 +490,15 @@ public class TestCaseService {
         if (StringUtils.isBlank(testCase.getVersionId())) {
             return;
         }
-        testCase.setLatest(false);
         TestCaseExample example = new TestCaseExample();
         example.createCriteria().andIdEqualTo(testCase.getId())
                 .andVersionIdEqualTo(testCase.getVersionId());
+
+        String defaultVersion = baseProjectVersionMapper.getDefaultVersion(testCase.getProjectId());
+        if (StringUtils.equalsIgnoreCase(testCase.getVersionId(), defaultVersion)) {
+            testCase.setLatest(false);
+        }
+
         if (testCaseMapper.updateByExampleSelective(testCase, example) == 0) {
             // 插入新版本的数据
             TestCaseWithBLOBs oldTestCase = testCaseMapper.selectByPrimaryKey(testCase.getId());
@@ -471,7 +513,7 @@ public class TestCaseService {
             dealWithOtherInfoOfNewVersion(testCase, oldTestCase.getId());
             testCaseMapper.insertSelective(testCase);
         }
-        String defaultVersion = baseProjectVersionMapper.getDefaultVersion(testCase.getProjectId());
+
         if (StringUtils.equalsIgnoreCase(testCase.getVersionId(), defaultVersion)) {
             checkAndSetLatestVersion(testCase.getRefId());
         }
@@ -1514,6 +1556,10 @@ public class TestCaseService {
     public void testCaseXmindExport(HttpServletResponse response, TestCaseBatchRequest request) {
         try {
             request.getCondition().setStatusIsNot("Trash");
+            if (request.getExportAll()) {
+                // 导出所有用例, 勾选ID清空
+                request.setIds(null);
+            }
             List<TestCaseDTO> testCaseDTOList = this.findByBatchRequest(request);
 
             TestCaseXmindData rootXmindData = this.generateTestCaseXmind(testCaseDTOList);
@@ -1868,6 +1914,12 @@ public class TestCaseService {
             batchEditTag(request);
         } else {
             // 批量移动
+            if (request.getCondition().isSelectAll()) {
+                // 全选则重新设置MoveIds
+                List<TestCaseDTO> testCaseDTOS = listTestCase(request.getCondition());
+                List<String> ids = testCaseDTOS.stream().map(TestCaseDTO::getId).collect(Collectors.toList());
+                request.setIds(ids);
+            }
             TestCaseWithBLOBs batchEdit = new TestCaseWithBLOBs();
             BeanUtils.copyBean(batchEdit, request);
             batchEdit.setUpdateTime(System.currentTimeMillis());
@@ -2174,7 +2226,7 @@ public class TestCaseService {
                     FileAttachmentMetadata fileAttachmentMetadata = new FileAttachmentMetadata();
                     BeanUtils.copyBean(fileAttachmentMetadata, fileMetadata);
                     fileAttachmentMetadata.setId(record.getAttachmentId());
-                    fileAttachmentMetadata.setCreator(fileMetadata.getCreateUser() == null ? StringUtils.EMPTY : fileMetadata.getCreateUser());
+                    fileAttachmentMetadata.setCreator(SessionUtils.getUserId());
                     fileAttachmentMetadata.setFilePath(fileMetadata.getPath() == null ? StringUtils.EMPTY : fileMetadata.getPath());
                     fileAttachmentMetadataBatchMapper.insert(fileAttachmentMetadata);
                 });
@@ -3082,8 +3134,26 @@ public class TestCaseService {
         TestCaseExample example = new TestCaseExample();
         example.createCriteria().andIdIn(request.getIds());
         List<TestCase> testCaseList = testCaseMapper.selectByExample(example);
+        Project project = null;
+        if (CollectionUtils.isNotEmpty(testCaseList)) {
+            project = baseProjectService.getProjectById(testCaseList.get(0).getProjectId());
+        }
 
         for (TestCase tc : testCaseList) {
+
+            if (project != null && StringUtils.equals(project.getPlatform(), IssuesManagePlatform.AzureDevops.name())) {
+                EditTestCaseRequest editTestCaseRequest = new EditTestCaseRequest();
+                BeanUtils.copyBean(editTestCaseRequest, tc);
+                try {
+                    doUpdateThirdPartyIssuesLink(editTestCaseRequest, project);
+                    // 同步用例与需求的关联关系
+                    IssuesRequest updateRequest = getIssuesRequest(editTestCaseRequest);
+                    doAddDemandHyperLink(editTestCaseRequest, "edit", updateRequest, project);
+                } catch (Exception e) {
+                    LogUtil.error(e);
+                }
+            }
+
             tc.setDemandId(demandId);
             tc.setDemandName(demandName);
             mapper.updateByPrimaryKey(tc);
@@ -3116,5 +3186,18 @@ public class TestCaseService {
         } else {
             return new ArrayList<>(0);
         }
+    }
+
+    public TestCaseWithBLOBs getSimpleCaseForEdit(String testCaseId) {
+        TestCaseWithBLOBs testCase = testCaseMapper.selectByPrimaryKey(testCaseId);
+        Project project = baseProjectService.getProjectById(testCase.getProjectId());
+        if (!SessionUtils.hasPermission(project.getWorkspaceId(), project.getId(), PermissionConstants.PROJECT_TRACK_CASE_READ_EDIT)) {
+            MSException.throwException(Translator.get("check_owner_project"));
+        }
+        return testCaseMapper.selectByPrimaryKey(testCaseId);
+    }
+
+    public TestCaseWithBLOBs getSimpleCase(String testCaseId) {
+        return testCaseMapper.selectByPrimaryKey(testCaseId);
     }
 }

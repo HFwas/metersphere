@@ -21,7 +21,7 @@ import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationContext;
-import org.springframework.core.LocalVariableTableParameterNameDiscoverer;
+import org.springframework.core.StandardReflectionParameterNameDiscoverer;
 import org.springframework.expression.EvaluationContext;
 import org.springframework.expression.Expression;
 import org.springframework.expression.ExpressionParser;
@@ -31,8 +31,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-import javax.annotation.Resource;
-import javax.servlet.http.HttpServletRequest;
+import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletRequest;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.UUID;
@@ -50,7 +50,7 @@ public class MsLogAspect {
     /**
      * 将方法参数纳入Spring管理
      */
-    LocalVariableTableParameterNameDiscoverer discoverer = new LocalVariableTableParameterNameDiscoverer();
+    StandardReflectionParameterNameDiscoverer discoverer = new StandardReflectionParameterNameDiscoverer();
 
     @Autowired
     private ApplicationContext applicationContext;

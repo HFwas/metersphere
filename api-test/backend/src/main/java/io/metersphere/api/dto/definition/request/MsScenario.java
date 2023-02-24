@@ -110,6 +110,9 @@ public class MsScenario extends MsTestElement {
         }
         if (config != null && StringUtils.equals(this.getId(), config.getScenarioId())) {
             config.setTransferVariables(this.variables);
+            if (CollectionUtils.isNotEmpty(this.headers)) {
+                ElementUtil.setHeader(scenarioTree, this.headers, this.getName());
+            }
         }
         if (config != null && !config.getExcludeScenarioIds().contains(this.getId())) {
             scenarioTree = MsCriticalSectionController.createHashTree(tree, this.getName(), this.isEnable());
@@ -274,7 +277,7 @@ public class MsScenario extends MsTestElement {
                 String environmentGroupId = scenario.getEnvironmentGroupId();
                 if (StringUtils.equals(environmentType, EnvironmentType.GROUP.name())) {
                     this.environmentMap = environmentGroupProjectService.getEnvMap(environmentGroupId);
-                } else if (StringUtils.equals(environmentType, EnvironmentType.JSON.name())) {
+                } else if (StringUtils.isNotEmpty(environmentJson) && StringUtils.equals(environmentType, EnvironmentType.JSON.name())) {
                     this.environmentMap = JSON.parseObject(environmentJson, Map.class);
                 }
             } else {

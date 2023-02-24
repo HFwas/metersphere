@@ -23,13 +23,13 @@ import io.metersphere.commons.enums.ApiReportStatus;
 import io.metersphere.commons.utils.*;
 import io.metersphere.constants.RunModeConstants;
 import io.metersphere.dto.JmeterRunRequestDTO;
-import io.metersphere.dto.ResultDTO;
+import io.metersphere.dto.ProjectJarConfig;
 import io.metersphere.environment.service.BaseEnvironmentService;
 import io.metersphere.plugin.core.MsTestElement;
-import io.metersphere.service.ApiExecutionQueueService;
+import io.metersphere.service.ApiRetryOnFailureService;
 import io.metersphere.service.RemakeReportService;
 import io.metersphere.utils.LoggerUtil;
-import io.metersphere.xpack.api.service.ApiRetryOnFailureService;
+import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jorphan.collections.HashTree;
 import org.json.JSONObject;
@@ -37,7 +37,6 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.annotation.Resource;
 import java.util.*;
 
 @Service
@@ -55,6 +54,8 @@ public class ApiCaseSerialService {
     private RedisTemplate<String, Object> redisTemplate;
     @Resource
     private TestPlanApiCaseMapper testPlanApiCaseMapper;
+    @Resource
+    private ApiRetryOnFailureService apiRetryOnFailureService;
 
     public void serial(DBTestQueue executionQueue) {
         ApiExecutionQueueDetail queue = executionQueue.getDetail();
@@ -125,25 +126,24 @@ public class ApiCaseSerialService {
             if (caseWithBLOBs != null) {
                 HashTree jmeterHashTree = new HashTree();
                 MsTestPlan testPlan = new MsTestPlan();
-
-                if (!runRequest.getPool().isPool()) {
-                    // 获取自定义JAR
-                    String projectId = caseWithBLOBs.getProjectId();
-                    testPlan.setJarPaths(NewDriverManager.getJars(new ArrayList<>() {{
-                        this.add(projectId);
-                    }}));
-                }
+                // 获取自定义JAR
+                String projectId = caseWithBLOBs.getProjectId();
+                Map<String, List<ProjectJarConfig>> jars = NewDriverManager.getJars(new ArrayList<>() {{
+                    this.add(projectId);
+                }}, runRequest.getPool());
+                testPlan.setProjectJarIds(jars.keySet().stream().toList());
+                testPlan.setPoolJarsMap(jars);
                 testPlan.setHashTree(new LinkedList<>());
                 MsThreadGroup group = new MsThreadGroup();
                 group.setLabel(caseWithBLOBs.getName());
                 group.setName(runRequest.getReportId());
+                group.setHashTree(new LinkedList<>());
                 // 接口用例集成报告
                 if (StringUtils.isNotEmpty(runRequest.getTestPlanReportId())
                         && StringUtils.equals(runRequest.getReportType(), RunModeConstants.SET_REPORT.toString())) {
                     group.setName(runRequest.getTestPlanReportId());
                 }
                 group.setProjectId(caseWithBLOBs.getProjectId());
-                group.setHashTree(new LinkedList<>());
                 // 数据兼容处理
                 JSONObject element = JSONUtil.parseObject(caseWithBLOBs.getRequest());
                 ElementUtil.dataFormatting(element);
@@ -152,19 +152,15 @@ public class ApiCaseSerialService {
                 if (runRequest.isRetryEnable() && runRequest.getRetryNum() > 0) {
                     try {
                         // 失败重试
-                        ApiRetryOnFailureService apiRetryOnFailureService = CommonBeanFactory.getBean(ApiRetryOnFailureService.class);
-                        if (apiRetryOnFailureService != null) {
-                            String retryData = apiRetryOnFailureService.retry(runData, 3, true);
-                            if (StringUtils.isNotBlank(retryData)) {
-                                runData = retryData;
-                            }
+                        String retryData = apiRetryOnFailureService.retry(runData, runRequest.getRetryNum(), true);
+                        if (StringUtils.isNotBlank(retryData)) {
+                            runData = retryData;
                         }
                     } catch (Exception e) {
                         LoggerUtil.error("失败重试脚本生成失败 ", runRequest.getReportId(), e);
                     }
                 }
                 group.getHashTree().add(JSONUtil.parseObject(runData, MsTestElement.class));
-
                 testPlan.getHashTree().add(group);
                 testPlan.toHashTree(jmeterHashTree, testPlan.getHashTree(), new ParameterConfig());
                 LoggerUtil.info("用例资源：" + caseWithBLOBs.getName() + ", 生成执行脚本JMX成功", runRequest.getReportId());
@@ -172,10 +168,7 @@ public class ApiCaseSerialService {
             }
         } catch (Exception ex) {
             RemakeReportService remakeReportService = CommonBeanFactory.getBean(RemakeReportService.class);
-            remakeReportService.remake(runRequest);
-            ResultDTO dto = new ResultDTO();
-            BeanUtils.copyBean(dto, runRequest);
-            CommonBeanFactory.getBean(ApiExecutionQueueService.class).queueNext(dto);
+            remakeReportService.testEnded(runRequest, ex.getMessage());
             LoggerUtil.error("用例资源：" + testId + ", 生成执行脚本失败", runRequest.getReportId(), ex);
         }
         return null;

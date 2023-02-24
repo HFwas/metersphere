@@ -60,6 +60,10 @@ export function getTapdUser(param) {
   return post(BASE_URL + "tapd/user", param);
 }
 
+export function getTapdCurrentOwner(id) {
+  return get(BASE_URL + "tapd/current_owner/" + id);
+}
+
 export function getDashboardIssues(page) {
   return post('issues/dashboard/list/' + page.currentPage + '/' + page.pageSize, page.condition)
     .then((response) => {
@@ -73,6 +77,34 @@ export function getIssuesByCaseId(refType, caseId, page) {
     return get('issues/get/case/' + refType + '/' + caseId)
       .then((response) => {
         page.data = response.data;
+        buildIssues(page);
+      });
+  }
+}
+
+function like(key, target) {
+  if (key === undefined || target === undefined) {
+    return false;
+  }
+  target = target + "";
+  return target.indexOf(key) !== -1;
+}
+
+export function getIssuesByCaseIdWithSearch(refType, caseId, page, condition) {
+  if (caseId) {
+    return get('issues/get/case/' + refType + '/' + caseId)
+      .then((response) => {
+        if(condition && condition.name && response.data){
+          //过滤
+          page.data = response.data.filter((v) => {
+            return (
+              like(condition.name, v.title) ||
+              like(condition.name, v.num)
+            );
+          });
+        } else{
+          page.data = response.data;
+        }
         buildIssues(page);
       });
   }
@@ -135,6 +167,7 @@ export function getRelateIssues(page) {
     .then((response) => {
       getPageDate(response, page);
       buildIssues(page);
+      page.loading = false;
     });
 }
 
@@ -235,7 +268,7 @@ export function getPluginCustomFields(projectId) {
   return get(BASE_URL + `plugin/custom/fields/${projectId}`);
 }
 
-export function getIssuePartTemplateWithProject(callback) {
+export function getIssuePartTemplateWithProject(callback, reject) {
   getCurrentProject().then((response) => {
     let currentProject = response.data;
     enableThirdPartTemplate(currentProject.id)
@@ -245,6 +278,10 @@ export function getIssuePartTemplateWithProject(callback) {
             .then((template) => {
               if (callback)
                 callback(template, currentProject);
+            }).catch((r) => {
+              if (reject) {
+                reject(r);
+              }
             });
         } else {
           Promise.all([getPluginCustomFields(currentProject.id), getIssueTemplate()])
@@ -256,7 +293,8 @@ export function getIssuePartTemplateWithProject(callback) {
               template.customFields.push(...pluginFields);
               if (callback)
                 callback(template, currentProject);
-            });
+            })
+            .catch(() => {reject(r)});
         }
       });
   });

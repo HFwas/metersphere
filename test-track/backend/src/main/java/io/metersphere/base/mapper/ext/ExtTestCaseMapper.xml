@@ -354,7 +354,7 @@
         select test_case.*, api_test.name as apiName, load_test.name AS performName from test_case left join api_test on
         test_case.test_id=api_test.id left join load_test on test_case.test_id=load_test.id
         <where>
-            <if test="request.ids!=null and request.ids.size() > 0">
+            <if test="!request.exportAll and request.ids != null and request.ids.size() > 0">
                 and test_case.id in
                 <foreach collection="request.ids" open="(" close=")" separator="," item="id">
                     #{id}
@@ -794,7 +794,7 @@
     </sql>
 
     <select id="countPriority" resultType="io.metersphere.dto.TrackCountResult">
-        SELECT test_case.priority as groupField, count(DISTINCT ref_id) AS countNumber
+        SELECT test_case.priority as groupField, count(id) AS countNumber
         FROM test_case
         WHERE project_id = #{projectId}
           AND test_case.status != 'Trash'
@@ -1194,7 +1194,7 @@
         <if test="request.refId != null">
             and ${versionTable}.ref_id = #{request.refId}
         </if>
-        <if test="request.versionId == null and request.refId == null">
+        <if test="request.versionId == null and request.refId == null and request.casePublic != true">
             AND ${versionTable}.latest = 1
         </if>
     </sql>

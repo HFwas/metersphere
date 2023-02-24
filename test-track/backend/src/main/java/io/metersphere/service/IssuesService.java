@@ -75,8 +75,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.annotation.Resource;
-import javax.servlet.http.HttpServletResponse;
+import jakarta.annotation.Resource;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.File;
 import java.io.IOException;
 import java.util.*;
@@ -432,6 +432,13 @@ public class IssuesService {
         ServiceUtils.getDefaultOrder(issueRequest.getOrders());
         issueRequest.setRefType(refType);
         List<IssuesDao> issues = extIssuesMapper.getIssuesByCaseId(issueRequest);
+        Map<String, User> userMap = getUserMap(issues);
+        issues.forEach(issue -> {
+            User user = userMap.get(issue.getCreator());
+            if (user != null) {
+                issue.setCreatorName(user.getName());
+            }
+        });
         handleCustomFieldStatus(issues);
         return DistinctKeyUtil.distinctByKey(issues, IssuesDao::getId);
     }
@@ -443,10 +450,11 @@ public class IssuesService {
         List<String> issueIds = issues.stream().map(Issues::getId).collect(Collectors.toList());
         String projectId = issues.get(0).getProjectId();
         Project project = projectMapper.selectByPrimaryKey(projectId);
-        if (project == null) {
+        IssueTemplateDao issueTemplate = getIssueTemplateByProjectId(project.getId());
+        if (issueTemplate == null) {
             return;
         }
-        String templateId = project.getIssueTemplateId();
+        String templateId = issueTemplate.getId();
         if (StringUtils.isBlank(templateId)) {
             return;
         }
@@ -1010,24 +1018,27 @@ public class IssuesService {
         if (MapUtils.isNotEmpty(attachmentMap)) {
             for (String issueId : attachmentMap.keySet()) {
                 // 查询我们平台的附件
-                Set<String> jiraAttachmentSet = new HashSet<>();
+                Set<String> platformAttachmentSet = new HashSet<>();
                 List<FileAttachmentMetadata> allMsAttachments = getIssueFileAttachmentMetadata(issueId);
                 Set<String> attachmentsNameSet = allMsAttachments.stream()
                         .map(FileAttachmentMetadata::getName)
                         .collect(Collectors.toSet());
 
                 List<PlatformAttachment> syncAttachments = attachmentMap.get(issueId);
+                if (CollectionUtils.isEmpty(syncAttachments)) {
+                    continue;
+                }
                 for (PlatformAttachment syncAttachment : syncAttachments) {
                     String fileName = syncAttachment.getFileName();
                     String fileKey = syncAttachment.getFileKey();
+                    platformAttachmentSet.add(fileName);
                     if (!attachmentsNameSet.contains(fileName)) {
-                        jiraAttachmentSet.add(fileName);
                         saveAttachmentModuleRelation(platform, issueId, fileName, fileKey, batchAttachmentModuleRelationMapper);
                     }
                 }
 
                 // 删除Jira中不存在的附件
-                deleteSyncAttachment(batchAttachmentModuleRelationMapper, jiraAttachmentSet, allMsAttachments);
+                deleteSyncAttachment(batchAttachmentModuleRelationMapper, platformAttachmentSet, allMsAttachments);
             }
         }
     }
@@ -1070,13 +1081,13 @@ public class IssuesService {
     }
 
     private void deleteSyncAttachment(AttachmentModuleRelationMapper batchAttachmentModuleRelationMapper,
-                                      Set<String> jiraAttachmentSet,
+                                      Set<String> platformAttachmentSet,
                                       List<FileAttachmentMetadata> allMsAttachments) {
        try {
            // 删除Jira中不存在的附件
            if (CollectionUtils.isNotEmpty(allMsAttachments)) {
                List<FileAttachmentMetadata> deleteMsAttachments = allMsAttachments.stream()
-                       .filter(msAttachment -> !jiraAttachmentSet.contains(msAttachment.getName()))
+                       .filter(msAttachment -> !platformAttachmentSet.contains(msAttachment.getName()))
                        .collect(Collectors.toList());
                deleteMsAttachments.forEach(fileAttachmentMetadata -> {
                    List<String> ids = List.of(fileAttachmentMetadata.getId());
@@ -1195,7 +1206,16 @@ public class IssuesService {
     }
 
     public List<IssuesDao> relateList(IssuesRequest request) {
-        return extIssuesMapper.getIssues(request);
+        List<IssuesDao> issues = extIssuesMapper.getIssues(request);
+        Map<String, User> userMap = getUserMap(issues);
+        issues.forEach(issue -> {
+            User user = userMap.get(issue.getCreator());
+            if (user != null) {
+                issue.setCreatorName(user.getName());
+            }
+        });
+        handleCustomFieldStatus(issues);
+        return issues;
     }
 
     public void userAuth(AuthUserIssueRequest authUserIssueRequest) {
@@ -1286,12 +1306,11 @@ public class IssuesService {
             return;
         }
         IssuesWithBLOBs issue = issuesMapper.selectByPrimaryKey(issuesId);
-        Project project = projectMapper.selectByPrimaryKey(issue.getProjectId());
-        if (project == null) {
+        IssueTemplateDao issueTemplate = getIssueTemplateByProjectId(issue.getProjectId());
+        if (issueTemplate == null) {
             return;
         }
-        String templateId = project.getIssueTemplateId();
-        if (StringUtils.isNotBlank(templateId)) {
+        if (StringUtils.isNotBlank(issueTemplate.getId())) {
             // 模版对于同一个系统字段应该只关联一次
             CustomField customField = baseCustomFieldService.getCustomFieldByName(issue.getProjectId(), SystemCustomField.ISSUE_STATUS);
             if (customField != null) {
@@ -1899,5 +1918,22 @@ public class IssuesService {
         syncAllIssuesRequest.setProjectConfig(PlatformPluginService.getCompatibleProjectConfig(project));
         syncAllIssuesRequest.setHandleSyncFunc(issueSyncRequest.getHandleSyncFunc());
         platform.syncAllIssues(syncAllIssuesRequest);
+    }
+
+    public List<String> getTapdIssueCurrentOwner(String id) {
+        IssuesWithBLOBs issuesWithBLOBs = issuesMapper.selectByPrimaryKey(id);
+        if (issuesWithBLOBs == null) {
+            return null;
+        }
+        IssuesRequest issuesRequest = new IssuesRequest();
+        Project project = baseProjectService.getProjectById(issuesWithBLOBs.getProjectId());
+        issuesRequest.setWorkspaceId(project.getWorkspaceId());
+        issuesRequest.setProjectId(issuesWithBLOBs.getProjectId());
+        TapdPlatform tapdPlatform = (TapdPlatform) IssueFactory.createPlatform(IssuesManagePlatform.Tapd.name(), issuesRequest);
+        List<String> tapdUsers = new ArrayList<>();
+        if (tapdPlatform != null) {
+            tapdUsers = tapdPlatform.getTapdUsers(issuesWithBLOBs.getProjectId(), issuesWithBLOBs.getPlatformId());
+        }
+        return tapdUsers;
     }
 }

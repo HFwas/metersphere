@@ -19,13 +19,13 @@ import io.metersphere.commons.utils.LogUtil;
 import io.metersphere.dto.ProjectConfig;
 import io.metersphere.service.definition.ApiDefinitionService;
 import io.metersphere.service.definition.ApiTestCaseService;
+import jakarta.annotation.Resource;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.stereotype.Service;
 
-import javax.annotation.Resource;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -83,6 +83,12 @@ public class MsHashTreeService {
     public static final String SHOW_CUSTOM_NUM = "showCustomNum";
     public static final String VERSION_ID = "versionId";
     public static final String RESOURCE_ID = ElementConstants.RESOURCE_ID;
+    private static final String CONNECT_TIMEOUT = "connectTimeout";
+    private static final String RESPONSE_TIMEOUT = "responseTimeout";
+    private static final String FOLLOW_REDIRECTS = "followRedirects";
+    private static final String AUTO_REDIRECTS = "autoRedirects";
+    private static final String ALIAS = "alias";
+    private static final String INDEX = "index";
 
     public void setHashTree(JSONArray hashTree) {
         // 将引用转成复制
@@ -140,6 +146,7 @@ public class MsHashTreeService {
             if (apiTestCase != null) {
                 if (StringUtils.equalsIgnoreCase(element.optString(REFERENCED), REF)) {
                     JSONObject refElement = JSONUtil.parseObject(apiTestCase.getRequest());
+                    refElement.remove(INDEX);
                     ElementUtil.dataFormatting(refElement);
                     JSONArray array = refElement.optJSONArray(HASH_TREE);
                     ElementUtil.copyBean(element, refElement);
@@ -151,6 +158,11 @@ public class MsHashTreeService {
                     element.put(AUTH_MANAGER, refElement.opt(AUTH_MANAGER));
                     element.put(ARGUMENTS, refElement.opt(ARGUMENTS));
                     element.put(PROJECT_ID, apiTestCase.getProjectId());
+                    element.put(CONNECT_TIMEOUT, refElement.opt(CONNECT_TIMEOUT));
+                    element.put(RESPONSE_TIMEOUT, refElement.opt(RESPONSE_TIMEOUT));
+                    element.put(FOLLOW_REDIRECTS, refElement.opt(FOLLOW_REDIRECTS));
+                    element.put(AUTO_REDIRECTS, refElement.opt(AUTO_REDIRECTS));
+                    element.put(ALIAS, refElement.opt(ALIAS));
                     if (array != null) {
                         JSONArray sourceHashTree = element.optJSONArray(HASH_TREE);
                         Map<String, List<JSONObject>> groupMap = ElementUtil.group(sourceHashTree);
