@@ -45,8 +45,10 @@ public class ApiScenarioReportStructureService {
             ElementConstants.ABS_SAMPLER
     );
     private static final List<String> CONTROLS = Arrays.asList(
+            ElementConstants.IF_CONTROLLER
+    );
+    private static final List<String> CONTROL = Arrays.asList(
             ElementConstants.ASSERTIONS,
-            ElementConstants.IF_CONTROLLER,
             ElementConstants.CONSTANT_TIMER
     );
     private static final String RESOURCE_ID = ElementConstants.RESOURCE_ID;
@@ -210,6 +212,15 @@ public class ApiScenarioReportStructureService {
                     children.setAllIndex(StringUtils.EMPTY + (children.getIndex() == 0 ? (i + 1) : children.getIndex()));
                     children.setResourceId(resourceId + "_" + children.getAllIndex());
                 }
+                if (StringUtils.equals(element.optString(TYPE), "GenericController") && element.has(HASH_TREE)) {
+                    JSONArray jsonArray = element.optJSONArray(HASH_TREE);
+                    for (int j = 0; j < jsonArray.length(); j++) {
+                        if (StringUtils.equals(jsonArray.optJSONObject(j).optString(TYPE), ElementConstants.ASSERTIONS)) {
+                            jsonArray.remove(j);
+                            break;
+                        }
+                    }
+                }
                 dto.getChildren().add(children);
                 if (element.has(HASH_TREE) && !REQUESTS.contains(children.getType())) {
                     JSONArray elementJSONArray = element.optJSONArray(HASH_TREE);
@@ -260,7 +271,7 @@ public class ApiScenarioReportStructureService {
                         stepError.set(stepError.longValue() + 1);
                     } else if (StringUtils.equalsAnyIgnoreCase(step.getTotalStatus(), ERROR_CODE, ApiReportStatus.FAKE_ERROR.name())) {
                         stepErrorCode.set(stepErrorCode.longValue() + 1);
-                    } else if (!StringUtils.equalsIgnoreCase(step.getTotalStatus(), ApiReportStatus.SUCCESS.name())) {
+                    } else if (!StringUtils.equalsIgnoreCase(step.getTotalStatus(), ApiReportStatus.SUCCESS.name()) && !CONTROL.contains(step.getType())) {
                         stepUnExecute.set(stepUnExecute.longValue() + 1);
                         unExecSize++;
                     }
@@ -308,8 +319,7 @@ public class ApiScenarioReportStructureService {
                 dto.setValue(new RequestResultExpandDTO(dto.getLabel(), ApiReportStatus.PENDING.name()));
             } else if (StringUtils.isNotEmpty(dto.getType()) && CONTROLS.contains(dto.getType()) && dto.getValue() == null) {
                 // 条件控制步骤
-                dto.setTotalStatus(ApiReportStatus.SUCCESS.name());
-                dto.setValue(new RequestResultExpandDTO(dto.getLabel(), ApiReportStatus.SUCCESS.name()));
+                dto.setTotalStatus(ApiReportStatus.PENDING.name());
             } else if (dto.getValue() instanceof RequestResultExpandDTO && StringUtils.isNotEmpty((dto.getValue()).getStatus())) {
                 dto.setTotalStatus((dto.getValue()).getStatus());
             } else if (dto.getValue() != null && StringUtils.isEmpty(dto.getTotalStatus())) {
@@ -320,7 +330,7 @@ public class ApiScenarioReportStructureService {
                 }
             }
             if (StringUtils.isNotEmpty(dto.getErrorCode()) && StringUtils.isEmpty(dto.getTotalStatus())) {
-                dto.setTotalStatus(ERROR_CODE);
+                dto.setTotalStatus(ApiReportStatus.FAKE_ERROR.name());
             }
 
             if (CollectionUtils.isNotEmpty(dto.getChildren())) {
@@ -362,7 +372,7 @@ public class ApiScenarioReportStructureService {
                         if (failCount > 0) {
                             dto.setTotalStatus(ApiReportStatus.ERROR.name());
                         } else if (errorReportCount > 0) {
-                            dto.setTotalStatus(ERROR_CODE);
+                            dto.setTotalStatus(ApiReportStatus.FAKE_ERROR.name());
                         } else {
                             dto.setTotalStatus(ApiReportStatus.SUCCESS.name());
                         }
@@ -370,14 +380,14 @@ public class ApiScenarioReportStructureService {
                         if (failCount > 0) {
                             dto.setTotalStatus(ApiReportStatus.ERROR.name());
                         } else if (errorReportCount > 0) {
-                            dto.setTotalStatus(ERROR_CODE);
+                            dto.setTotalStatus(ApiReportStatus.FAKE_ERROR.name());
                         } else {
                             dto.setTotalStatus(ApiReportStatus.SUCCESS.name());
                         }
                     }
                 }
             }
-            if (StringUtils.isEmpty(dto.getTotalStatus())) {
+            if (StringUtils.isEmpty(dto.getTotalStatus()) && !CONTROL.contains(dto.getType())) {
                 dto.setTotalStatus(ApiReportStatus.PENDING.name());
             } else if (StringUtils.equalsAnyIgnoreCase(dto.getTotalStatus(), ApiReportStatus.ERROR.name())) {
                 dto.setTotalStatus(ApiReportStatus.ERROR.name());
@@ -652,6 +662,10 @@ public class ApiScenarioReportStructureService {
                 if (step.getValue() instanceof RequestResultExpandDTO && StringUtils.equalsIgnoreCase(((RequestResultExpandDTO) step.getValue()).getStatus(), ApiReportStatus.PENDING.name())) {
                     allUnExecute.set(allUnExecute.longValue() + 1);
                 }
+            }
+            if (step.getValue() == null && StringUtils.containsAnyIgnoreCase(step.getType(), "GenericController", "IfController", "LoopController", "TransactionController")
+                    && StringUtils.equalsIgnoreCase(step.getTotalStatus(), ApiReportStatus.PENDING.name())) {
+                allUnExecute.set(allUnExecute.longValue() + 1);
             }
             if (CollectionUtils.isNotEmpty(step.getChildren())) {
                 this.countAllUnexpected(step.getChildren(), allUnExecute);

@@ -1,6 +1,6 @@
 <template>
   <div style="background-color: #f5f6f7; overflow: auto">
-    <ms-container>
+    <ms-container v-if="hasHomePermission">
       <ms-main-container style="padding: 0px">
         <div class="track-home-layout">
           <el-row :gutter="16">
@@ -58,8 +58,9 @@ import ReviewList from "./components/ReviewList";
 import MsRunningTaskList from "./components/RunningTaskList";
 import { getUUID } from "metersphere-frontend/src/utils";
 import MsFailureTestCaseList from "@/business/home/components/FailureTestCaseList";
+import {hasPermission} from "@/business/utils/sdk-utils";
 
-require("echarts/lib/component/legend");
+// require("echarts/lib/component/legend");
 export default {
   name: "TrackHome",
   components: {
@@ -75,6 +76,11 @@ export default {
   },
   data() {
     return {};
+  },
+  computed: {
+    hasHomePermission() {
+      return hasPermission("PROJECT_TRACK_HOME:READ");
+    }
   },
   methods: {
     redirectPage(page, dataType, selectType, projectId, protocol) {
@@ -129,9 +135,14 @@ export default {
           );
           break;
         case "issue":
-          home = this.$router.resolve(
-            "/track/issue/" + uuid + "/" + dataType + "/" + selectType
-          );
+          home = this.$router.resolve({
+            name: "issueManagement",
+            params: {
+              id: uuid,
+              projectId: dataType,
+              dataSelectRange: selectType,
+            }
+          });
       }
       if (home) {
         window.open(home.href, "_blank");

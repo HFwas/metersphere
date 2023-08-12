@@ -323,6 +323,13 @@
                 WHERE `group` = 'API_SCENARIO_TEST'AND enable IS TRUE
                 )
             </if>
+            <if test="request.selectDataType == 'schedule' and request.selectDataRange == null ">
+                AND api_scenario.id IN
+                (
+                SELECT resource_id FROM `schedule`
+                WHERE `group` = 'API_SCENARIO_TEST'
+                )
+            </if>
             <if test="request.selectDataRange == 'scheduleNotRun' ">
                 AND api_scenario.id IN
                 (
@@ -941,7 +948,8 @@
         atc.step_total,
         atc. STATUS,
         atc.tags,
-        atc.version_id
+        atc.version_id,
+        atc.custom_num
         FROM
         api_scenario atc
         LEFT JOIN test_case_test tct ON atc.id = tct.test_id

@@ -87,6 +87,8 @@ public class AttachmentService {
             if (testCase == null) {
                 MSException.throwException(Translator.get("test_case_attachment_upload_not_found") + request.getBelongId());
             }
+        } else {
+            MSException.throwException(Translator.get("invalid_parameter"));
         }
 
         // 上传MS平台
@@ -163,7 +165,7 @@ public class AttachmentService {
     }
 
     public void copyAttachment(AttachmentRequest request, List<String> filterIds) {
-        List<AttachmentModuleRelation> needDealFiles = new ArrayList<>();
+        List<AttachmentModuleRelation> needDealFiles;
         AttachmentModuleRelationExample example = new AttachmentModuleRelationExample();
         example.createCriteria().andRelationIdEqualTo(request.getCopyBelongId()).andRelationTypeEqualTo(request.getBelongType());
         List<AttachmentModuleRelation> attachmentModuleRelations = attachmentModuleRelationMapper.selectByExample(example);
@@ -178,7 +180,7 @@ public class AttachmentService {
             List<String> localAttachments = needDealFiles.stream()
                     .filter(relation -> StringUtils.isEmpty(relation.getFileMetadataRefId()))
                     .map(AttachmentModuleRelation::getAttachmentId)
-                    .filter(StringUtils::isNotEmpty).collect(Collectors.toList());
+                    .filter(StringUtils::isNotEmpty).toList();
             localAttachments.forEach(localAttachmentId -> {
                 FileAttachmentMetadata fileAttachmentMetadata = copyAttachment(localAttachmentId, request.getBelongType(), request.getBelongId());
                 AttachmentModuleRelation record = new AttachmentModuleRelation();
@@ -189,7 +191,7 @@ public class AttachmentService {
             });
             // 文件管理关联附件
             List<AttachmentModuleRelation> refAttachments = needDealFiles.stream()
-                    .filter(relation -> StringUtils.isNotEmpty(relation.getFileMetadataRefId())).collect(Collectors.toList());
+                    .filter(relation -> StringUtils.isNotEmpty(relation.getFileMetadataRefId())).toList();
             refAttachments.forEach(refAttachment -> {
                 refAttachment.setRelationId(request.getBelongId());
                 attachmentModuleRelationMapper.insert(refAttachment);
@@ -227,7 +229,7 @@ public class AttachmentService {
     }
 
     public List<FileAttachmentMetadata> listMetadata(AttachmentRequest request) {
-        List<FileAttachmentMetadata> attachments = new ArrayList<FileAttachmentMetadata>();
+        List<FileAttachmentMetadata> attachments = new ArrayList<>();
         AttachmentModuleRelationExample example = new AttachmentModuleRelationExample();
         example.createCriteria().andRelationIdEqualTo(request.getBelongId()).andRelationTypeEqualTo(request.getBelongType());
         List<AttachmentModuleRelation> attachmentModuleRelations = attachmentModuleRelationMapper.selectByExample(example);
@@ -376,9 +378,7 @@ public class AttachmentService {
         AttachmentModuleRelationExample example = new AttachmentModuleRelationExample();
         example.createCriteria().andRelationIdEqualTo(request.getBelongId()).andRelationTypeEqualTo(request.getBelongType());
         List<AttachmentModuleRelation> attachmentModuleRelations = attachmentModuleRelationMapper.selectByExample(example);
-        List<String> attachmentIds = attachmentModuleRelations.stream().map(AttachmentModuleRelation::getAttachmentId)
-                .collect(Collectors.toList());
-        return attachmentIds;
+        return attachmentModuleRelations.stream().map(AttachmentModuleRelation::getAttachmentId).toList();
     }
 
     public String getRefIdByAttachmentId(String attachmentId) {
@@ -453,6 +453,9 @@ public class AttachmentService {
     }
 
     public FileAttachmentMetadata saveAttachment(MultipartFile file, String attachmentType, String belongId) {
+        if (attachmentType.contains("/") || belongId.contains("/")) {
+            MSException.throwException(Translator.get("invalid_parameter"));
+        }
         String uploadPath = FileUtils.ATTACHMENT_DIR + "/" + attachmentType + "/" + belongId;
         FileUtils.uploadFile(file, uploadPath);
         final FileAttachmentMetadata fileAttachmentMetadata = new FileAttachmentMetadata();
@@ -462,7 +465,7 @@ public class AttachmentService {
         fileAttachmentMetadata.setSize(file.getSize());
         fileAttachmentMetadata.setCreateTime(System.currentTimeMillis());
         fileAttachmentMetadata.setUpdateTime(System.currentTimeMillis());
-        fileAttachmentMetadata.setCreator(SessionUtils.getUser().getName());
+        fileAttachmentMetadata.setCreator(SessionUtils.getUser() == null ? "admin" : SessionUtils.getUser().getName());
         fileAttachmentMetadata.setFilePath(uploadPath);
         fileAttachmentMetadataMapper.insert(fileAttachmentMetadata);
         return fileAttachmentMetadata;
@@ -491,7 +494,7 @@ public class AttachmentService {
             fileAttachmentMetadata.setSize(Integer.valueOf(total).longValue());
             fileAttachmentMetadata.setCreateTime(System.currentTimeMillis());
             fileAttachmentMetadata.setUpdateTime(System.currentTimeMillis());
-            fileAttachmentMetadata.setCreator(SessionUtils.getUser().getName());
+            fileAttachmentMetadata.setCreator(SessionUtils.getUser() == null ? "admin" : SessionUtils.getUser().getName());
             fileAttachmentMetadata.setFilePath(uploadPath);
             fileAttachmentMetadataMapper.insert(fileAttachmentMetadata);
             return fileAttachmentMetadata;
@@ -524,7 +527,7 @@ public class AttachmentService {
             fileAttachmentMetadata.setId(UUID.randomUUID().toString());
             fileAttachmentMetadata.setCreateTime(System.currentTimeMillis());
             fileAttachmentMetadata.setUpdateTime(System.currentTimeMillis());
-            fileAttachmentMetadata.setCreator(SessionUtils.getUser().getName());
+            fileAttachmentMetadata.setCreator(SessionUtils.getUser() == null ? "admin" : SessionUtils.getUser().getName());
             fileAttachmentMetadata.setFilePath(copyPath);
             fileAttachmentMetadataMapper.insert(fileAttachmentMetadata);
         }
@@ -541,21 +544,6 @@ public class AttachmentService {
         }
 
         List<String> fileIds = testCaseFiles.stream().map(TestCaseFile::getFileId).collect(Collectors.toList());
-        FileAttachmentMetadataExample example = new FileAttachmentMetadataExample();
-        example.createCriteria().andIdIn(fileIds);
-        return fileAttachmentMetadataMapper.selectByExample(example);
-    }
-
-    public List<FileAttachmentMetadata> getFileAttachmentMetadataByIssueId(String issueId) {
-        IssueFileExample issueFileExample = new IssueFileExample();
-        issueFileExample.createCriteria().andIssueIdEqualTo(issueId);
-        final List<IssueFile> issueFiles = issueFileMapper.selectByExample(issueFileExample);
-
-        if (org.apache.commons.collections.CollectionUtils.isEmpty(issueFiles)) {
-            return new ArrayList<>();
-        }
-
-        List<String> fileIds = issueFiles.stream().map(IssueFile::getFileId).collect(Collectors.toList());
         FileAttachmentMetadataExample example = new FileAttachmentMetadataExample();
         example.createCriteria().andIdIn(fileIds);
         return fileAttachmentMetadataMapper.selectByExample(example);
@@ -592,13 +580,14 @@ public class AttachmentService {
     /**
      * 上传文件的操作记录
      *
-     * @param sourceId
-     * @param type
-     * @return
+     * @param sourceId 所属操作对象ID
+     * @param type 所属操作类型
+     * @return 操作日志content
      */
     public String getLogDetails(String sourceId, String type, String fileName, Boolean isDelete) {
         String projectId = null;
         String createUser = null;
+        String title = null;
         if (StringUtils.isBlank(sourceId) || StringUtils.isBlank(type) || StringUtils.isBlank(fileName)) {
             return null;
         }
@@ -609,6 +598,7 @@ public class AttachmentService {
             }
             projectId = issues.getProjectId();
             createUser = issues.getCreator();
+            title = issues.getTitle();
         } else if (AttachmentType.TEST_CASE.type().equals(type)) {
             TestCaseWithBLOBs testCase = testCaseMapper.selectByPrimaryKey(sourceId);
             if (testCase == null) {
@@ -616,6 +606,7 @@ public class AttachmentService {
             }
             projectId = testCase.getProjectId();
             createUser = testCase.getCreateUser();
+            title = testCase.getName();
         }
         AttachmentRequest attachmentRequest = new AttachmentRequest();
         attachmentRequest.setBelongId(sourceId);
@@ -639,23 +630,23 @@ public class AttachmentService {
         }
 
         List<DetailColumn> columns = new ArrayList<>();
+        DetailColumn column;
         if (isDelete) {
-            DetailColumn column = new DetailColumn("附件", "files", after, before);
-            columns.add(column);
+            column = new DetailColumn("附件", "files", after, before);
         } else {
-            DetailColumn column = new DetailColumn("附件", "files", before, after);
-            columns.add(column);
+            column = new DetailColumn("附件", "files", before, after);
         }
-        OperatingLogDetails details = new OperatingLogDetails(JSON.toJSONString(sourceId), projectId, createUser, columns);
+        columns.add(column);
+        OperatingLogDetails details = new OperatingLogDetails(JSON.toJSONString(sourceId), projectId, title, createUser, columns);
         return JSON.toJSONString(details);
     }
 
     /**
      * 删除文件操作记录
      *
-     * @param attachmentId
-     * @param attachmentType
-     * @return
+     * @param attachmentId 所属对象ID
+     * @param attachmentType 所属对象类型
+     * @return 操作日志content
      */
     public String getLogDetails(String attachmentId, String attachmentType) {
         FileAttachmentMetadata fileAttachmentMetadata = fileAttachmentMetadataMapper.selectByPrimaryKey(attachmentId);
@@ -676,14 +667,16 @@ public class AttachmentService {
     /**
      * 关联文件的操作记录
      *
-     * @param sourceId
-     * @param type
+     * @param sourceId 附件所属对象ID
+     * @param type 附件所属对象类型
      * @param refIds 关联或取消关联的文件ID
-     * @return
+     * @param isRelate 关联操作
+     * @return 返回操作日志content
      */
-    public String getLogDetails(String sourceId, String type, List refIds, Boolean isRelate) {
+    public String getLogDetails(String sourceId, String type, List<String> refIds, Boolean isRelate) {
         String projectId = null;
         String createUser = null;
+        String title = null;
         if (StringUtils.isBlank(sourceId) || StringUtils.isBlank(type) || CollectionUtils.isEmpty(refIds)) {
             return null;
         }
@@ -694,6 +687,7 @@ public class AttachmentService {
             }
             projectId = issues.getProjectId();
             createUser = issues.getCreator();
+            title = issues.getTitle();
         } else if (AttachmentType.TEST_CASE.type().equals(type)) {
             TestCaseWithBLOBs testCase = testCaseMapper.selectByPrimaryKey(sourceId);
             if (testCase == null) {
@@ -701,6 +695,7 @@ public class AttachmentService {
             }
             projectId = testCase.getProjectId();
             createUser = testCase.getCreateUser();
+            title = testCase.getName();
         }
         AttachmentRequest attachmentRequest = new AttachmentRequest();
         attachmentRequest.setBelongId(sourceId);
@@ -716,7 +711,7 @@ public class AttachmentService {
         FileMetadataExample example = new FileMetadataExample();
         example.createCriteria().andIdIn(refIds);
         List<FileMetadata> fileMetadata = fileMetadataMapper.selectByExample(example);
-        List<String> refNames = fileMetadata.stream().map(FileMetadata::getName).collect(Collectors.toList());
+        List<String> refNames = fileMetadata.stream().map(FileMetadata::getName).toList();
 
         after = String.join(",", fileNames);
         List<String> unRelateFiles = fileNames.stream().filter(filename -> !refNames.contains(filename)).collect(Collectors.toList());
@@ -725,21 +720,22 @@ public class AttachmentService {
         List<DetailColumn> columns = new ArrayList<>();
         DetailColumn column = new DetailColumn("附件", "files", before, after);
         columns.add(column);
-        OperatingLogDetails details = new OperatingLogDetails(JSON.toJSONString(sourceId), projectId, createUser, columns);
+        OperatingLogDetails details = new OperatingLogDetails(JSON.toJSONString(sourceId), projectId, title, createUser, columns);
         return JSON.toJSONString(details);
     }
 
     /**
      * 取消关联文件的操作记录
      *
-     * @param sourceId
-     * @param type
+     * @param sourceId 附件所属对象ID
+     * @param type 附件所属对象类型
      * @param refIds 关联或取消关联的文件ID
-     * @return
+     * @return 返回操作日志content
      */
-    public String getLogDetails(String sourceId, String type, List refIds) {
+    public String getLogDetails(String sourceId, String type, List<String> refIds) {
         String projectId = null;
         String createUser = null;
+        String title = null;
         if (StringUtils.isBlank(sourceId) || StringUtils.isBlank(type) || CollectionUtils.isEmpty(refIds)) {
             return null;
         }
@@ -750,6 +746,7 @@ public class AttachmentService {
             }
             projectId = issues.getProjectId();
             createUser = issues.getCreator();
+            title = issues.getTitle();
         } else if (AttachmentType.TEST_CASE.type().equals(type)) {
             TestCaseWithBLOBs testCase = testCaseMapper.selectByPrimaryKey(sourceId);
             if (testCase == null) {
@@ -757,6 +754,7 @@ public class AttachmentService {
             }
             projectId = testCase.getProjectId();
             createUser = testCase.getCreateUser();
+            title = testCase.getName();
         }
         AttachmentRequest attachmentRequest = new AttachmentRequest();
         attachmentRequest.setBelongId(sourceId);
@@ -770,15 +768,14 @@ public class AttachmentService {
         String before;
 
         before = String.join(",", fileNames);
-        List<String> unRelateFiles = originFiles.stream().filter(originFile -> !StringUtils.equals(originFile.getId(), refIds.get(0).toString()))
+        List<String> unRelateFiles = originFiles.stream().filter(originFile -> !StringUtils.equals(originFile.getId(), refIds.get(0)))
                 .map(FileAttachmentMetadata::getName).collect(Collectors.toList());
         after = String.join(",", unRelateFiles);
 
         List<DetailColumn> columns = new ArrayList<>();
         DetailColumn column = new DetailColumn("附件", "files", before, after);
         columns.add(column);
-        OperatingLogDetails details = new OperatingLogDetails(JSON.toJSONString(sourceId), projectId, createUser, columns);
+        OperatingLogDetails details = new OperatingLogDetails(JSON.toJSONString(sourceId), projectId, title, createUser, columns);
         return JSON.toJSONString(details);
     }
-
 }

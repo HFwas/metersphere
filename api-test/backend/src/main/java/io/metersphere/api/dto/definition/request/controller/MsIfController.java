@@ -1,5 +1,6 @@
 package io.metersphere.api.dto.definition.request.controller;
 
+import io.metersphere.api.dto.definition.request.ElementUtil;
 import io.metersphere.api.dto.definition.request.ParameterConfig;
 import io.metersphere.commons.constants.ElementConstants;
 import io.metersphere.plugin.core.MsParameter;
@@ -7,6 +8,7 @@ import io.metersphere.plugin.core.MsTestElement;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.control.IfController;
 import org.apache.jmeter.save.SaveService;
@@ -36,6 +38,7 @@ public class MsIfController extends MsTestElement {
         if (!config.isOperating() && !this.isEnable()) {
             return;
         }
+        
         final HashTree groupTree = tree.add(ifController());
         if (CollectionUtils.isNotEmpty(hashTree)) {
             hashTree.forEach(el -> {

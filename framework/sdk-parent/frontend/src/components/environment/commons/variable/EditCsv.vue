@@ -102,7 +102,7 @@ export default {
       showMessage: false,
       rules: {
         name: [
-          {required: true, message: this.$t('test_track.case.input_name'), trigger: 'blur'},
+          {required: true, message: this.$t('test_track.variable_name'), trigger: 'blur'},
         ],
       },
     }
@@ -138,7 +138,7 @@ export default {
       this.previewData = [];
     },
     step(results, parser) {
-      if (this.allData.length < 500) {
+      if (this.allData.length < 501) {
         this.allData.push(results.data);
       } else {
         this.showMessage = true;

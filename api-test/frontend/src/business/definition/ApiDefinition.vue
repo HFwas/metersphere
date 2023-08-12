@@ -293,6 +293,7 @@ import { useApiStore } from '@/store';
 import { buildTree } from 'metersphere-frontend/src/model/NodeTree';
 import { createMockConfig, getMockApiParams, mockExpectConfig } from '@/api/api-mock';
 import MockEditDrawer from '@/business/definition/components/mock/MockEditDrawer';
+import {getUserDefaultApiType} from "metersphere-frontend/src/api/environment";
 
 const store = useApiStore();
 export default {
@@ -374,7 +375,7 @@ export default {
       selectDataRange: 'all',
       showCasePage: true,
       apiDefaultTab: 'default',
-      currentProtocol: 'HTTP',
+      currentProtocol: '',
       currentModule: null,
       selectNodeIds: [],
       currentApi: {},
@@ -479,6 +480,13 @@ export default {
     apiDefaultTab() {
       this.isAsideHidden = this.apiDefaultTab === 'default' || this.apiDefaultTab === 'trash';
     },
+  },
+  beforeCreate() {
+    getUserDefaultApiType().then(response => {
+      if (!this.currentProtocol) {
+        this.currentProtocol = response.data;
+      }
+    })
   },
   created() {
     let routeParamObj = this.$route.params;
@@ -753,7 +761,8 @@ export default {
             if (
               store.apiMap.get(t.api.id).get('responseChange') === true ||
               store.apiMap.get(t.api.id).get('requestChange') === true ||
-              store.apiMap.get(t.api.id).get('fromChange') === true
+              store.apiMap.get(t.api.id).get('fromChange') === true ||
+              store.apiMap.get(t.api.id).get('customFormChange') === true
             ) {
               message += t.api.name;
               id = t.api.id;
@@ -782,6 +791,7 @@ export default {
       } else {
         if (id) {
           store.apiMap.delete(id);
+          store.saveMap.delete(id);
         }
         this.handleTabRemove(targetName);
       }
@@ -857,6 +867,9 @@ export default {
     initForwardData() {
       let dataRange = this.$route.params.dataSelectRange;
       let dataType = this.$route.params.dataType;
+      if (this.$route && this.$route.params && this.$route.params.type) {
+        this.currentProtocol = this.$route.params.type;
+      }
       if (dataRange && typeof dataRange === 'string' && dataType === 'api') {
         let selectParamArr = dataRange.split('edit:');
         if (selectParamArr.length === 2) {
@@ -1049,6 +1062,13 @@ export default {
           t.isCopy = false;
         }
       });
+      store.apiStatus.set('fromChange', false);
+      store.apiStatus.set('requestChange', false);
+      store.apiStatus.set('responseChange', false);
+      store.apiStatus.set('customFormChange', false);
+      store.apiMap.set(data.id, store.apiStatus);
+      // 保存后将保存状态置为true
+      store.saveMap.set(data.id, true);
     },
 
     showExecResult(row) {
@@ -1100,7 +1120,7 @@ export default {
 };
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .ms-api-div {
   overflow-y: hidden;
   height: calc(100vh - 100px);

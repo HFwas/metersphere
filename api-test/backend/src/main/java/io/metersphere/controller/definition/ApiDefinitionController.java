@@ -11,9 +11,7 @@ import io.metersphere.api.dto.definition.request.assertions.document.DocumentEle
 import io.metersphere.api.dto.scenario.Body;
 import io.metersphere.api.dto.swaggerurl.SwaggerTaskResult;
 import io.metersphere.api.dto.swaggerurl.SwaggerUrlRequest;
-import io.metersphere.api.exec.api.ApiExecuteService;
 import io.metersphere.api.exec.generator.JSONSchemaParser;
-import io.metersphere.api.exec.queue.ExecThreadPoolExecutor;
 import io.metersphere.api.parse.api.ApiDefinitionImport;
 import io.metersphere.base.domain.ApiDefinition;
 import io.metersphere.base.domain.ApiTestEnvironmentWithBLOBs;
@@ -30,12 +28,14 @@ import io.metersphere.dto.MsExecResponseDTO;
 import io.metersphere.dto.RelationshipEdgeDTO;
 import io.metersphere.environment.service.BaseEnvironmentService;
 import io.metersphere.log.annotation.MsAuditLog;
+import io.metersphere.log.annotation.MsRequestLog;
 import io.metersphere.notice.annotation.SendNotice;
 import io.metersphere.request.ResetOrderRequest;
 import io.metersphere.service.definition.ApiDefinitionService;
 import io.metersphere.service.definition.FunctionRunService;
 import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.shiro.authz.annotation.Logical;
 import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -51,14 +51,10 @@ public class ApiDefinitionController {
     @Resource
     private BaseEnvironmentService apiTestEnvironmentService;
     @Resource
-    private ExecThreadPoolExecutor execThreadPoolExecutor;
-    @Resource
-    private ApiExecuteService apiExecuteService;
-    @Resource
     private FunctionRunService functionRunService;
 
     @PostMapping("/list/{goPage}/{pageSize}")
-    @RequiresPermissions("PROJECT_API_DEFINITION:READ")
+    @RequiresPermissions(PermissionConstants.PROJECT_API_DEFINITION_READ)
     public Pager<List<ApiDefinitionResult>> list(@PathVariable int goPage, @PathVariable int pageSize, @RequestBody ApiDefinitionRequest request) {
         apiDefinitionService.checkFilterHasCoverage(request);
         apiDefinitionService.getApplicationUpdateRule(request);
@@ -67,6 +63,7 @@ public class ApiDefinitionController {
     }
 
     @PostMapping("/list/week/{projectId}/{versionId}/{goPage}/{pageSize}")
+    @RequiresPermissions(value= {PermissionConstants.PROJECT_API_DEFINITION_READ, PermissionConstants.PROJECT_API_HOME}, logical = Logical.OR)
     public Pager<List<ApiDefinitionResult>> weekList(@PathVariable String projectId, @PathVariable String versionId, @PathVariable int goPage, @PathVariable int pageSize) {
         if (StringUtils.equalsIgnoreCase(versionId, "default")) {
             versionId = null;
@@ -93,7 +90,7 @@ public class ApiDefinitionController {
     }
 
     @PostMapping("/list/all")
-    @RequiresPermissions("PROJECT_API_DEFINITION:READ")
+    @RequiresPermissions(PermissionConstants.PROJECT_API_DEFINITION_READ)
     public List<ApiDefinitionResult> list(@RequestBody ApiDefinitionRequest request) {
         return apiDefinitionService.list(request);
     }
@@ -105,7 +102,7 @@ public class ApiDefinitionController {
 
 
     @PostMapping(value = "/create", consumes = {"multipart/form-data"})
-    @RequiresPermissions(PermissionConstants.PROJECT_API_DEFINITION_READ_CREATE_API)
+    @RequiresPermissions(value= {PermissionConstants.PROJECT_API_DEFINITION_READ_CREATE_API, PermissionConstants.PROJECT_API_DEFINITION_READ_COPY_API}, logical = Logical.OR)
     @MsAuditLog(module = OperLogModule.API_DEFINITION, type = OperLogConstants.CREATE, title = "#request.name", content = "#msClass.getLogDetails(#request.id)", msClass = ApiDefinitionService.class)
     @SendNotice(taskType = NoticeConstants.TaskType.API_DEFINITION_TASK, event = NoticeConstants.Event.CREATE, subject = "接口定义通知")
     public ApiDefinitionResult create(@RequestPart("request") SaveApiDefinitionRequest request, @RequestPart(value = "files", required = false) List<MultipartFile> bodyFiles) {
@@ -135,6 +132,7 @@ public class ApiDefinitionController {
     }
 
     @PostMapping("/del-batch")
+    @RequiresPermissions(PermissionConstants.PROJECT_API_DEFINITION_READ_DELETE_API)
     @MsAuditLog(module = OperLogModule.API_DEFINITION, type = OperLogConstants.BATCH_DEL, beforeEvent = "#msClass.getLogDetails(#request.ids)", msClass = ApiDefinitionService.class)
     public void deleteBatchByParams(@RequestBody ApiBatchRequest request) {
         apiDefinitionService.deleteByParams(request);
@@ -170,18 +168,20 @@ public class ApiDefinitionController {
     }
 
     @GetMapping("/get/{id}")
-    @RequiresPermissions("PROJECT_API_DEFINITION:READ")
+    @RequiresPermissions(PermissionConstants.PROJECT_API_DEFINITION_READ)
     public ApiDefinitionResult getApiDefinitionResult(@PathVariable String id) {
         return apiDefinitionService.getById(id);
     }
 
     @PostMapping(value = "/run/debug", consumes = {"multipart/form-data"})
+    @RequiresPermissions(value = {PermissionConstants.PROJECT_API_DEFINITION_READ_DEBUG, PermissionConstants.PROJECT_API_DEFINITION_READ_RUN}, logical = Logical.OR)
     @MsAuditLog(module = OperLogModule.API_DEFINITION, type = OperLogConstants.DEBUG, title = "#request.name", project = "#request.projectId")
     public MsExecResponseDTO runDebug(@RequestPart("request") RunDefinitionRequest request, @RequestPart(value = "files", required = false) List<MultipartFile> bodyFiles) {
         return apiDefinitionService.run(request, bodyFiles);
     }
 
     @PostMapping(value = "/run", consumes = {"multipart/form-data"})
+    @RequiresPermissions(PermissionConstants.PROJECT_API_DEFINITION_READ_RUN)
     @MsAuditLog(module = OperLogModule.API_DEFINITION, type = OperLogConstants.EXECUTE, sourceId = "#request.id", title = "#request.name", project = "#request.projectId")
     public MsExecResponseDTO run(@RequestPart("request") RunDefinitionRequest request, @RequestPart(value = "files", required = false) List<MultipartFile> bodyFiles) {
         request.setReportId(null);
@@ -248,12 +248,14 @@ public class ApiDefinitionController {
 
     //更新定时任务更新定时任务
     @PostMapping(value = "/schedule-switch")
+    @MsRequestLog(module = OperLogModule.API_DEFINITION)
     public void updateScheduleEnable(@RequestBody Schedule request) {
         apiDefinitionService.switchSchedule(request);
     }
 
     //删除定时任务和swaggereUrl
     @PostMapping("/del-schedule")
+    @MsRequestLog(module = OperLogModule.API_DEFINITION)
     public void deleteSchedule(@RequestBody ScheduleRequest request) {
         apiDefinitionService.deleteSchedule(request);
     }
@@ -267,6 +269,7 @@ public class ApiDefinitionController {
 
     @PostMapping("/batch/edit")
     @RequiresPermissions(PermissionConstants.PROJECT_API_DEFINITION_READ_EDIT_API)
+    @MsRequestLog(module = OperLogModule.API_DEFINITION)
     public void editApiBath(@RequestBody ApiBatchRequest request) {
         apiDefinitionService.editApiBath(request);
     }
@@ -293,6 +296,7 @@ public class ApiDefinitionController {
     }
 
     @PostMapping("/relevance/review")
+    @MsRequestLog(module = OperLogModule.API_DEFINITION)
     public void testCaseReviewRelevance(@RequestBody ApiCaseRelevanceRequest request) {
         apiDefinitionService.testCaseReviewRelevance(request);
     }
@@ -333,6 +337,7 @@ public class ApiDefinitionController {
     }
 
     @PostMapping("/relationship/add")
+    @MsRequestLog(module = OperLogModule.API_DEFINITION)
     public void saveRelationshipBatch(@RequestBody ApiDefinitionRelationshipEdgeRequest request) {
         apiDefinitionService.saveRelationshipBatch(request);
     }
@@ -353,19 +358,16 @@ public class ApiDefinitionController {
     }
 
     @PostMapping("/update/follows/{definitionId}")
+    @MsRequestLog(module = OperLogModule.API_DEFINITION)
     public void saveFollows(@PathVariable String definitionId, @RequestBody List<String> follows) {
         apiDefinitionService.saveFollows(definitionId, follows);
     }
 
 
     @PostMapping("/delete/follows/batch")
+    @MsRequestLog(module = OperLogModule.API_DEFINITION)
     public void deleteFollows(@RequestBody List<String> definitionIds) {
         apiDefinitionService.deleteFollows(definitionIds);
-    }
-
-    @GetMapping("/getWorkerQueue")
-    public String getWorkerQueue() {
-        return execThreadPoolExecutor.getWorkerQueue();
     }
 
     @GetMapping("versions/{definitionId}")
@@ -394,6 +396,7 @@ public class ApiDefinitionController {
     }
 
     @PostMapping("/update/file")
+    @MsRequestLog(module = OperLogModule.API_DEFINITION)
     public void updateFileMetadataId(@RequestBody List<ReplaceFileIdRequest> requestList) {
         apiDefinitionService.updateFileMetadataId(requestList);
     }

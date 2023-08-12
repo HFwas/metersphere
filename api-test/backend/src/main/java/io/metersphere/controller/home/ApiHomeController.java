@@ -13,6 +13,7 @@ import io.metersphere.api.dto.definition.RunDefinitionRequest;
 import io.metersphere.api.dto.export.ScenarioToPerformanceInfoDTO;
 import io.metersphere.base.domain.ApiDefinition;
 import io.metersphere.base.domain.Schedule;
+import io.metersphere.commons.constants.PermissionConstants;
 import io.metersphere.commons.constants.ReportTriggerMode;
 import io.metersphere.commons.enums.ExecutionExecuteTypeEnum;
 import io.metersphere.commons.utils.*;
@@ -26,6 +27,7 @@ import io.metersphere.service.scenario.ApiScenarioService;
 import io.metersphere.task.service.TaskService;
 import jakarta.annotation.Resource;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -126,7 +128,7 @@ public class ApiHomeController {
             apiCountResult.setApiCoveredRate(df.format(coveredRateNumber) + "%");
         }
         //计算用例的通过率和执行率
-        List<ExecuteResultCountDTO> apiCaseExecResultList = apiTestCaseService.selectExecuteResultByProjectId(allCount, projectId, versionId);
+        List<ExecuteResultCountDTO> apiCaseExecResultList = apiTestCaseService.selectExecuteResultByProjectId(apiCountResult.getTotal(), projectId, versionId);
         apiCountResult.countApiCaseRunResult(apiCaseExecResultList);
         if (apiCountResult.getExecutedCount() > 0) {
             //通过率
@@ -229,6 +231,7 @@ public class ApiHomeController {
     }
 
     @PostMapping(value = "/gen/performance/xml", consumes = {"multipart/form-data"})
+    @RequiresPermissions(PermissionConstants.PROJECT_API_DEFINITION_READ_CREATE_PERFORMANCE)
     public ScenarioToPerformanceInfoDTO genPerformanceTest(@RequestPart("request") RunDefinitionRequest runRequest, @RequestPart(value = "files", required = false) List<MultipartFile> bodyFiles) {
         JmxInfoDTO jmxInfoDTO = DataFormattingUtil.getJmxInfoDTO(runRequest, bodyFiles);
         ScenarioToPerformanceInfoDTO returnDTO = new ScenarioToPerformanceInfoDTO();

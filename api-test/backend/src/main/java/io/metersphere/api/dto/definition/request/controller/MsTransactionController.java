@@ -1,12 +1,15 @@
 package io.metersphere.api.dto.definition.request.controller;
 
+import io.metersphere.api.dto.definition.request.ElementUtil;
 import io.metersphere.api.dto.definition.request.ParameterConfig;
+import io.metersphere.commons.constants.CommonConstants;
 import io.metersphere.commons.constants.ElementConstants;
 import io.metersphere.plugin.core.MsParameter;
 import io.metersphere.plugin.core.MsTestElement;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.control.TransactionController;
 import org.apache.jmeter.save.SaveService;
@@ -34,7 +37,7 @@ public class MsTransactionController extends MsTestElement {
         if (!config.isOperating() && !this.isEnable()) {
             return;
         }
-
+        
         TransactionController transactionController = transactionController();
         final HashTree groupTree = tree.add(transactionController);
         if (CollectionUtils.isNotEmpty(hashTree)) {
@@ -52,7 +55,7 @@ public class MsTransactionController extends MsTestElement {
         if (StringUtils.isEmpty(this.getName())) {
             this.setName(getLabelName());
         }
-        transactionController.setName("Transaction=" + this.getName());
+        transactionController.setName(CommonConstants.PRE_TRANSACTION + this.getName());
         transactionController.setProperty(TestElement.TEST_CLASS, TransactionController.class.getName());
         transactionController.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("TransactionControllerGui"));
         transactionController.setGenerateParentSample(generateParentSample);

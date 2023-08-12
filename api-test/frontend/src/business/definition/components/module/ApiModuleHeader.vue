@@ -1,6 +1,6 @@
 <template>
   <div>
-    <el-row>
+    <el-row :gutter="8">
       <el-col :span="8">
         <el-select class="protocol-select" size="small" v-model="condition.protocol">
           <el-option
@@ -12,7 +12,7 @@
           </el-option>
         </el-select>
       </el-col>
-      <el-col :span="15">
+      <el-col :span="16">
         <ms-search-bar :show-operator="showOperator && !isTrashData" :condition="condition" :commands="operators" />
       </el-col>
     </el-row>
@@ -216,7 +216,7 @@ export default {
         return;
       }
       this.protocol = 'HTTP';
-      this.$refs.apiImport.open(this.moduleOptions);
+      this.$refs.apiImport.open(this.currentModule.id ? this.currentModule : this.moduleOptions);
     },
     addApi() {
       if (!this.projectId) {
@@ -240,7 +240,7 @@ export default {
 
 <style scoped>
 .protocol-select {
-  width: 85px;
+  width: 100%;
   height: 30px;
 }
 

@@ -39,7 +39,7 @@
       <el-tag size="small" class="ms-tag" v-if="scenario.referenced === 'Deleted'" type="danger">
         {{ $t('api_test.automation.reference_deleted') }}
       </el-tag>
-      <el-tag size="small" class="ms-tag" v-if="scenario.referenced === 'Copy'"> {{ $t('commons.copy') }} </el-tag>
+      <el-tag size="small" class="ms-tag" v-if="scenario.referenced === 'Copy'"> {{ $t('commons.copy') }}</el-tag>
       <el-tag size="small" class="ms-tag" v-if="scenario.referenced === 'REF'"
         >{{ $t('api_test.scenario.reference') }}
       </el-tag>
@@ -61,8 +61,14 @@
       </span>
       <span
         class="ms-step-debug-code"
+        :class="'ms-req-error-report'"
+        v-if="!loading && !node.data.testing && node.data.debug && node.data.code === 'FAKE_ERROR'">
+        FakeError
+      </span>
+      <span
+        class="ms-step-debug-code"
         :class="node.data.code === 'ERROR' ? 'ms-req-error' : 'ms-req-success'"
-        v-if="!loading && node.data.debug && !node.data.testing">
+        v-if="!loading && node.data.debug && !node.data.testing && node.data.code !== 'FAKE_ERROR'">
         {{ getCode() }}
       </span>
     </template>
@@ -75,7 +81,8 @@
           style="padding: 5px"
           class="ms-btn"
           size="mini"
-          circle />
+          circle
+          v-permission="['PROJECT_API_SCENARIO:READ+DEBUG', 'PROJECT_API_SCENARIO:READ+RUN']" />
       </el-tooltip>
       <el-tooltip :content="$t('report.stop_btn')" placement="top" :enterable="false" v-else>
         <el-button
@@ -84,7 +91,8 @@
           size="mini"
           style="color: white; padding: 0 0.1px; width: 24px; height: 24px"
           class="stop-btn"
-          circle>
+          circle
+          v-permission="['PROJECT_API_SCENARIO:READ+DEBUG', 'PROJECT_API_SCENARIO:READ+RUN']">
           <div style="transform: scale(0.66)">
             <span style="margin-left: -4.5px; font-weight: bold">STOP</span>
           </div>
@@ -104,7 +112,7 @@ import { getCurrentProjectID, getCurrentWorkspaceId } from 'metersphere-frontend
 import { getUUID, strMapToObj } from 'metersphere-frontend/src/utils';
 import { STEP } from '@/business/automation/scenario/Setting';
 import { getOwnerProjectIds, getProject } from '@/api/project';
-import { checkScenarioEnv, getScenarioById, setScenarioDomain } from '@/api/scenario';
+import { getScenarioById, setScenarioDomain } from '@/api/scenario';
 
 export default {
   name: 'ApiScenarioComponent',
@@ -154,11 +162,10 @@ export default {
   created() {
     this.isShowNum = this.scenario.num ? true : false;
     if (this.scenario.id && this.scenario.referenced === 'REF' && !this.scenario.loaded && this.scenario.hashTree) {
-      this.scenario.root = this.node.parent.parent ? false : true;
       this.scenario.disabled = true;
       this.scenario.showExtend =
         this.node.parent && this.node.parent.data && this.node.parent.data.disabled ? false : true;
-      this.recursive(this.scenario.hashTree, this.scenario.projectId, true);
+      this.recursiveEnable(this.scenario.hashTree);
     }
     if (this.scenario.id && this.scenario.referenced === 'Copy' && !this.scenario.isCopy && !this.scenario.disabled) {
       this.scenario.isCopy = true;
@@ -221,14 +228,7 @@ export default {
       this.reload();
     },
     checkEnv(val) {
-      checkScenarioEnv(this.scenario.id).then((res) => {
-        if (this.scenario.environmentEnable && !res.data) {
-          this.scenario.environmentEnable = false;
-          this.$warning(this.$t('commons.scenario_warning'));
-          return;
-        }
-        this.setDomain(val);
-      });
+      this.setDomain(val);
     },
     setDomain(val) {
       let param = {
@@ -264,14 +264,7 @@ export default {
           this.node.expanded = !this.node.expanded;
         }
       }
-      if (this.scenario && this.scenario.hashTree && this.node.expanded) {
-        this.scenario.disabled = this.scenario.id && this.scenario.referenced === 'REF';
-        this.recursive(
-          this.scenario.hashTree,
-          this.scenario.projectId,
-          this.scenario.id && this.scenario.referenced === 'REF'
-        );
-      }
+      this.recursive(this.scenario.hashTree, this.scenario.projectId);
       this.reload();
     },
     copyRow() {
@@ -286,9 +279,18 @@ export default {
         this.loading = false;
       });
     },
-    recursive(arr, id, disabled) {
+    recursiveEnable(arr) {
       for (let i in arr) {
-        arr[i].disabled = disabled;
+        arr[i].disabled = true;
+        arr[i].caseEnable = true;
+        if (arr[i].hashTree && arr[i].hashTree.length > 0) {
+          this.recursiveEnable(arr[i].hashTree);
+        }
+      }
+    },
+
+    recursive(arr, id) {
+      for (let i in arr) {
         arr[i].isCopy = false;
         arr[i].projectId = this.calcProjectId(arr[i].projectId, id);
         // 处理子请求环境
@@ -301,7 +303,7 @@ export default {
           }
         }
         if (arr[i].hashTree && arr[i].hashTree.length > 0) {
-          this.recursive(arr[i].hashTree, arr[i].projectId, disabled);
+          this.recursive(arr[i].hashTree, arr[i].projectId);
         }
       }
     },
@@ -445,5 +447,9 @@ export default {
   margin-left: 1rem;
   font-size: 15px;
   color: #de9d1c;
+}
+
+.ms-req-error-report {
+  color: #f6972a;
 }
 </style>

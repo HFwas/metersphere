@@ -27,9 +27,11 @@ import io.metersphere.excel.listener.TestCasePretreatmentListener;
 import io.metersphere.excel.utils.EasyExcelExporter;
 import io.metersphere.excel.utils.ExcelImportType;
 import io.metersphere.i18n.Translator;
+import io.metersphere.log.service.OperatingLogService;
 import io.metersphere.log.utils.ReflexObjectUtil;
 import io.metersphere.log.vo.DetailColumn;
 import io.metersphere.log.vo.OperatingLogDetails;
+import io.metersphere.log.vo.StatusReference;
 import io.metersphere.log.vo.track.TestCaseReference;
 import io.metersphere.plan.service.TestPlanService;
 import io.metersphere.plan.service.TestPlanTestCaseService;
@@ -190,6 +192,8 @@ public class TestCaseService {
     private ExtTestAnalysisMapper extTestAnalysisMapper;
     @Resource
     private PlatformPluginService platformPluginService;
+    @Resource
+    private OperatingLogService operatingLogService;
 
     private ThreadLocal<Integer> importCreateNum = new ThreadLocal<>();
 
@@ -211,7 +215,7 @@ public class TestCaseService {
 
     public TestCaseWithBLOBs addTestCase(EditTestCaseRequest request) {
         request.setName(request.getName());
-        checkTestCaseExist(request);
+        checkTestCaseExist(request, false);
         request.setId(request.getId());
         request.setCreateTime(System.currentTimeMillis());
         request.setUpdateTime(System.currentTimeMillis());
@@ -268,6 +272,7 @@ public class TestCaseService {
 
     /**
      * 用例变更时，调用插件的需求变更的方法
+     *
      * @param request
      * @param type
      * @param project
@@ -415,27 +420,30 @@ public class TestCaseService {
         return testCaseDTO;
     }
 
-    public TestCaseWithBLOBs editTestCase(EditTestCaseRequest testCase) {
+    public TestCaseWithBLOBs editTestCase(EditTestCaseRequest testCase, boolean handleDemand) {
         checkTestCustomNum(testCase);
         testCase.setUpdateTime(System.currentTimeMillis());
         TestCaseWithBLOBs originCase = testCaseMapper.selectByPrimaryKey(testCase.getId());
 
-        try {
-            // 同步缺陷与需求的关联关系
-            updateThirdPartyIssuesLink(testCase);
+        if (handleDemand) {
+            try {
+                // 同步缺陷与需求的关联关系
+                updateThirdPartyIssuesLink(testCase);
 
-            // 同步用例与需求的关联关系
-            addDemandHyperLink(testCase, "edit");
+                // 同步用例与需求的关联关系
+                addDemandHyperLink(testCase, "edit");
 
-            handleDemandUpdate(testCase, DemandUpdateRequest.OperateType.EDIT,
-                    projectMapper.selectByPrimaryKey(testCase.getProjectId()), originCase.getDemandId());
-        } catch (Exception e) {
-            LogUtil.error(e);
+                handleDemandUpdate(testCase, DemandUpdateRequest.OperateType.EDIT,
+                        projectMapper.selectByPrimaryKey(testCase.getProjectId()), originCase.getDemandId());
+            } catch (Exception e) {
+                LogUtil.error(e);
+            }
+
+            if (StringUtils.isEmpty(testCase.getDemandId())) {
+                testCase.setDemandId(StringUtils.EMPTY);
+            }
         }
 
-        if (StringUtils.isEmpty(testCase.getDemandId())) {
-            testCase.setDemandId(StringUtils.EMPTY);
-        }
         createNewVersionOrNot(testCase);
 
         if (StringUtils.isNotBlank(testCase.getCustomNum()) && StringUtils.isNotBlank(testCase.getId())) {
@@ -455,6 +463,7 @@ public class TestCaseService {
         // latest 字段 createNewVersionOrNot 已经设置过了，不更新
         testCase.setLatest(null);
 
+        checkTestCaseExist(testCase, true);
         testCaseMapper.updateByPrimaryKeySelective(testCase);
 
         TestCaseWithBLOBs testCaseWithBLOBs = testCaseMapper.selectByPrimaryKey(testCase.getId());
@@ -462,6 +471,10 @@ public class TestCaseService {
         reReviewTestReviewTestCase(originCase, testCaseWithBLOBs);
 
         return testCaseWithBLOBs;
+    }
+
+    public TestCaseWithBLOBs editTestCase(EditTestCaseRequest testCase) {
+        return editTestCase(testCase, true);
     }
 
     /**
@@ -614,7 +627,7 @@ public class TestCaseService {
         }
     }
 
-    public TestCaseWithBLOBs checkTestCaseExist(TestCaseWithBLOBs testCase) {
+    public void checkTestCaseExist(TestCaseWithBLOBs testCase, boolean isEdit) {
 
         // 全部字段值相同才判断为用例存在
         if (testCase != null) {
@@ -634,7 +647,12 @@ public class TestCaseService {
             if (StringUtils.isNotBlank(testCase.getTestId())) {
                 criteria.andTestIdEqualTo(testCase.getTestId());
             }
-            if (StringUtils.isNotBlank(testCase.getId())) {
+
+            if (StringUtils.isNotBlank(testCase.getVersionId())) {
+                criteria.andVersionIdEqualTo(testCase.getVersionId());
+            }
+
+            if (isEdit && StringUtils.isNotBlank(testCase.getId())) {
                 criteria.andIdNotEqualTo(testCase.getId());
             }
             List<TestCaseWithBLOBs> caseList = testCaseMapper.selectByExampleWithBLOBs(example);
@@ -649,13 +667,11 @@ public class TestCaseService {
                     String remark = tc.getRemark() == null ? StringUtils.EMPTY : tc.getRemark();
                     String prerequisite = tc.getPrerequisite() == null ? StringUtils.EMPTY : tc.getPrerequisite();
                     if (StringUtils.equals(steps, caseSteps) && StringUtils.equals(remark, caseRemark) && StringUtils.equals(prerequisite, casePrerequisite)) {
-                        //MSException.throwException(Translator.get("test_case_already_exists"));
-                        return tc;
+                        MSException.throwException(Translator.get("test_case_already_exists_in_module"));
                     }
                 }
             }
         }
-        return null;
     }
 
     /**
@@ -764,7 +780,7 @@ public class TestCaseService {
             addDemandHyperLink(request, "delete");
 
             handleDemandUpdate(request, DemandUpdateRequest.OperateType.DELETE,
-                    projectMapper.selectByPrimaryKey(testCase.getProjectId()));
+                    projectMapper.selectByPrimaryKey(testCaseWithBLOBs.getProjectId()));
         }
 
         DeleteTestCaseRequest request = new DeleteTestCaseRequest();
@@ -813,7 +829,7 @@ public class TestCaseService {
         ServiceUtils.buildCombineTagsToSupportMultiple(request);
         List<TestCaseDTO> list = extTestCaseMapper.list(request);
         if (!isSampleInfo) {
-            buildUserInfo(list);
+            buildUserInfoByCurrentProjectMembers(list);
             if (StringUtils.isNotBlank(request.getProjectId())) {
                 buildProjectInfo(request.getProjectId(), list);
             } else {
@@ -829,7 +845,7 @@ public class TestCaseService {
             return;
         }
         Map<String, List<CustomFieldDao>> fieldMap =
-                customFieldTestCaseService.getMapByResourceIds(data.stream().map(TestCaseDTO::getId).collect(Collectors.toList()));
+                customFieldTestCaseService.getMapByResourceIdsForList(data.stream().map(TestCaseDTO::getId).collect(Collectors.toList()));
         data.forEach(i -> i.setFields(fieldMap.get(i.getId())));
     }
 
@@ -883,6 +899,7 @@ public class TestCaseService {
     }
 
     public List<TestCaseDTO> publicListTestCase(QueryTestCaseRequest request) {
+        ServiceUtils.buildCombineTagsToSupportMultiple(request);
         List<TestCaseDTO> returnList = extTestCaseMapper.publicList(request);
         ServiceUtils.buildProjectInfo(returnList);
         buildUserInfo(returnList);
@@ -1075,11 +1092,17 @@ public class TestCaseService {
             int nextNum = getNextNum(request.getProjectId());
             importCreateNum.set(nextNum);
         }
+        ExcelResponse excelResponse;
         if (multipartFile.getOriginalFilename().endsWith(".xmind")) {
-            return testCaseXmindImport(multipartFile, request, httpRequest);
+            excelResponse = testCaseXmindImport(multipartFile, request, httpRequest);
         } else {
-            return testCaseExcelImport(multipartFile, request, httpRequest);
+            excelResponse = testCaseExcelImport(multipartFile, request, httpRequest);
         }
+        if (BooleanUtils.isFalse(excelResponse.getSuccess())) {
+            // 如果导入失败，创建的模块需要回滚，则抛出异常
+            MSException.throwException("import error", excelResponse);
+        }
+        return excelResponse;
     }
 
     private List<TestCase> getTestCaseForImport(String projectId) {
@@ -1115,8 +1138,13 @@ public class TestCaseService {
         try {
             request.setTestCaseNames(testCaseNames);
             request.setUseCustomId(useCunstomId);
+            request.setCustomFields(getProjectCustomFields(projectId));
             XmindCaseParser xmindParser = new XmindCaseParser(request);
             errList = xmindParser.parse(multipartFile);
+            List<TestCaseWithBLOBs> testCase = xmindParser.getTestCase();
+            testCase.forEach(testCaseWithBLOBs -> {
+                testCaseWithBLOBs.setSteps(testCaseWithBLOBs.getSteps().replace("&amp;", "&"));
+            });
             if (CollectionUtils.isEmpty(xmindParser.getNodePaths())
                     && CollectionUtils.isEmpty(xmindParser.getTestCase())
                     && CollectionUtils.isEmpty(xmindParser.getUpdateTestCase())) {
@@ -1135,9 +1163,9 @@ public class TestCaseService {
                         testCaseNodeService.createNodes(xmindParser.getNodePaths(), projectId);
                     }
                     if (CollectionUtils.isNotEmpty(xmindParser.getTestCase())) {
-                        this.saveImportData(xmindParser.getTestCase(), request, null);
-                        names = xmindParser.getTestCase().stream().map(TestCase::getName).collect(Collectors.toList());
-                        ids = xmindParser.getTestCase().stream().map(TestCase::getId).collect(Collectors.toList());
+                        this.saveImportData(testCase, request, null);
+                        names = testCase.stream().map(TestCase::getName).collect(Collectors.toList());
+                        ids = testCase.stream().map(TestCase::getId).collect(Collectors.toList());
                     }
                     if (CollectionUtils.isNotEmpty(xmindParser.getUpdateTestCase())) {
                         this.updateImportData(xmindParser.getUpdateTestCase(), request, null);
@@ -1153,8 +1181,8 @@ public class TestCaseService {
                     if (CollectionUtils.isNotEmpty(xmindParser.getUpdateTestCase())) {
                         continueCaseList.removeAll(xmindParser.getUpdateTestCase());
                         this.updateImportData(xmindParser.getUpdateTestCase(), request, null);
-                        names = xmindParser.getTestCase().stream().map(TestCase::getName).collect(Collectors.toList());
-                        ids = xmindParser.getTestCase().stream().map(TestCase::getId).collect(Collectors.toList());
+                        names = testCase.stream().map(TestCase::getName).collect(Collectors.toList());
+                        ids = testCase.stream().map(TestCase::getId).collect(Collectors.toList());
                     }
                     List<String> nodePathList = xmindParser.getValidatedNodePath();
                     if (CollectionUtils.isNotEmpty(nodePathList)) {
@@ -1218,17 +1246,9 @@ public class TestCaseService {
         try {
             //根据本地语言环境选择用哪种数据对象进行存放读取的数据
             Class clazz = new TestCaseExcelDataFactory().getExcelDataByLocal();
-            TrackTestCaseTemplateService trackTestCaseTemplateService = CommonBeanFactory.getBean(TrackTestCaseTemplateService.class);
-            TestCaseTemplateDao testCaseTemplate = trackTestCaseTemplateService.getTemplate(projectId);
-            List<CustomFieldDao> customFields = null;
-            if (testCaseTemplate == null) {
-                customFields = new ArrayList<>();
-            } else {
-                customFields = testCaseTemplate.getCustomFields();
-            }
             request.setUserIds(userIds);
             request.setTestCaseNames(testCaseNames);
-            request.setCustomFields(customFields);
+            request.setCustomFields(getProjectCustomFields(projectId));
             request.setSavedCustomIds(savedIds);
             request.setUseCustomId(useCustomId);
             Set<ExcelMergeInfo> mergeInfoSet = new TreeSet<>();
@@ -1253,10 +1273,29 @@ public class TestCaseService {
         return getImportResponse(errList, isUpdated);
     }
 
+    private static List<CustomFieldDao> getProjectCustomFields(String projectId) {
+        TrackTestCaseTemplateService trackTestCaseTemplateService = CommonBeanFactory.getBean(TrackTestCaseTemplateService.class);
+        TestCaseTemplateDao testCaseTemplate = trackTestCaseTemplateService.getTemplate(projectId);
+        List<CustomFieldDao> customFields = null;
+        if (testCaseTemplate == null) {
+            customFields = new ArrayList<>();
+        } else {
+            customFields = testCaseTemplate.getCustomFields();
+        }
+        return customFields;
+    }
+
     public void saveImportData(List<TestCaseWithBLOBs> testCases, TestCaseImportRequest request,
                                Map<String, List<CustomFieldResourceDTO>> testCaseCustomFieldMap) {
+        saveImportData(testCases, request, testCaseCustomFieldMap, null);
+    }
+
+    public void saveImportData(List<TestCaseWithBLOBs> testCases, TestCaseImportRequest request,
+                               Map<String, List<CustomFieldResourceDTO>> testCaseCustomFieldMap, Map<String, String> nodePathMap) {
         String projectId = request.getProjectId();
-        Map<String, String> nodePathMap = testCaseNodeService.createNodeByTestCases(testCases, projectId);
+        if (nodePathMap == null) {
+            nodePathMap = testCaseNodeService.createNodeByTestCases(testCases, projectId);
+        }
         SqlSession sqlSession = sqlSessionFactory.openSession(ExecutorType.BATCH);
         Project project = baseProjectService.getProjectById(projectId);
         TestCaseMapper mapper = sqlSession.getMapper(TestCaseMapper.class);
@@ -1788,6 +1827,7 @@ public class TestCaseService {
         if (filters != null && !filters.containsKey("status")) {
             filters.put("status", new ArrayList<>(0));
         }
+        ServiceUtils.buildCombineTagsToSupportMultiple(param.getCondition());
         ServiceUtils.getSelectAllIds(param, param.getCondition(),
                 (query) -> extTestCaseMapper.selectIds(query));
         return param;
@@ -1833,7 +1873,7 @@ public class TestCaseService {
             buildExportCustomField(customSelectValueMap, customNameMap, t, data, textFields);
             buildExportOtherField(data, t, otherHeaders);
 
-            this.validateExportTextField(t);
+            this.validateExportTextField(data);
             if (CollectionUtils.isNotEmpty(stepDescList)) {
                 // 如果有多条步骤则添加多条数据，之后合并单元格
                 buildExportMergeData(rowMergeInfo, list, stepDescList, stepResultList, data);
@@ -1844,19 +1884,20 @@ public class TestCaseService {
         return list;
     }
 
-    private void validateExportTextField(TestCaseDTO data) {
-        List<String> textValues= Arrays.asList(data.getPrerequisite(), data.getStepDescription(), data.getExpectedResult(), data.getRemark());
-        for (String textValue : textValues) {
-            validateExportText(data.getName(), textValue);
-        }
+    private void validateExportTextField(TestCaseExcelData data) {
+        data.setPrerequisite(validateExportText(data.getPrerequisite()));
+        data.setRemark(validateExportText(data.getRemark()));
+        data.setStepDesc(validateExportText(data.getStepDesc()));
+        data.setStepResult(validateExportText(data.getStepResult()));
     }
 
-    private void validateExportText(String name, String textValue) {
+    private String validateExportText(String textValue) {
         // poi 导出的单个单元格最大字符数量为 32767 ，这里添加校验提示
         int maxLength = 32767;
         if (StringUtils.isNotBlank(textValue) && textValue.length() > maxLength) {
-            MSException.throwException(String.format(Translator.get("case_export_text_validate_tip"), name, maxLength));
+            return String.format(Translator.get("case_export_text_validate_tip"), maxLength);
         }
+        return textValue;
     }
 
     private void buildExportOtherField(TestCaseExcelData data, TestCaseDTO t, List<TestCaseExportRequest.TestCaseExportHeader> otherHeaders) {
@@ -1916,20 +1957,23 @@ public class TestCaseService {
 
     private void buildExportCustomField(Map<String, Map<String, String>> customSelectValueMap,
                                         Map<String, String> customNameMap, TestCaseDTO t, TestCaseExcelData data, Set<String> textFields) {
-        try {
-            List<CustomFieldResourceDTO> fields = customFieldTestCaseService.getByResourceId(t.getId());
-            Map<String, Object> map = new HashMap<>();
-            for (int index = 0; index < fields.size(); index++) {
+
+        List<CustomFieldResourceDTO> fields = customFieldTestCaseService.getByResourceId(t.getId());
+        Map<String, Object> map = new HashMap<>();
+        for (int index = 0; index < fields.size(); index++) {
+            try {
                 CustomFieldResourceDTO field = fields.get(index);
                 //进行key value对换
                 String id = field.getFieldId();
                 if (textFields.contains(id)) {
-                    map.put(customNameMap.get(id), field.getTextValue());
-                    this.validateExportText(data.getName(), field.getTextValue());
+                    map.put(customNameMap.get(id), this.validateExportText(field.getTextValue()));
                     continue;
                 }
                 if (StringUtils.isNotBlank(field.getValue())) {
                     Object value = JSON.parseObject(field.getValue());
+                    if (value == null) {
+                        continue;
+                    }
                     Map<String, String> optionMap = customSelectValueMap.get(id);
                     if (value instanceof List) {
                         List<String> results = new ArrayList<>();
@@ -1949,11 +1993,11 @@ public class TestCaseService {
                         map.put(customNameMap.get(id), value.toString());
                     }
                 }
+            } catch (Exception e) {
+                LogUtil.error(e);
             }
-            data.setCustomData(map);
-        } catch (Exception e) {
-            LogUtil.error(e);
         }
+        data.setCustomData(map);
     }
 
     private void buildExportStep(TestCaseDTO t, List<String> stepDescList, List<String> stepResultList, TestCaseExcelData data) {
@@ -2163,11 +2207,13 @@ public class TestCaseService {
             for (int i = 0; i < list.size(); i++) {
                 TestCaseWithBLOBs batchCopy = new TestCaseWithBLOBs();
                 BeanUtils.copyBean(batchCopy, list.get(i));
-                checkTestCaseExist(batchCopy);
+                batchCopy.setNodeId(request.getNodeId());
+                batchCopy.setName("copy_" + batchCopy.getName());
+                batchCopy.setProjectId(SessionUtils.getCurrentProjectId());
+                checkTestCaseExist(batchCopy, false);
                 String oldTestCaseId = batchCopy.getId();
                 String id = UUID.randomUUID().toString();
                 batchCopy.setId(id);
-                batchCopy.setName("copy_" + batchCopy.getName());
                 if (batchCopy.getName().length() > 255) {
                     batchCopy.setName(batchCopy.getName().substring(0, 250) + batchCopy.getName().substring(batchCopy.getName().length() - 5));
                 }
@@ -2178,14 +2224,12 @@ public class TestCaseService {
                 batchCopy.setReviewStatus(TestCaseReviewStatus.Prepare.name());
                 batchCopy.setStatus(TestCaseReviewStatus.Prepare.name());
                 batchCopy.setNodePath(StringUtils.EMPTY);
-                batchCopy.setNodeId(request.getNodeId());
                 batchCopy.setCasePublic(false);
                 batchCopy.setRefId(id);
                 if (!(batchCopy.getProjectId()).equals(SessionUtils.getCurrentProjectId())) {
                     String versionId = baseProjectVersionMapper.getDefaultVersion(SessionUtils.getCurrentProjectId());
                     batchCopy.setVersionId(versionId);
                 }
-                batchCopy.setProjectId(SessionUtils.getCurrentProjectId());
                 batchCopy.setOrder(nextOrder += ServiceUtils.ORDER_STEP);
                 batchCopy.setCustomNum(String.valueOf(nextNum));
                 batchCopy.setNum(nextNum++);
@@ -2294,15 +2338,11 @@ public class TestCaseService {
      * @return
      */
     public boolean exist(TestCaseWithBLOBs testCaseWithBLOBs) {
-
         try {
-            TestCaseWithBLOBs caseWithBLOBs = checkTestCaseExist(testCaseWithBLOBs);
-            if (caseWithBLOBs != null)
-                return true;
+            checkTestCaseExist(testCaseWithBLOBs, testCaseWithBLOBs.getId() == null ? true : false);
         } catch (MSException e) {
             return true;
         }
-
         return false;
     }
 
@@ -2439,7 +2479,7 @@ public class TestCaseService {
                     BeanUtils.copyBean(editRequest, item);
                     editRequest.setCustomFields(null);
                     editRequest.setTags(null);
-                    editTestCase(editRequest);
+                    editTestCase(editRequest, false);
                     changeOrder(item, request.getProjectId());
                     lastAddId = null;
                 } else {
@@ -2780,6 +2820,7 @@ public class TestCaseService {
 
         Set<String> serviceIdSet = DiscoveryUtil.getServiceIdSet();
 
+        List<String> scenarioProjectIds = new ArrayList<>();
         List<String> projectIds = new ArrayList<>();
         List<String> versionIds = new ArrayList<>();
         List<ApiTestCase> apiCases = new ArrayList<>();
@@ -2793,7 +2834,8 @@ public class TestCaseService {
             apiScenarios = relevanceApiCaseService.getScenarioCaseByIds(
                     getTestIds(testCaseTests, TestCaseTestType.automation.name()));
             projectIds.addAll(apiCases.stream().map(s -> s.getProjectId()).collect(Collectors.toList()));
-            projectIds.addAll(apiScenarios.stream().map(s -> s.getProjectId()).collect(Collectors.toList()));
+            scenarioProjectIds = apiScenarios.stream().map(s -> s.getProjectId()).distinct().collect(Collectors.toList());
+            projectIds.addAll(scenarioProjectIds);
             versionIds.addAll(apiCases.stream().map(s -> s.getVersionId()).collect(Collectors.toList()));
             versionIds.addAll(apiScenarios.stream().map(s -> s.getVersionId()).collect(Collectors.toList()));
         }
@@ -2834,13 +2876,22 @@ public class TestCaseService {
 
         Map<String, String> versionNameMap = projectVersions.stream().collect(Collectors.toMap(ProjectVersion::getId, ProjectVersion::getName));
 
+        // 获取项目下自定义场景ID配置
+        List<ProjectApplication> projectApplicationTypeVals = new ArrayList<>();
+        if (CollectionUtils.isNotEmpty(scenarioProjectIds)) {
+            projectApplicationTypeVals = baseProjectApplicationService.getProjectApplicationTypeVals(scenarioProjectIds, ProjectApplicationType.SCENARIO_CUSTOM_NUM.name());
+        }
+        Map<String, String> customTypeMap = projectApplicationTypeVals.stream().collect(Collectors.toMap(ProjectApplication::getProjectId, ProjectApplication::getTypeValue));
+
         List<TestCaseTestDao> testCaseTestList = new ArrayList<>();
         apiCases.forEach(item -> {
             getTestCaseTestDaoList(TestCaseTestType.testcase.name(), item.getNum(), item.getName(), item.getId(), projectNameMap.get(item.getProjectId()), versionNameMap.get(item.getVersionId()),
                     testCaseTestList, testCaseTestsMap);
         });
         apiScenarios.forEach(item -> {
-            getTestCaseTestDaoList(TestCaseTestType.automation.name(), item.getNum(), item.getName(), item.getId(), projectNameMap.get(item.getProjectId()), versionNameMap.get(item.getVersionId()),
+            // 所属项目是否开启自定义场景ID
+            String customType = customTypeMap.get(item.getProjectId());
+            getTestCaseTestDaoList(TestCaseTestType.automation.name(), StringUtils.equals(customType, "true") ? item.getCustomNum() : item.getNum(), item.getName(), item.getId(), projectNameMap.get(item.getProjectId()), versionNameMap.get(item.getVersionId()),
                     testCaseTestList, testCaseTestsMap);
         });
         apiLoadTests.forEach(item -> {
@@ -2955,12 +3006,49 @@ public class TestCaseService {
 
     public void updateLastExecuteStatus(List<String> ids, String status) {
         if (CollectionUtils.isNotEmpty(ids) && StringUtils.isNotBlank(status)) {
+            addBatchLastExecuteResultChangeLog(ids, status);
             TestCaseExample example = new TestCaseExample();
             example.createCriteria().andIdIn(ids);
             TestCaseWithBLOBs testCase = new TestCaseWithBLOBs();
             testCase.setLastExecuteResult(status);
             testCaseMapper.updateByExampleSelective(testCase, example);
         }
+    }
+
+    /**
+     * 测试计划功能用例页面和脑图页面批量修改执行结果时记录下操作日志，用例的变更日志需要查看
+     * @param ids
+     * @param status
+     */
+    public void addBatchLastExecuteResultChangeLog(List<String> ids, String status) {
+        TestCaseExample testCaseExample = new TestCaseExample();
+        testCaseExample.createCriteria().andIdIn(ids);
+        List<TestCase> testCases = extTestCaseMapper.getTestCaseForLastResultLog(ids);
+        testCases.forEach(testCase -> {
+            try {
+                OperatingLogWithBLOBs log = new OperatingLogWithBLOBs();
+                log.setOperTitle(testCase.getName());
+                log.setOperContent(testCase.getName());
+                log.setId(UUID.randomUUID().toString());
+                log.setOperType(OperLogConstants.UPDATE.name());
+                log.setOperModule(OperLogModule.TRACK_TEST_PLAN);
+                log.setProjectId(SessionUtils.getCurrentProjectId());
+                List<DetailColumn> columns = new LinkedList<>();
+                DetailColumn executeStatusColumn = new DetailColumn("状态", "lastExecuteResult",
+                        StatusReference.statusMap.get(testCase.getLastExecuteResult()), StatusReference.statusMap.get(status));
+                columns.add(executeStatusColumn);
+                OperatingLogDetails details = new OperatingLogDetails(JSON.toJSONString(testCase.getId()), testCase.getProjectId(), testCase.getName(),
+                        SessionUtils.getUserId(), columns);
+                log.setOperContent(JSON.toJSONString(details));
+                log.setOperTime(System.currentTimeMillis());
+                log.setCreateUser(SessionUtils.getUserId());
+                log.setOperUser(SessionUtils.getUserId());
+                log.setSourceId(testCase.getId());
+                operatingLogService.create(log, log.getSourceId());
+            } catch (Exception e) {
+                LogUtil.error(e);
+            }
+        });
     }
 
     public void updateLastExecuteStatus(String id, String status) {
@@ -3044,6 +3132,17 @@ public class TestCaseService {
         Project project = baseProjectService.getProjectById(projectId);
         list.forEach(item -> {
             item.setProjectName(project.getName());
+        });
+    }
+
+    public void buildUserInfoByCurrentProjectMembers(List<TestCaseDTO> testCases) {
+        Map<String, String> userMap = baseUserService.getProjectMemberOption(SessionUtils.getCurrentProjectId())
+                .stream()
+                .collect(Collectors.toMap(User::getId, User::getName));
+        testCases.forEach(caseResult -> {
+            caseResult.setCreateName(userMap.get(caseResult.getCreateUser()));
+            caseResult.setDeleteUserId(userMap.get(caseResult.getDeleteUserId()));
+            caseResult.setMaintainerName(userMap.get(caseResult.getMaintainer()));
         });
     }
 
@@ -3135,12 +3234,25 @@ public class TestCaseService {
                 mapper.insert(testCase);
 
                 dealWithCopyOtherInfo(testCase, oldTestCaseId);
+                copyCustomFields(oldTestCaseId, id);
                 if (i % 50 == 0)
                     sqlSession.flushStatements();
             }
             sqlSession.flushStatements();
         } finally {
             SqlSessionUtils.closeSqlSession(sqlSession, sqlSessionFactory);
+        }
+    }
+
+    private void copyCustomFields(String oldTestCaseId, String id) {
+        CustomFieldTestCaseExample example = new CustomFieldTestCaseExample();
+        example.createCriteria().andResourceIdEqualTo(oldTestCaseId);
+        List<CustomFieldTestCase> customFieldTestCases = customFieldTestCaseMapper.selectByExampleWithBLOBs(example);
+        if (CollectionUtils.isNotEmpty(customFieldTestCases)) {
+            customFieldTestCases.forEach(customFieldTestCase -> {
+                customFieldTestCase.setResourceId(id);
+                customFieldTestCaseMapper.insertSelective(customFieldTestCase);
+            });
         }
     }
 
@@ -3258,7 +3370,7 @@ public class TestCaseService {
         }
 
         for (TestCase tc : testCaseList) {
-
+            tc.setDemandId(demandId);
             if (project != null && StringUtils.equals(project.getPlatform(), IssuesManagePlatform.AzureDevops.name())) {
                 EditTestCaseRequest editTestCaseRequest = new EditTestCaseRequest();
                 BeanUtils.copyBean(editTestCaseRequest, tc);
@@ -3271,8 +3383,6 @@ public class TestCaseService {
                     LogUtil.error(e);
                 }
             }
-
-            tc.setDemandId(demandId);
             tc.setDemandName(demandName);
             mapper.updateByPrimaryKey(tc);
         }

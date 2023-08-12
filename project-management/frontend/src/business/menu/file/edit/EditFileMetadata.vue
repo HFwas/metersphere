@@ -8,7 +8,10 @@
     ref="editFile"
   >
     <span slot="title" class="dialog-footer">
-      <span>{{ data.name }}</span>
+      <el-tooltip :content="data.name" v-if="data.name && data.name.length > 80">
+        <span>{{ data.name | split }}</span>
+      </el-tooltip>
+      <span v-else>{{ data.name | split }}</span>
       <i
         class="el-icon-download ms-header-menu"
         @click="download"
@@ -52,12 +55,14 @@
               <el-col :span="18" style="padding-top: 80px">
                 <el-card
                   :body-style="{ padding: '0px' }"
-                  v-if="isImage(data.type) && !isRepositoryFile()"
+                  v-if="isImage(data) && !isRepositoryFile()"
                 >
-                  <img
-                    :src="'/project/file/metadata/info/' + data.id"
-                    class="ms-edit-image"
-                  />
+                  <div v-loading="fileBase64Str==='' || fileBase64Str === 'loading'">
+                    <img
+                      :src="fileBase64Str"
+                      class="ms-edit-image"
+                    />
+                  </div>
                 </el-card>
                 <el-card :body-style="{ padding: '0px' }" v-else>
                   <div class="ms-edit-image">
@@ -152,7 +157,6 @@
                       :defaultKey="data.moduleId"
                       @getValue="setModule"
                       :obj="moduleObj"
-                      clearable
                       checkStrictly
                     />
                   </el-form-item>
@@ -230,17 +234,12 @@
 </template>
 
 <script>
-import { operationConfirm } from "metersphere-frontend/src/utils";
-import { getCurrentProjectID } from "metersphere-frontend/src/utils/token";
-import {
-  getFileMetaPages,
-  modifyFileMeta,
-  pullGitFile,
-  uploadFileMeta,
-} from "../../../../api/file";
+import {operationConfirm} from "metersphere-frontend/src/utils";
+import {getCurrentProjectID} from "metersphere-frontend/src/utils/token";
+import {getFileBytes, getFileMetaPages, modifyFileMeta, pullGitFile, uploadFileMeta,} from "../../../../api/file";
 import FileVersionList from "@/business/menu/file/list/FileVersionList";
 import FileCaseRelevanceList from "@/business/menu/file/list/FileCaseRelevanceList";
-import { hasPermission } from "metersphere-frontend/src/utils/permission";
+import {hasPermission} from "metersphere-frontend/src/utils/permission";
 
 export default {
   name: "MsEditFileMetadata",
@@ -255,6 +254,7 @@ export default {
     return {
       data: {},
       visible: false,
+      fileBase64Str: '',
       isFirst: false,
       isLast: false,
       isPullBtnLoading: false,
@@ -333,6 +333,15 @@ export default {
       },
     },
   },
+  filters: {
+    split: (value) => {
+      if (value && value.length > 80) {
+        return value.substring(0, 80) + "...";
+      } else {
+        return value;
+      }
+    }
+  },
   methods: {
     getCommitId() {
       if (this.data && this.data.attachInfo) {
@@ -395,6 +404,7 @@ export default {
       this.showPanel = "baseInfo";
       this.pageSize = size;
       this.currentPage = page;
+      this.fileBase64Str = '';
       this.total = t;
       this.data = data;
       this.results = this.metadataArray;
@@ -442,8 +452,17 @@ export default {
         return type || "";
       }
     },
-    isImage(type) {
-      return type && this.images.indexOf(type.toLowerCase()) !== -1;
+    isImage(data) {
+      let type = data.type;
+      let isImage = type && this.images.indexOf(type.toLowerCase()) !== -1;
+      if (isImage && this.fileBase64Str === '') {
+        this.fileBase64Str = 'loading';
+        getFileBytes(data.id).then(res => {
+          let fileRsp = res.data;
+          this.fileBase64Str = "data:image/png;base64," + fileRsp.bytes;
+        })
+      }
+      return isImage;
     },
     download() {
       this.$emit("download", this.data);
@@ -502,6 +521,8 @@ export default {
       this.isFirst = index <= 0;
       if (!this.isFirst) {
         this.data = this.results[index - 1];
+        this.fileBase64Str = '';
+        this.isImage(this.data);
       } else {
         if (this.currentPage === 1) {
           this.$warning(this.$t("project.file_first"));
@@ -509,6 +530,8 @@ export default {
           // 向上翻页
           this.currentPage--;
           this.getProjectFiles(true);
+          this.fileBase64Str = '';
+          this.isImage(this.data);
         }
       }
     },
@@ -534,6 +557,8 @@ export default {
       this.isLast = this.results.length - 1 === index;
       if (!this.isLast) {
         this.data = this.results[index + 1];
+        this.fileBase64Str = '';
+        this.isImage(this.data);
       } else {
         let totalPages = Math.ceil(this.total / this.pageSize);
         if (totalPages === this.currentPage) {
@@ -542,6 +567,8 @@ export default {
           // 向后翻页
           this.currentPage++;
           this.getProjectFiles(false);
+          this.fileBase64Str = '';
+          this.isImage(this.data);
         }
       }
     },

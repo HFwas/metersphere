@@ -106,27 +106,30 @@ public class JMeterParser extends ApiImportAbstractParser<ScenarioImport> {
 
             MsScenario scenario = new MsScenario();
             scenario.setReferenced("IMPORT");
-
-            TestPlan plan = (TestPlan) testPlan.getArray()[0];
-            if (plan.getArguments() != null) {
-                List<ScenarioVariable> variables = new LinkedList<>();
-                plan.getArguments().forEach(item -> {
-                    ScenarioVariable scenarioVariable = new ScenarioVariable();
-                    scenarioVariable.setId(UUID.randomUUID().toString());
-                    scenarioVariable.setName(item.getName());
-                    if (ObjectUtils.isNotEmpty(item.getObjectValue())) {
-                        Argument arg = (Argument) item.getObjectValue();
-                        scenarioVariable.setValue(arg.getValue());
-                    }
-                    scenarioVariable.setType(VariableTypeConstants.CONSTANT.name());
-                    variables.add(scenarioVariable);
-                });
-                scenario.setVariables(variables);
+            if (testPlan.getArray()[0] instanceof TestPlan) {
+                TestPlan plan = (TestPlan) testPlan.getArray()[0];
+                if (plan.getArguments() != null) {
+                    List<ScenarioVariable> variables = new LinkedList<>();
+                    plan.getArguments().forEach(item -> {
+                        ScenarioVariable scenarioVariable = new ScenarioVariable();
+                        scenarioVariable.setId(UUID.randomUUID().toString());
+                        scenarioVariable.setName(item.getName());
+                        if (ObjectUtils.isNotEmpty(item.getObjectValue())) {
+                            Argument arg = (Argument) item.getObjectValue();
+                            scenarioVariable.setValue(arg.getValue());
+                        }
+                        scenarioVariable.setType(VariableTypeConstants.CONSTANT.name());
+                        variables.add(scenarioVariable);
+                    });
+                    scenario.setVariables(variables);
+                }
+                if (CollectionUtils.isEmpty(scenario.getHashTree())) {
+                    scenario.setHashTree(new LinkedList<>());
+                }
+                formatHashTree(testPlan.getTree(plan), scenario);
+            } else {
+                formatHashTree(testPlan, scenario);
             }
-            if (CollectionUtils.isEmpty(scenario.getHashTree())) {
-                scenario.setHashTree(new LinkedList<>());
-            }
-            formatHashTree(testPlan.getTree(plan), scenario);
             this.projectId = request.getProjectId();
             ScenarioImport scenarioImport = new ScenarioImport();
             scenarioImport.setData(parseObj(scenario, request));
@@ -335,9 +338,11 @@ public class JMeterParser extends ApiImportAbstractParser<ScenarioImport> {
                 samplerProxy.setUrl(this.getUrl(source));
                 samplerProxy.setPath(null);
                 samplerProxy.setCustomizeReq(true);
+                samplerProxy.setIsRefEnvironment(false);
             }
             samplerProxy.setId(UUID.randomUUID().toString());
             samplerProxy.setType(ElementConstants.HTTP_SAMPLER);
+            samplerProxy.setClazzName(MsHTTPSamplerProxy.class.getCanonicalName());
             body.getKvs().add(new KeyValue());
             body.getBinary().add(new KeyValue());
 
@@ -375,6 +380,7 @@ public class JMeterParser extends ApiImportAbstractParser<ScenarioImport> {
         msTCPSampler.setUsername(tcpSampler.getProperty(ConfigTestElement.USERNAME).getStringValue());
         msTCPSampler.setPassword(tcpSampler.getProperty(ConfigTestElement.PASSWORD).getStringValue());
         msTCPSampler.setClassname(tcpSampler.getClassname());
+        msTCPSampler.setClazzName(MsTCPSampler.class.getCanonicalName());
     }
 
     private void convertDubboSample(MsDubboSampler elementNode, DubboSample sampler) {
@@ -431,6 +437,7 @@ public class JMeterParser extends ApiImportAbstractParser<ScenarioImport> {
             });
         }
         elementNode.setAttachmentArgs(attachmentArgs);
+        elementNode.setClazzName(MsDubboSampler.class.getCanonicalName());
     }
 
     /**
@@ -558,6 +565,10 @@ public class JMeterParser extends ApiImportAbstractParser<ScenarioImport> {
             msJDBCSampler.setDataSourceId(dataPools.getDataSources().get(jdbcSampler.getPropertyAsString("dataSource")).getId());
         }
         msJDBCSampler.setVariables(new LinkedList<>());
+        msJDBCSampler.setCustomizeReq(true);
+        msJDBCSampler.setIsRefEnvironment(false);
+        msJDBCSampler.setReferenced(ElementConstants.STEP_CREATED);
+        msJDBCSampler.setClazzName(MsJDBCSampler.class.getCanonicalName());
     }
 
     private void convertMsExtract(MsExtract extract, Object key) {
@@ -630,6 +641,19 @@ public class JMeterParser extends ApiImportAbstractParser<ScenarioImport> {
                     assertionRegex.setDescription(assertion.getName());
                     assertionRegex.setAssumeSuccess(assertion.getAssumeSuccess());
                     assertionRegex.setExpression(item.getStringValue());
+                    if (assertion.isNotType()) {
+                        assertionRegex.setExpression("(?s)^((?!" + item.getStringValue() + ").)*$");
+                        assertionRegex.setDescription(" not contains: " + item.getStringValue());
+                    }
+                    if (assertion.isEqualsType()) {
+                        assertionRegex.setExpression("^" + item.getStringValue() + "$");
+                        assertionRegex.setDescription(" equals: " + item.getStringValue());
+                    }
+                    if (assertion.isContainsType()) {
+                        assertionRegex.setExpression(".*" + item.getStringValue() + ".*");
+                        assertionRegex.setDescription(" contains: " + item.getStringValue());
+                    }
+
                     if (assertion.isTestFieldResponseData()) {
                         assertionRegex.setSubject("Response Data");
                     }
@@ -757,6 +781,7 @@ public class JMeterParser extends ApiImportAbstractParser<ScenarioImport> {
                 BeanUtils.copyBean(elementNode, jsr223Sampler);
                 ((MsJSR223Processor) elementNode).setScript(jsr223Sampler.getPropertyAsString(ElementConstants.SCRIPT));
                 ((MsJSR223Processor) elementNode).setScriptLanguage(jsr223Sampler.getPropertyAsString("scriptLanguage"));
+                elementNode.setClazzName(MsJSR223Processor.class.getCanonicalName());
             }
             // BeanShell自定义脚本
             else if (key instanceof BeanShellSampler) {
@@ -766,6 +791,7 @@ public class JMeterParser extends ApiImportAbstractParser<ScenarioImport> {
                 ((MsJSR223Processor) elementNode).setJsrEnable(false);
                 ((MsJSR223Processor) elementNode).setScript(jsr223Sampler.getPropertyAsString("BeanShellSampler.query"));
                 ((MsJSR223Processor) elementNode).setScriptLanguage(jsr223Sampler.getPropertyAsString("scriptLanguage"));
+                elementNode.setClazzName(MsJSR223Processor.class.getCanonicalName());
             }
             // 后置脚本
             else if (key instanceof JSR223PostProcessor) {
@@ -774,6 +800,7 @@ public class JMeterParser extends ApiImportAbstractParser<ScenarioImport> {
                 BeanUtils.copyBean(elementNode, jsr223Sampler);
                 ((MsJSR223PostProcessor) elementNode).setScript(jsr223Sampler.getPropertyAsString(ElementConstants.SCRIPT));
                 ((MsJSR223PostProcessor) elementNode).setScriptLanguage(jsr223Sampler.getPropertyAsString("scriptLanguage"));
+                elementNode.setClazzName(MsJSR223PostProcessor.class.getCanonicalName());
             } else if (key instanceof BeanShellPostProcessor) {
                 elementNode = getMsTestElement((BeanShellPostProcessor) key);
             } else if (key instanceof BeanShellPreProcessor) {
@@ -786,22 +813,26 @@ public class JMeterParser extends ApiImportAbstractParser<ScenarioImport> {
                 BeanUtils.copyBean(elementNode, jsr223Sampler);
                 ((MsJSR223PreProcessor) elementNode).setScript(jsr223Sampler.getPropertyAsString(ElementConstants.SCRIPT));
                 ((MsJSR223PreProcessor) elementNode).setScriptLanguage(jsr223Sampler.getPropertyAsString("scriptLanguage"));
+                elementNode.setClazzName(MsJSR223PreProcessor.class.getCanonicalName());
             }
             // 断言规则
             else if (key instanceof ResponseAssertion || key instanceof JSONPathAssertion || key instanceof XPath2Assertion || key instanceof JSR223Assertion || key instanceof DurationAssertion) {
                 elementNode = new MsAssertions();
                 convertMsAssertions((MsAssertions) elementNode, key);
+                elementNode.setClazzName(MsAssertions.class.getCanonicalName());
             }
             // 提取参数
             else if (key instanceof RegexExtractor || key instanceof XPath2Extractor || key instanceof JSONPostProcessor) {
                 elementNode = new MsExtract();
                 convertMsExtract((MsExtract) elementNode, key);
+                elementNode.setClazzName(MsExtract.class.getCanonicalName());
             }
             // 定时器
             else if (key instanceof ConstantTimer) {
                 elementNode = new MsConstantTimer();
                 BeanUtils.copyBean(elementNode, key);
                 elementNode.setType(ElementConstants.CONSTANT_TIMER);
+                elementNode.setClazzName(MsConstantTimer.class.getCanonicalName());
             }
             // 次数循环控制器
             else if (key instanceof LoopController) {
@@ -814,6 +845,7 @@ public class JMeterParser extends ApiImportAbstractParser<ScenarioImport> {
                 countController.setLoops(String.valueOf(loopController.getLoops()));
                 countController.setProceed(true);
                 ((MsLoopController) elementNode).setCountController(countController);
+                elementNode.setClazzName(MsLoopController.class.getCanonicalName());
             }
             // While循环控制器
             else if (key instanceof WhileController) {
@@ -825,6 +857,7 @@ public class JMeterParser extends ApiImportAbstractParser<ScenarioImport> {
                 MsWhileController countController = new MsWhileController();
                 countController.setValue(whileController.getCondition());
                 ((MsLoopController) elementNode).setWhileController(countController);
+                elementNode.setClazzName(MsLoopController.class.getCanonicalName());
             }
             // Foreach 循环控制器
             else if (key instanceof ForeachController) {
@@ -837,12 +870,14 @@ public class JMeterParser extends ApiImportAbstractParser<ScenarioImport> {
                 countController.setInputVal(foreachController.getInputValString());
                 countController.setReturnVal(foreachController.getReturnValString());
                 ((MsLoopController) elementNode).setForEachController(countController);
+                elementNode.setClazzName(MsLoopController.class.getCanonicalName());
             } else if (key instanceof TransactionController) {
                 TransactionController transactionController = (TransactionController) key;
                 elementNode = new MsTransactionController();
                 elementNode.setName(transactionController.getName());
                 ((MsTransactionController) elementNode).setGenerateParentSample(transactionController.isGenerateParentSample());
                 ((MsTransactionController) elementNode).setIncludeTimers(transactionController.isIncludeTimers());
+                elementNode.setClazzName(MsTransactionController.class.getCanonicalName());
             } else if (StringUtils.equals(key.getClass().getName(), "net.xmeter.samplers.ConnectSampler")) {
                 elementNode = getMqttElement(key, "io.metersphere.plugin.mqtt.sampler.MqttConnectSampler");
             } else if (StringUtils.equals(key.getClass().getName(), "net.xmeter.samplers.DisConnectSampler")) {
@@ -864,6 +899,7 @@ public class JMeterParser extends ApiImportAbstractParser<ScenarioImport> {
                 elementNode.setName(testElement.getName());
                 ((MsJmeterElement) elementNode).setJmeterElement(objToXml(key));
                 ((MsJmeterElement) elementNode).setElementType(key.getClass().getSimpleName());
+                elementNode.setClazzName(MsJmeterElement.class.getCanonicalName());
             }
             elementNode.setEnable(((TestElement) key).isEnabled());
             elementNode.setResourceId(UUID.randomUUID().toString());

@@ -166,7 +166,7 @@
                 "
                 style="color: #5daf34"
               >
-                {{ request.responseResult.responseTime }}
+                {{ request.responseResult.responseTime }} ms
               </div>
               <div
                 v-else-if="
@@ -175,10 +175,13 @@
                 "
                 style="color: #f6972a"
               >
-                {{ request.responseResult.responseTime }}
+                {{ request.responseResult.responseTime }} ms
               </div>
-              <div style="color: #fe6f71" v-else>
-                {{ request.responseResult.responseTime }}
+              <div style="color: #fe6f71" v-else-if="totalStatus === 'ERROR'">
+                {{ request.responseResult.responseTime }} ms
+              </div>
+              <div v-else>
+                {{ request.responseResult.responseTime }} ms
               </div>
             </div>
             <div v-else>
@@ -191,9 +194,10 @@
             </div>
           </el-col>
           <el-col :span="2">
-            <div v-if="totalStatus">
-              <el-tag size="mini" v-if="totalStatus === 'unexecute'"
-                >{{ $t("api_test.home_page.detail_card.unexecute") }}
+            <div v-if="totalStatus" style="float:right;">
+              <el-tag size="mini" type="info"
+                      v-if="totalStatus === 'unexecute' || totalStatus === 'Pending'|| totalStatus === 'PENDING'"
+              > Pending
               </el-tag>
               <el-tag
                 v-else-if="
@@ -203,7 +207,7 @@
                 class="ms-test-error_code"
                 size="mini"
               >
-                {{ $t("error_report_library.option.name") }}
+                FakeError
               </el-tag>
               <el-tag
                 size="mini"
@@ -214,23 +218,23 @@
                   totalStatus === 'success'
                 "
               >
-                {{ $t("api_report.success") }}
+                Success
               </el-tag>
               <el-tag size="mini" type="danger" v-else>
-                {{ $t("api_report.fail") }}</el-tag
+                Error </el-tag
               >
             </div>
-            <div v-else>
+            <div v-else style="float:right;">
               <el-tag
                 v-if="request.testing"
                 class="ms-test-running"
                 size="mini"
               >
-                <i class="el-icon-loading" style="font-size: 16px" />
-                {{ $t("commons.testing") }}
+                <i class="el-icon-loading" style="font-size: 16px"/>
+                Pending
               </el-tag>
-              <el-tag size="mini" v-else-if="request.unexecute"
-                >{{ $t("api_test.home_page.detail_card.unexecute") }}
+              <el-tag size="mini" v-else-if="request.unexecute">
+                Pending
               </el-tag>
               <el-tag
                 size="mini"
@@ -238,8 +242,8 @@
                   !request.success &&
                   request.status &&
                   request.status === 'unexecute'
-                "
-                >{{ $t("api_test.home_page.detail_card.unexecute") }}
+                ">
+                Pending
               </el-tag>
               <el-tag
                 v-else-if="
@@ -248,13 +252,13 @@
                 class="ms-test-error_code"
                 size="mini"
               >
-                {{ $t("error_report_library.option.name") }}
+                FakeError
               </el-tag>
               <el-tag size="mini" type="success" v-else-if="request.success">
-                {{ $t("api_report.success") }}</el-tag
+                Success</el-tag
               >
               <el-tag size="mini" type="danger" v-else>
-                {{ $t("api_report.fail") }}</el-tag
+                Error</el-tag
               >
             </div>
           </el-col>
@@ -294,6 +298,7 @@ export default {
     console: String,
     totalStatus: String,
     redirect: Boolean,
+    isTemplate: Boolean,
     errorCode: {
       type: String,
       default: "",
@@ -388,12 +393,14 @@ export default {
         this.request.responseResult.body === null ||
         this.request.responseResult.body === undefined
       ) {
-        if (this.isShare) {
+        if (this.isTemplate) {
+          this.requestInfo.loading = false;
+        } else if (this.isShare) {
           this.$get(
             "/share/" +
-              this.shareId +
-              "/scenario/report/selectReportContent/" +
-              this.stepId
+            this.shareId +
+            "/scenario/report/selectReportContent/" +
+            this.stepId
           ).then((response) => {
             this.requestInfo = response.data;
             this.$nextTick(() => {
@@ -447,6 +454,12 @@ export default {
       }
       return name;
     },
+    showStatus(status) {
+      if (!status) {
+        status = 'PENDING';
+      }
+      return status.toLowerCase()[0].toUpperCase() + status.toLowerCase().substr(1);
+    }
   },
 };
 </script>

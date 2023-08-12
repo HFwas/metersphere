@@ -1,11 +1,12 @@
 <template>
   <test-case-relevance-base
-    :is-across-space="isAcrossSpace"
-    @setProject="setProject"
-    :dialog-title="$t('api_test.definition.api_import')"
-    ref="baseRelevance">
+      :is-across-space="isAcrossSpace"
+      @setProject="setProject"
+      :dialog-title="$t('api_test.definition.api_import')"
+      ref="baseRelevance">
     <template v-slot:aside>
       <ms-api-module
+        class="node-tree"
         @nodeSelectEvent="nodeChange"
         @protocolChange="handleProtocolChange"
         @refreshTable="refresh"
@@ -17,60 +18,60 @@
     </template>
 
     <scenario-relevance-api-list
-      v-if="isApiListEnable"
-      :project-id="projectId"
-      :version-filters="versionFilters"
-      :current-version="currentVersion"
-      :current-protocol="currentProtocol"
-      :select-node-ids="selectNodeIds"
-      :is-api-list-enable="isApiListEnable"
-      @isApiListEnableChange="isApiListEnableChange"
-      @selectCountChange="setSelectCounts"
-      ref="apiList">
+        v-if="isApiListEnable"
+        :project-id="projectId"
+        :version-filters="versionFilters"
+        :current-version="currentVersion"
+        :current-protocol="currentProtocol"
+        :select-node-ids="selectNodeIds"
+        :is-api-list-enable="isApiListEnable"
+        @isApiListEnableChange="isApiListEnableChange"
+        @selectCountChange="setSelectCounts"
+        ref="apiList">
       <template v-slot:version>
         <mx-version-select
-          v-xpack
-          :project-id="projectId"
-          :default-version="currentVersion"
-          @changeVersion="currentVersionChange" />
+            v-xpack
+            :project-id="projectId"
+            :default-version="currentVersion"
+            @changeVersion="currentVersionChange"/>
       </template>
     </scenario-relevance-api-list>
 
     <scenario-relevance-case-list
-      v-if="!isApiListEnable"
-      :project-id="projectId"
-      :version-filters="versionFilters"
-      :current-version="currentVersion"
-      :current-protocol="currentProtocol"
-      :select-node-ids="selectNodeIds"
-      :is-api-list-enable="isApiListEnable"
-      @isApiListEnableChange="isApiListEnableChange"
-      @selectCountChange="setSelectCounts"
-      ref="apiCaseList">
+        v-if="!isApiListEnable"
+        :project-id="projectId"
+        :version-filters="versionFilters"
+        :current-version="currentVersion"
+        :current-protocol="currentProtocol"
+        :select-node-ids="selectNodeIds"
+        :is-api-list-enable="isApiListEnable"
+        @isApiListEnableChange="isApiListEnableChange"
+        @selectCountChange="setSelectCounts"
+        ref="apiCaseList">
       <template v-slot:version>
         <mx-version-select
-          v-xpack
-          :project-id="projectId"
-          :default-version="currentVersion"
-          @changeVersion="currentVersionChange" />
+            v-xpack
+            :project-id="projectId"
+            :default-version="currentVersion"
+            @changeVersion="currentVersionChange"/>
       </template>
     </scenario-relevance-case-list>
 
     <template v-slot:headerBtn>
       <!--  显示数量    -->
-      <table-select-count-bar :count="selectCounts" style="float: left; margin: 5px" />
+      <table-select-count-bar :count="selectCounts" style="float: left; margin: 5px"/>
 
-      <el-button size="mini" icon="el-icon-refresh" @click="refresh" />
+      <el-button size="mini" icon="el-icon-refresh" @click="refreshData"/>
       <el-button type="primary" @click="copy" :loading="buttonIsWorking" @keydown.enter.native.prevent size="mini">
         {{ $t('commons.copy') }}
       </el-button>
       <el-button
-        v-if="!isApiListEnable"
-        type="primary"
-        :loading="buttonIsWorking"
-        @click="reference"
-        size="mini"
-        @keydown.enter.native.prevent>
+          v-if="!isApiListEnable"
+          type="primary"
+          :loading="buttonIsWorking"
+          @click="reference"
+          size="mini"
+          @keydown.enter.native.prevent>
         {{ $t('api_test.scenario.reference') }}
       </el-button>
     </template>
@@ -78,9 +79,9 @@
 </template>
 
 <script>
-import { getApiCaseWithBLOBs } from '@/api/api-test-case';
-import { apiListBatch } from '@/api/definition';
-import { getProjectVersions } from '@/api/xpack';
+import {getApiCaseWithBLOBs} from '@/api/api-test-case';
+import {apiListBatch} from '@/api/definition';
+import {getProjectVersions} from '@/api/xpack';
 import ScenarioRelevanceCaseList from './RelevanceCaseList';
 import MsApiModule from '../../../definition/components/module/ApiModule';
 import MsContainer from 'metersphere-frontend/src/components/MsContainer';
@@ -89,9 +90,9 @@ import MsMainContainer from 'metersphere-frontend/src/components/MsMainContainer
 import ScenarioRelevanceApiList from './RelevanceApiList';
 import RelevanceDialog from '@/business/commons/RelevanceDialog';
 import TestCaseRelevanceBase from '@/business/commons/TestCaseRelevanceBase';
-import { hasLicense } from 'metersphere-frontend/src/utils/permission';
+import {hasLicense} from 'metersphere-frontend/src/utils/permission';
 import TableSelectCountBar from '@/business/automation/scenario/api/TableSelectCountBar';
-import { operationConfirm } from 'metersphere-frontend/src/utils';
+import {operationConfirm} from 'metersphere-frontend/src/utils';
 
 export default {
   name: 'ApiRelevance',
@@ -163,17 +164,17 @@ export default {
             this.$warning(this.$t('automation.case_message'));
             this.buttonIsWorking = false;
           } else {
-            if (apis.length > 500) {
+            if (params.condition.selectAll) {
               operationConfirm(
-                this,
-                this.$t('automation.scenario_step_ref_message', [apis.length]) + '？',
-                () => {
-                  this.$emit('save', apis, 'API', reference);
-                  this.$refs.baseRelevance.close();
-                },
-                () => {
-                  this.buttonIsWorking = false;
-                }
+                  this,
+                  this.$t('automation.scenario_step_ref_message') + '？',
+                  () => {
+                    this.$emit('save', apis, 'API', reference);
+                    this.$refs.baseRelevance.close();
+                  },
+                  () => {
+                    this.buttonIsWorking = false;
+                  }
               );
             } else {
               this.$emit('save', apis, 'API', reference);
@@ -189,17 +190,17 @@ export default {
             this.$warning(this.$t('automation.case_message'));
             this.buttonIsWorking = false;
           } else {
-            if (apiCases.length > 500) {
+            if (this.$refs.apiCaseList.condition.selectAll) {
               operationConfirm(
-                this,
-                this.$t('automation.scenario_step_ref_message', [apiCases.length]) + '？',
-                () => {
-                  this.$emit('save', apiCases, 'CASE', reference);
-                  this.$refs.baseRelevance.close();
-                },
-                () => {
-                  this.buttonIsWorking = false;
-                }
+                  this,
+                  this.$t('automation.scenario_step_ref_message') + '？',
+                  () => {
+                    this.$emit('save', apiCases, 'CASE', reference);
+                    this.$refs.baseRelevance.close();
+                  },
+                  () => {
+                    this.buttonIsWorking = false;
+                  }
               );
             } else {
               this.$emit('save', apiCases, 'CASE', reference);
@@ -242,6 +243,10 @@ export default {
         this.$refs.apiCaseList.initTable(this.projectId);
       }
     },
+    refreshData() {
+      this.$refs.nodeTree.refresh(this.projectId);
+      this.refresh();
+    },
     setProject(projectId) {
       this.projectId = projectId;
     },
@@ -253,13 +258,13 @@ export default {
         getProjectVersions(this.projectId).then((response) => {
           if (currentVersion) {
             this.versionFilters = response.data
-              .filter((u) => u.id === currentVersion)
-              .map((u) => {
-                return { text: u.name, value: u.id };
-              });
+                .filter((u) => u.id === currentVersion)
+                .map((u) => {
+                  return {text: u.name, value: u.id};
+                });
           } else {
             this.versionFilters = response.data.map((u) => {
-              return { text: u.name, value: u.id };
+              return {text: u.name, value: u.id};
             });
           }
         });
@@ -279,5 +284,13 @@ export default {
 
 .version-select {
   padding-left: 10px;
+}
+
+.node-tree {
+  margin-top: 15px;
+  margin-bottom: 15px;
+  max-height: calc(75vh - 120px);
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 </style>

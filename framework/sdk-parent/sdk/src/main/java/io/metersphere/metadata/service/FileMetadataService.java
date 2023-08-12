@@ -1,6 +1,6 @@
 package io.metersphere.metadata.service;
 
-import com.alibaba.nacos.common.utils.ByteUtils;
+
 import io.metersphere.base.domain.*;
 import io.metersphere.base.mapper.FileAssociationMapper;
 import io.metersphere.base.mapper.FileContentMapper;
@@ -92,7 +92,6 @@ public class FileMetadataService {
                 QueryProjectFileRequest request = new QueryProjectFileRequest();
                 request.setName(file.getOriginalFilename());
                 result.add(this.saveFile(file, fileMetadata));
-
             }
         }
         return result;
@@ -251,6 +250,10 @@ public class FileMetadataService {
         return null;
     }
 
+    public FileMetadataWithBLOBs selectById(String id) {
+        return fileMetadataMapper.selectByPrimaryKey(id);
+    }
+
     public byte[] loadFileAsBytes(String id) {
         FileMetadataWithBLOBs fileMetadata = fileMetadataMapper.selectByPrimaryKey(id);
         if (fileMetadata == null) {
@@ -259,13 +262,13 @@ public class FileMetadataService {
         return this.loadFileAsBytes(fileMetadata);
     }
 
-    private byte[] loadFileAsBytes(FileMetadataWithBLOBs fileMetadata) {
+    public byte[] loadFileAsBytes(FileMetadataWithBLOBs fileMetadata) {
         byte[] bytes = new byte[0];
         // 兼容历史数据
         if (StringUtils.isEmpty(fileMetadata.getStorage()) && StringUtils.isEmpty(fileMetadata.getResourceType())) {
             bytes = getContent(fileMetadata.getId());
         }
-        if (ByteUtils.isEmpty(bytes)) {
+        if (bytes == null || bytes.length == 0) {
             FileRequest request = new FileRequest(fileMetadata.getProjectId(), fileMetadata.getName(), fileMetadata.getType());
             request.setResourceType(fileMetadata.getResourceType());
             request.setPath(fileMetadata.getPath());
@@ -330,6 +333,10 @@ public class FileMetadataService {
             if (fileMetadataMapper.countByExample(example) > 0) {
                 MSException.throwException(Translator.get("project_file_already_exists"));
             }
+        }
+        // 文件名不得超过250个字符
+        if (fileMetadata.getName().length() > 250) {
+            MSException.throwException(Translator.get("project_file_name_too_long"));
         }
     }
 
@@ -783,5 +790,25 @@ public class FileMetadataService {
         } else {
             return new ArrayList<>();
         }
+    }
+
+    public List<FileMetadataWithBLOBs> selectByIdAndType(List<String> idList, String jmx) {
+        FileMetadataExample fileMetadataExample = new FileMetadataExample();
+        fileMetadataExample.createCriteria().andIdIn(idList).andTypeEqualTo("JMX");
+        return fileMetadataMapper.selectByExampleWithBLOBs(fileMetadataExample);
+    }
+
+    //检查项目下的文件，存在所属模块不存在的文件，将其挪到默认目录下
+    public void checkProjectFileHasModuleId(String projectId) {
+        List<String> illegalModuleFileIdList = baseFileMetadataMapper.selectIllegalModuleIdListByProjectId(projectId);
+        if (CollectionUtils.isNotEmpty(illegalModuleFileIdList)) {
+            FileModule fileModule = fileModuleService.initDefaultNode(projectId);
+            FileMetadataExample example = new FileMetadataExample();
+            example.createCriteria().andIdIn(illegalModuleFileIdList);
+            FileMetadataWithBLOBs updateModel = new FileMetadataWithBLOBs();
+            updateModel.setModuleId(fileModule.getId());
+            fileMetadataMapper.updateByExampleSelective(updateModel, example);
+        }
+
     }
 }

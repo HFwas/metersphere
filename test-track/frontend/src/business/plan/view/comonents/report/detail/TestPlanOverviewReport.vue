@@ -19,11 +19,11 @@
             {{ resourcePool }}
           </el-form-item>
         </el-col>
-        <el-col :span="8"> </el-col>
+        <el-col :span="8"></el-col>
       </el-row>
       <el-row
         class="select-time"
-        v-if="report.envGroupName || report.projectEnvMap"
+        v-if="report.envGroupName || (report.projectEnvMap && JSON.stringify(report.projectEnvMap) !== '{}')"
         style="display: inline-block"
       >
         <div>
@@ -57,6 +57,21 @@
           </div>
         </div>
       </el-row>
+      <el-row
+        class="select-time"
+        v-else
+        style="display: inline-block"
+      >
+        <div style="float: left">
+          {{ $t("commons.environment") + ":" }}
+        </div>
+        <div style="float: right">
+          <div style="margin-left: 42px">
+            {{ $t('test_track.report.case_env') }}
+          </div>
+        </div>
+
+      </el-row>
       <el-row type="flex" justify="space-between" class="select-time">
         <el-col :span="8">
           <el-form-item
@@ -70,7 +85,7 @@
             :label="$t('test_track.report.executive_finish_rate') + ':'"
           >
             {{
-              (report.executeRate ? (report.executeRate * 100).toFixed(1) : 0) +
+              (report.executeRate ? (report.executeRate * 100).toFixed(2) : 0) +
               "%"
             }}
             <ms-instructions-icon
@@ -81,7 +96,7 @@
         <el-col :span="8">
           <el-form-item :label="$t('test_track.report.passing_rate') + ':'">
             {{
-              (report.passRate ? (report.passRate * 100).toFixed(1) : 0) + "%"
+              (report.passRate ? (report.passRate * 100).toFixed(2) : 0) + "%"
             }}
             <ms-instructions-icon
               :content="$t('test_track.report.passing_rate_tip')"
@@ -98,7 +113,7 @@ import MsFormDivider from "metersphere-frontend/src/components/MsFormDivider";
 import TestPlanReportContainer from "@/business/plan/view/comonents/report/detail/TestPlanReportContainer";
 import MsInstructionsIcon from "metersphere-frontend/src/components/MsInstructionsIcon";
 import MsTag from "metersphere-frontend/src/components/MsTag";
-import { datetimeFormat } from "fit2cloud-ui/src/filters/time";
+import {datetimeFormat} from "fit2cloud-ui/src/filters/time";
 
 export default {
   name: "TestPlanOverviewReport",

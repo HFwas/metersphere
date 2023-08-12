@@ -1,4 +1,4 @@
-import el from "element-ui/lib/locale/lang/zh-CN"; // 加载element的内容
+import el from "metersphere-frontend/src/i18n/lang/ele-zh-CN"; // 加载element的内容
 import fu from "fit2cloud-ui/src/locale/lang/zh-CN"; // 加载fit2cloud的内容
 import mf from "metersphere-frontend/src/i18n/lang/zh-CN";
 
@@ -64,6 +64,7 @@ const message = {
   },
   plan: {
     batch_delete_tip: "批量删除测试计划，是否继续?",
+    relevance_case_success: "已添加至测试计划"
   },
   review: {
     result_distribution: "结果分布",
@@ -152,6 +153,8 @@ const message = {
     back_tips: "你填写的信息未保存, 确定退出吗?",
     dependency_remove_confirm: "确定解除依赖吗?",
     minder_paste_tip: "粘贴的节点中有未加载用例的模块，目前不支持复制未加载的用例！",
+    minder_move_confirm_tip: "当前存在字段排序，无法设置用例顺序，请切换至用例列表，取消字段排序!",
+    minder_module_move_confirm_tip: "模块不支持设置顺序!",
     public: {
       remove: '是否移除用例',
       batch_remove_confirm: "确定移除{0}项用例?",

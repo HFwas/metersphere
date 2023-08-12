@@ -17,6 +17,7 @@ import io.metersphere.dto.MsExecResponseDTO;
 import io.metersphere.dto.PlanReportCaseDTO;
 import io.metersphere.dto.RunModeConfigDTO;
 import io.metersphere.log.annotation.MsAuditLog;
+import io.metersphere.log.annotation.MsRequestLog;
 import io.metersphere.request.ResetOrderRequest;
 import io.metersphere.service.plan.TestPlanScenarioCaseService;
 import io.metersphere.service.scenario.ApiScenarioService;
@@ -79,6 +80,7 @@ public class TestPlanScenarioCaseController {
     }
 
     @PostMapping("/relevance/projectIds")
+    @MsRequestLog(module = OperLogModule.TRACK_TEST_PLAN)
     public ScenarioProjectDTO relevanceProjectIds(@RequestBody ApiScenarioRequest request) {
         return testPlanScenarioCaseService.relevanceProjectIds(request);
     }
@@ -102,7 +104,6 @@ public class TestPlanScenarioCaseController {
     }
 
     @PostMapping(value = "/run")
-    @MsAuditLog(module = OperLogModule.TRACK_TEST_PLAN, type = OperLogConstants.EXECUTE, content = "#msClass.getLogDetails(#request.planCaseIds)", msClass = TestPlanScenarioCaseService.class)
     public List<MsExecResponseDTO> run(@RequestBody RunTestPlanScenarioRequest request) {
         request.setExecuteType(ExecuteType.Completed.name());
         if (request.getConfig() == null) {
@@ -115,7 +116,6 @@ public class TestPlanScenarioCaseController {
     }
 
     @PostMapping(value = "/jenkins/run")
-    @MsAuditLog(module = OperLogModule.TRACK_TEST_PLAN, type = OperLogConstants.EXECUTE, content = "#msClass.getLogDetails(#request.ids)", msClass = TestPlanScenarioCaseService.class)
     public List<MsExecResponseDTO> runByRun(@RequestBody RunTestPlanScenarioRequest request) {
         request.setExecuteType(ExecuteType.Saved.name());
         request.setTriggerMode(ApiRunMode.API.name());
@@ -135,6 +135,7 @@ public class TestPlanScenarioCaseController {
     }
 
     @PostMapping("/edit/order")
+    @MsRequestLog(module = OperLogModule.TRACK_TEST_PLAN)
     public void orderCase(@RequestBody ResetOrderRequest request) {
         testPlanScenarioCaseService.updateOrder(request);
     }
@@ -155,6 +156,7 @@ public class TestPlanScenarioCaseController {
     }
 
     @PostMapping("/relevance/{planId}")
+    @MsRequestLog(module = OperLogModule.TRACK_TEST_PLAN)
     public void testPlanRelevance(@RequestBody List<String> ids, @PathVariable("planId") String planId) {
         testPlanScenarioCaseService.relevanceByTestIds(ids, planId);
     }

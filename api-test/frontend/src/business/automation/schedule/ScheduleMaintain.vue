@@ -52,6 +52,10 @@
             <span>{{ $t('load_test.runtime_config') }}</span>
             <div style="padding-top: 10px">
               <span class="ms-mode-span">{{ $t('commons.environment') }}：</span>
+              <el-radio-group v-model="runConfig.defaultEnv" style="margin-right: 20px">
+                <el-radio :label="true">{{ $t('automation.default_environment') }}</el-radio>
+                <el-radio :label="false">{{ $t('automation.select_new_environment') }}</el-radio>
+              </el-radio-group>
               <env-popover
                 :project-ids="projectIds"
                 :placement="'bottom-start'"
@@ -64,18 +68,13 @@
                 @setProjectEnvMap="setProjectEnvMap"
                 @showPopover="showPopover"
                 ref="envPopover"
-                class="env-popover" />
+                class="env-popover"
+                v-show="this.runConfig.defaultEnv === false" />
             </div>
             <div class="ms-mode-div">
               <span class="ms-mode-span">{{ $t('run_mode.other_config') }}：</span>
-              <el-checkbox v-model="runConfig.runWithinResourcePool" :disabled="runMode === 'POOL'">
-                {{ $t('run_mode.run_with_resource_pool') }}
-              </el-checkbox>
-              <el-select
-                style="margin-left: 10px"
-                :disabled="!runConfig.runWithinResourcePool"
-                v-model="runConfig.resourcePoolId"
-                size="mini">
+              <span>{{ $t('run_mode.run_with_resource_pool') }}:</span>
+              <el-select style="margin-left: 10px" v-model="runConfig.resourcePoolId" size="mini">
                 <el-option
                   v-for="item in resourcePools"
                   :key="item.id"
@@ -90,7 +89,7 @@
               <crontab @hide="showCron = false" @fill="crontabFill" :expression="schedule.value" ref="crontab" />
             </el-dialog>
           </el-tab-pane>
-          <el-tab-pane :label="$t('schedule.task_notification')" name="second">
+          <el-tab-pane :label="$t('schedule.task_notification')" name="second" v-permission="['PROJECT_MESSAGE:READ']">
             <ms-schedule-notification :test-id="testId" :schedule-receiver-options="scheduleReceiverOptions" />
           </el-tab-pane>
         </el-tabs>
@@ -114,8 +113,6 @@ import { ENV_TYPE } from 'metersphere-frontend/src/utils/constants';
 import EnvPopover from '@/business/automation/scenario/EnvPopover';
 import { getMaintainer, getOwnerProjects, getProjectConfig } from '@/api/project';
 import { getTestResourcePools } from '@/api/test-resource-pool';
-import { getSystemBaseSetting } from 'metersphere-frontend/src/api/system';
-
 function defaultCustomValidate() {
   return { pass: true };
 }
@@ -146,11 +143,6 @@ export default {
     'schedule.value'() {
       this.form.cronValue = this.schedule.value;
     },
-    'runConfig.runWithinResourcePool'() {
-      if (!this.runConfig.runWithinResourcePool) {
-        this.runConfig.resourcePoolId = null;
-      }
-    },
   },
   data() {
     const validateCron = (rule, cronValue, callback) => {
@@ -168,7 +160,6 @@ export default {
       }
     };
     return {
-      runMode: '',
       loading: false,
       scheduleReceiverOptions: [],
       operation: true,
@@ -194,11 +185,11 @@ export default {
         mode: 'serial',
         reportType: 'iddReport',
         onSampleError: false,
-        runWithinResourcePool: false,
         resourcePoolId: null,
         envMap: {},
         environmentGroupId: '',
         environmentType: ENV_TYPE.JSON,
+        defaultEnv: true,
       },
       projectList: [],
       projectIds: new Set(),
@@ -206,31 +197,29 @@ export default {
     };
   },
   methods: {
-    query() {
-      this.loading = true;
-      this.result = getSystemBaseSetting().then((response) => {
-        if (!response.data.runMode) {
-          response.data.runMode = 'LOCAL';
-        }
-        this.runMode = response.data.runMode;
-        if (this.runMode === 'POOL') {
-          this.runConfig.runWithinResourcePool = true;
-          this.getProjectApplication();
-        } else {
-          this.loading = false;
+    async checkPool() {
+      let hasPool = false;
+      this.resourcePools.forEach((item) => {
+        if (item.id === this.runConfig.resourcePoolId) {
+          hasPool = true;
         }
       });
+      return hasPool;
     },
-    getProjectApplication() {
-      getProjectConfig(getCurrentProjectID(), '').then((res) => {
-        if (res.data && res.data.poolEnable && res.data.resourcePoolId) {
-          this.runConfig.resourcePoolId = res.data.resourcePoolId;
-        }
-        this.loading = false;
-      });
-    },
-    currentUser: () => {
-      return getCurrentUser();
+    async getProjectApplication() {
+      let hasPool = await this.checkPool();
+      if (!hasPool) {
+        this.runConfig.resourcePoolId = null;
+        getProjectConfig(getCurrentProjectID(), '').then(async (res) => {
+          if (res.data && res.data.poolEnable && res.data.resourcePoolId) {
+            this.runConfig.resourcePoolId = res.data.resourcePoolId;
+          }
+          hasPool = await this.checkPool();
+          if (!hasPool) {
+            this.runConfig.resourcePoolId = undefined;
+          }
+        });
+      }
     },
     intervalValidate() {
       if (this.getIntervalTime() < 1 * 60 * 1000) {
@@ -268,6 +257,7 @@ export default {
     getResourcePools() {
       this.result = getTestResourcePools().then((response) => {
         this.resourcePools = response.data;
+        this.getProjectApplication();
       });
     },
     updateTask(param) {
@@ -298,7 +288,7 @@ export default {
       param.testId = this.testId;
       return param;
     },
-    open(row) {
+    async open(row) {
       //测试计划页面跳转来的
       let paramTestId = '';
       this.paramRow = row;
@@ -313,7 +303,7 @@ export default {
         this.scheduleTaskType = 'API_SCENARIO_TEST';
       }
       this.testId = paramTestId;
-      this.findSchedule(paramTestId);
+      await this.findSchedule(paramTestId);
       this.initUserList();
       this.dialogVisible = true;
       this.form.cronValue = this.schedule.value;
@@ -321,10 +311,9 @@ export default {
       this.activeName = 'first';
       this.getResourcePools();
       this.getWsProjects();
-      this.query();
       this.runConfig.environmentType = ENV_TYPE.JSON;
     },
-    findSchedule() {
+    async findSchedule() {
       let scheduleResourceID = this.testId;
       let taskType = this.scheduleTaskType;
       this.result = getScheduleByIdAndType(scheduleResourceID, taskType).then((response) => {
@@ -332,6 +321,10 @@ export default {
           this.schedule = response.data;
           if (response.data.config) {
             this.runConfig = JSON.parse(response.data.config);
+            // 兼容历史数据
+            if (this.runConfig.defaultEnv === null) {
+              this.runConfig.defaultEnv = false;
+            }
             if (this.runConfig.envMap) {
               this.projectEnvListMap = objToStrMap(this.runConfig.envMap);
             } else {
@@ -394,16 +387,15 @@ export default {
       }
       if (this.schedule.enable) {
         if (
-          (this.runConfig.environmentType === 'JSON' && Object.keys(this.runConfig.envMap).length === 0) ||
+          (!this.runConfig.defaultEnv &&
+            this.runConfig.environmentType === 'JSON' &&
+            Object.keys(this.runConfig.envMap).length === 0) ||
           (this.runConfig.environmentType === 'GROUP' && !this.runConfig.environmentGroupId)
-        ) {
-          this.$warning(this.$t('workspace.env_group.please_select_env_for_current_scenario'));
-          return;
-        }
-        if (this.runConfig.runWithinResourcePool && this.runConfig.resourcePoolId == null) {
-          this.$warning(this.$t('workspace.env_group.please_select_run_within_resource_pool'));
-          return;
-        }
+        )
+          if (this.runConfig.resourcePoolId == null) {
+            this.$warning(this.$t('workspace.env_group.please_select_run_within_resource_pool'));
+            return;
+          }
       }
       param.config = JSON.stringify(this.runConfig);
       param.scheduleFrom = 'scenario';

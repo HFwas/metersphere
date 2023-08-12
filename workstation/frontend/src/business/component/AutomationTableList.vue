@@ -170,13 +170,8 @@
                          :fields-width="fieldsWidth"
                          sortable
                          min-width="130px">
-          <template v-slot:default="{row}">
-            <el-link type="success" @click="showReport(row)" v-if="row.lastResult === 'Success'">
-              {{ $t('api_test.automation.success') }}
-            </el-link>
-            <el-link type="danger" @click="showReport(row)" v-else-if="row.lastResult === 'Fail'">
-              {{ $t('api_test.automation.fail') }}
-            </el-link>
+                         <template v-slot:default="{ row }">
+            <ms-api-report-status :status="row.lastResult" />
           </template>
         </ms-table-column>
 
@@ -236,6 +231,7 @@ export default {
     MsTag,
     MsTableColumn,
     HeaderLabelOperate,
+    MsApiReportStatus: () => import('@/business/module/api/ApiReportStatus'),
     HeaderCustom: () => import("metersphere-frontend/src/components/head/HeaderCustom"),
     BatchMove: () => import("@/business/module/api/BatchMove"),
     EnvironmentSelect: () => import("@/business/module/environment/EnvSelect"),
@@ -416,7 +412,7 @@ export default {
         }
       } else {
 
-        this.condition.combine = {status: {operator: "in", value: ["Fail"]}}
+        this.condition.combine = {lastResult: {operator: "in", value: ["error"]}}
         if (this.condition.filters) {
           this.condition.filters.principal = [getCurrentUserId()];
         } else {
@@ -492,7 +488,7 @@ export default {
           }
 
         } else {
-          this.condition.combine = {status: {operator: "in", value: ["Fail"]}}
+          this.condition.combine = {lastResult: {operator: "in", value: ["Error"]}}
           if (this.condition.filters) {
             this.condition.filters.principal = [getCurrentUserId()];
           } else {
@@ -628,13 +624,6 @@ export default {
           this.sort(stepArray[i].hashTree);
         }
       }
-    },
-
-
-    showReport(row) {
-      this.showReportVisible = true;
-      this.infoDb = true;
-      this.showReportId = row.reportId;
     },
     //判断是否只显示本周的数据。  从首页跳转过来的请求会带有相关参数
     isSelectThissWeekData() {

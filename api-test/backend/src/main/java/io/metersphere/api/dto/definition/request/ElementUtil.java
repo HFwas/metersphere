@@ -28,6 +28,7 @@ import io.metersphere.base.domain.ApiTestEnvironmentWithBLOBs;
 import io.metersphere.base.domain.FileMetadata;
 import io.metersphere.base.mapper.ApiScenarioMapper;
 import io.metersphere.commons.constants.ElementConstants;
+import io.metersphere.commons.constants.MsHashTreeConstants;
 import io.metersphere.commons.constants.PropertyConstant;
 import io.metersphere.commons.constants.StorageConstants;
 import io.metersphere.commons.exception.MSException;
@@ -43,9 +44,12 @@ import io.metersphere.metadata.service.FileMetadataService;
 import io.metersphere.plugin.core.MsParameter;
 import io.metersphere.plugin.core.MsTestElement;
 import io.metersphere.request.BodyFile;
+import io.metersphere.service.MsHashTreeService;
 import io.metersphere.utils.LoggerUtil;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.BooleanUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.config.Arguments;
 import org.apache.jmeter.config.CSVDataSet;
@@ -63,16 +67,17 @@ import org.apache.jmeter.testelement.TestElement;
 import org.apache.jmeter.testelement.TestPlan;
 import org.apache.jmeter.threads.ThreadGroup;
 import org.apache.jorphan.collections.HashTree;
+import org.jetbrains.annotations.NotNull;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class ElementUtil {
     private static final String PRE = "PRE";
@@ -80,6 +85,15 @@ public class ElementUtil {
     private static final String ASSERTIONS = ElementConstants.ASSERTIONS;
     private static final String BODY_FILE_DIR = FileUtils.BODY_FILE_DIR;
     private static final String TEST_BEAN_GUI = "TestBeanGUI";
+    private final static String SCENARIO_REF = "SCENARIO-REF-STEP";
+    private final static String MS_DEFAULT = "ms-default-data-source";
+    public final static List<String> scriptList = new ArrayList<String>() {{
+        this.add(ElementConstants.JSR223);
+        this.add(ElementConstants.JSR223_PRE);
+        this.add(ElementConstants.JSR223_POST);
+    }};
+    public static final String JSR = "jsr223";
+    public static final String CLAZZ = "clazzName";
 
 
     public static Map<String, EnvironmentConfig> getEnvironmentConfig(String environmentId, String projectId) {
@@ -336,7 +350,7 @@ public class ElementUtil {
         }
     }
 
-    public static void dataSetDomain(JSONArray hashTree, MsParameter msParameter) {
+    public static void dataSetDomain(JSONArray hashTree, ParameterConfig msParameter) {
         try {
             ApiScenarioMapper apiScenarioMapper = CommonBeanFactory.getBean(ApiScenarioMapper.class);
             BaseEnvGroupProjectService environmentGroupProjectService = CommonBeanFactory.getBean(BaseEnvGroupProjectService.class);
@@ -345,7 +359,7 @@ public class ElementUtil {
             for (int i = 0; i < hashTree.length(); i++) {
                 JSONObject element = hashTree.optJSONObject(i);
                 boolean isScenarioEnv = false;
-                ParameterConfig config = new ParameterConfig();
+                ParameterConfig config = new ParameterConfig(msParameter.getCurrentProjectId(), false);
                 if (element != null && element.get(PropertyConstant.TYPE).toString().equals(ElementConstants.SCENARIO)) {
                     MsScenario scenario = JSON.parseObject(element.toString(), MsScenario.class);
                     if (scenario.isEnvironmentEnable()) {
@@ -391,127 +405,204 @@ public class ElementUtil {
     }
 
     public static void setDomain(JSONObject element, MsParameter msParameter) {
+        if (!StringUtils.equals(element.optString(MsHashTreeService.TYPE), ElementConstants.HTTP_SAMPLER) || !element.has(CLAZZ)) {
+            return;
+        }
         MsHTTPSamplerProxy httpSamplerProxy = JSON.parseObject(element.toString(), MsHTTPSamplerProxy.class);
+        ParameterConfig config = (ParameterConfig) msParameter;
         if (httpSamplerProxy != null &&
                 (!httpSamplerProxy.isCustomizeReq() || (httpSamplerProxy.isCustomizeReq()
-                        && BooleanUtils.isTrue(httpSamplerProxy.getIsRefEnvironment())))) {
+                        && BooleanUtils.isTrue(httpSamplerProxy.getIsRefEnvironment()))) && MapUtils.isNotEmpty(config.getConfig())) {
             if (element != null && element.has(ElementConstants.HASH_TREE)) {
                 httpSamplerProxy.setHashTree(JSONUtil.readValue(element.optString(ElementConstants.HASH_TREE)));
             }
-            HashTree tmpHashTree = new HashTree();
-            httpSamplerProxy.toHashTree(tmpHashTree, null, msParameter);
-            if (tmpHashTree != null && tmpHashTree.getArray().length > 0) {
-                HTTPSamplerProxy object = (HTTPSamplerProxy) tmpHashTree.getArray()[0];
-                // 清空Domain
-                element.put("domain", "");
-                if (object != null && StringUtils.isNotEmpty(object.getDomain())) {
-                    element.put("domain", StringUtils.isNotEmpty(object.getProtocol()) ?
-                            object.getProtocol() + "://" + object.getDomain() : object.getDomain());
+            try {
+                HashTree tmpHashTree = new HashTree();
+                httpSamplerProxy.toHashTree(tmpHashTree, null, msParameter);
+                if (tmpHashTree != null && tmpHashTree.getArray().length > 0) {
+                    HTTPSamplerProxy object = (HTTPSamplerProxy) tmpHashTree.getArray()[0];
+                    // 清空Domain
+                    element.put("domain", "");
+                    if (object != null && StringUtils.isNotEmpty(object.getDomain())) {
+                        element.put("domain", StringUtils.isNotEmpty(object.getProtocol()) ?
+                                object.getProtocol() + "://" + object.getDomain() : object.getDomain());
+                    }
                 }
+            } catch (Exception e) {
+                LogUtil.error(e);
             }
         }
     }
 
     public static void mergeHashTree(MsTestElement element, LinkedList<MsTestElement> targetHashTree) {
         try {
-            if (CollectionUtils.isNotEmpty(element.getHashTree())
-                    && CollectionUtils.isNotEmpty(targetHashTree)
-                    && element.getHashTree().size() == targetHashTree.size()) {
-                element.setHashTree(targetHashTree);
-                return;
+            Map<String, LinkedList<MsTestElement>> source = groupCase(element.getHashTree());
+            Map<String, LinkedList<MsTestElement>> target = groupCase(targetHashTree);
+            List<MsTestElement> step = new LinkedList<>();
+            List<MsTestElement> pre = ElementUtil.mergeCaseHashTree(source.get(PRE), target.get(PRE));
+            List<MsTestElement> post = ElementUtil.mergeCaseHashTree(source.get(POST), target.get(POST));
+            List<MsTestElement> rules = MsHashTreeService.mergeCaseAssertions(source.get(ASSERTIONS), target.get(ASSERTIONS));
+            if (CollectionUtils.isNotEmpty(pre)) {
+                step.addAll(pre);
             }
-            // 合并步骤
-            List<MsTestElement> sourceList = Stream.of(element.getHashTree(), targetHashTree)
-                    .flatMap(Collection::stream)
-                    .distinct()
-                    .collect(Collectors.toList());
-
-            // 历史数据补充id
-            sourceList.forEach(item -> {
-                if (StringUtils.isBlank(item.getId())) {
-                    item.setId(UUID.randomUUID().toString());
-                }
-            });
-
-            sourceList = sourceList.stream().collect(Collectors
-                    .collectingAndThen(
-                            Collectors.toCollection(() -> new TreeSet<>(Comparator.comparing(MsTestElement::getId))),
-                            ArrayList::new));
-
+            if (CollectionUtils.isNotEmpty(post)) {
+                step.addAll(post);
+            }
+            if (CollectionUtils.isNotEmpty(rules)) {
+                step.addAll(rules);
+            }
             element.getHashTree().clear();
-            element.getHashTree().addAll(sourceList);
+            element.getHashTree().addAll(step);
         } catch (Exception e) {
             element.setHashTree(targetHashTree);
         }
     }
 
-    public static List<JSONObject> mergeHashTree(List<JSONObject> sourceHashTree, List<JSONObject> targetHashTree) {
+    public static Map<String, LinkedList<MsTestElement>> groupCase(List<MsTestElement> elements) {
+        Map<String, LinkedList<MsTestElement>> groupMap = new LinkedHashMap<>();
+        if (elements != null) {
+            for (int i = 0; i < elements.size(); i++) {
+                MsTestElement item = elements.get(i);
+                if (ElementConstants.ASSERTIONS.equals(item.getType())) {
+                    if (groupMap.containsKey(ASSERTIONS)) {
+                        groupMap.get(ASSERTIONS).add(item);
+                    } else {
+                        groupMap.put(ASSERTIONS, new LinkedList<MsTestElement>() {{
+                            this.add(item);
+                        }});
+                    }
+                } else if (preOperates.contains(item.getType())) {
+                    if (groupMap.containsKey(PRE)) {
+                        groupMap.get(PRE).add(item);
+                    } else {
+                        groupMap.put(PRE, new LinkedList<MsTestElement>() {{
+                            this.add(item);
+                        }});
+                    }
+                } else if (postOperates.contains(item.getType())) {
+                    if (groupMap.containsKey(POST)) {
+                        groupMap.get(POST).add(item);
+                    } else {
+                        groupMap.put(POST, new LinkedList<MsTestElement>() {{
+                            this.add(item);
+                        }});
+                    }
+                }
+            }
+        }
+        return groupMap;
+    }
+
+    public static List<MsTestElement> mergeCaseHashTree(List<MsTestElement> targets, List<MsTestElement> sources) {
         try {
             List<String> sourceIds = new ArrayList<>();
             List<String> delIds = new ArrayList<>();
-            Map<String, JSONObject> updateMap = new HashMap<>();
-
-            if (CollectionUtils.isNotEmpty(targetHashTree)) {
-                for (int i = 0; i < targetHashTree.size(); i++) {
-                    JSONObject item = targetHashTree.get(i);
-                    item.put("disabled", true);
-                    if (StringUtils.isNotEmpty(item.optString("id"))) {
-                        updateMap.put(item.optString("id"), item);
+            Map<String, MsTestElement> updateMap = new HashMap<>();
+            if (CollectionUtils.isNotEmpty(sources)) {
+                for (int i = 0; i < sources.size(); i++) {
+                    MsTestElement msTestElement = sources.get(i);
+                    if (StringUtils.isNotEmpty(msTestElement.getId())) {
+                        updateMap.put(msTestElement.getId(), msTestElement);
                     }
                 }
             }
             // 找出待更新内容和源已经被删除的内容
-            if (CollectionUtils.isNotEmpty(sourceHashTree)) {
-                for (int i = 0; i < sourceHashTree.size(); i++) {
-                    JSONObject source = sourceHashTree.get(i);
-                    if (source != null) {
-                        sourceIds.add(source.optString("id"));
-                        if (!StringUtils.equals(source.optString("label"), "SCENARIO-REF-STEP") && StringUtils.isNotEmpty(source.optString("id"))) {
-                            if (updateMap.containsKey(source.optString("id"))) {
-                                sourceHashTree.set(i, updateMap.get(source.optString("id")));
-                            } else {
-                                delIds.add(source.optString("id"));
-                            }
+            if (CollectionUtils.isNotEmpty(targets)) {
+                for (int i = 0; i < targets.size(); i++) {
+                    MsTestElement msTestElement = targets.get(i);
+                    if (msTestElement == null) {
+                        continue;
+                    }
+                    sourceIds.add(msTestElement.getId());
+                    if (!StringUtils.equals(msTestElement.getLabel(), SCENARIO_REF)
+                            && StringUtils.isNotEmpty(msTestElement.getId())) {
+                        if (updateMap.containsKey(msTestElement.getId())) {
+                            targets.set(i, updateMap.get(msTestElement.getId()));
+                            updateMap.remove(msTestElement.getId());
+                        } else {
+                            delIds.add(msTestElement.getId());
                         }
-                        // 历史数据兼容
-                        if (!source.has("id") && !StringUtils.equals(source.optString("label"), "SCENARIO-REF-STEP") && i < targetHashTree.size()) {
-                            sourceHashTree.set(i, targetHashTree.get(i));
+                    }
+                }
+            }
+
+            // 删除多余的步骤 delIds中包含的全都干掉
+            targets.removeIf(msTestElement -> delIds.contains(msTestElement.getId()));
+
+            // 补充新增的源引用步骤
+            if (CollectionUtils.isNotEmpty(sources)) {
+                for (int i = 0; i < sources.size(); i++) {
+                    MsTestElement msTestElement = sources.get(i);
+                    if (!sourceIds.contains(msTestElement.getId())) {
+                        targets.add(msTestElement);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            return sources;
+        }
+        //根据index排序
+        targets.sort(Comparator.comparing(MsTestElement::getIndex));
+        return targets;
+    }
+
+    public static List<JSONObject> mergeHashTree(List<JSONObject> targets, List<JSONObject> sources) {
+        try {
+            List<String> sourceIds = new ArrayList<>();
+            List<String> delIds = new ArrayList<>();
+            Map<String, JSONObject> updateMap = new HashMap<>();
+            if (CollectionUtils.isNotEmpty(sources)) {
+                for (int i = 0; i < sources.size(); i++) {
+                    JSONObject item = sources.get(i);
+                    item.put(MsHashTreeConstants.DISABLED, true);
+                    item.put(ElementConstants.REF_ENABLE, true);
+                    if (StringUtils.isNotEmpty(item.optString(ElementConstants.ID))) {
+                        updateMap.put(item.optString(ElementConstants.ID), item);
+                    }
+                }
+            }
+            // 找出待更新内容和源已经被删除的内容
+            if (CollectionUtils.isNotEmpty(targets)) {
+                for (int i = 0; i < targets.size(); i++) {
+                    JSONObject object = targets.get(i);
+                    if (object == null) {
+                        continue;
+                    }
+                    sourceIds.add(object.optString(ElementConstants.ID));
+                    if (!StringUtils.equals(object.optString("label"), SCENARIO_REF)
+                            && StringUtils.isNotEmpty(object.optString(ElementConstants.ID))) {
+                        if (updateMap.containsKey(object.optString(ElementConstants.ID))) {
+                            targets.set(i, updateMap.get(object.optString(ElementConstants.ID)));
+                            updateMap.remove(object.optString(ElementConstants.ID));
+                        } else {
+                            delIds.add(object.optString(ElementConstants.ID));
                         }
+                    }
+                    // 历史数据兼容
+                    if (!object.has(ElementConstants.ID)
+                            && !StringUtils.equals(object.optString("label"), SCENARIO_REF)
+                            && i < sources.size()) {
+                        targets.set(i, sources.get(i));
                     }
                 }
             }
 
             // 删除多余的步骤
-            for (int i = 0; i < sourceHashTree.size(); i++) {
-                JSONObject source = sourceHashTree.get(i);
-                if (delIds.contains(source.optString("id"))) {
-                    sourceHashTree.remove(i);
-                }
-            }
+            targets.removeIf(msTestElement -> delIds.contains(msTestElement.optString(ElementConstants.ID)));
+
             // 补充新增的源引用步骤
-            if (CollectionUtils.isNotEmpty(targetHashTree)) {
-                for (int i = 0; i < targetHashTree.size(); i++) {
-                    JSONObject item = sourceHashTree.get(i);
-                    if (!sourceIds.contains(item.optString("id"))) {
-                        sourceHashTree.add(item);
+            if (CollectionUtils.isNotEmpty(sources)) {
+                for (int i = 0; i < sources.size(); i++) {
+                    JSONObject item = sources.get(i);
+                    if (!sourceIds.contains(item.optString(ElementConstants.ID))) {
+                        targets.add(item);
                     }
                 }
             }
         } catch (Exception e) {
-            return targetHashTree;
+            return sources;
         }
-        return sourceHashTree;
-    }
-
-    public static String hashTreeToString(HashTree hashTree) {
-        try (ByteArrayOutputStream bas = new ByteArrayOutputStream()) {
-            SaveService.saveTree(hashTree, bas);
-            return bas.toString();
-        } catch (Exception e) {
-            e.printStackTrace();
-            io.metersphere.plugin.core.utils.LogUtil.warn("HashTree error, can't log jmx scenarioDefinition");
-        }
-        return null;
+        return targets;
     }
 
     public static String getResourceId(String resourceId, ParameterConfig config, MsTestElement parent, String indexPath) {
@@ -718,7 +809,8 @@ public class ElementUtil {
             variables.stream()
                     .filter(ScenarioVariable::isConstantValid).forEach(keyValue ->
                             arguments.addArgument(keyValue.getName(),
-                                    keyValue.getValue(), "="));
+                                    StringUtils.isNotBlank(keyValue.getValue())
+                                            ? keyValue.getValue().replaceAll("[\r\n]", "") : keyValue.getValue(), "="));
             List<ScenarioVariable> variableList = variables.stream()
                     .filter(ScenarioVariable::isListValid).collect(Collectors.toList());
             variableList.forEach(item -> {
@@ -730,10 +822,10 @@ public class ElementUtil {
         }
         // 环境通用变量
         if (config.isEffective(projectId)
-                && config.getConfig().get(projectId).getCommonConfig() != null
-                && CollectionUtils.isNotEmpty(config.getConfig().get(projectId).getCommonConfig().getVariables())) {
+                && config.get(projectId).getCommonConfig() != null
+                && CollectionUtils.isNotEmpty(config.get(projectId).getCommonConfig().getVariables())) {
             //常量
-            List<ScenarioVariable> constants = config.getConfig().get(projectId).getCommonConfig().getVariables().stream()
+            List<ScenarioVariable> constants = config.get(projectId).getCommonConfig().getVariables().stream()
                     .filter(ScenarioVariable::isConstantValid)
                     .filter(ScenarioVariable::isEnable)
                     .collect(Collectors.toList());
@@ -741,9 +833,11 @@ public class ElementUtil {
                     arguments.addArgument(keyValue.getName(),
                             keyValue.getValue() != null && keyValue.getValue().startsWith("@")
                                     ? ScriptEngineUtils.buildFunctionCallString(keyValue.getValue())
-                                    : keyValue.getValue(), "="));
+                                    : (StringUtils.isNotBlank(keyValue.getValue())
+                                    ? keyValue.getValue().replaceAll("[\r\n]", "")
+                                    : keyValue.getValue()), "="));
             // List类型的变量
-            List<ScenarioVariable> variableList = config.getConfig().get(projectId).getCommonConfig().getVariables().stream()
+            List<ScenarioVariable> variableList = config.get(projectId).getCommonConfig().getVariables().stream()
                     .filter(ScenarioVariable::isListValid)
                     .filter(ScenarioVariable::isEnable)
                     .collect(Collectors.toList());
@@ -754,8 +848,8 @@ public class ElementUtil {
                 }
             });
             // 清空变量，防止重复添加
-            config.getConfig().get(projectId).getCommonConfig().getVariables().removeAll(constants);
-            config.getConfig().get(projectId).getCommonConfig().getVariables().removeAll(variableList);
+            config.get(projectId).getCommonConfig().getVariables().removeAll(constants);
+            config.get(projectId).getCommonConfig().getVariables().removeAll(variableList);
         }
 
         if (arguments.getArguments() != null && arguments.getArguments().size() > 0) {
@@ -765,14 +859,14 @@ public class ElementUtil {
     }
 
     public static void addApiVariables(ParameterConfig config, HashTree httpSamplerTree, String projectId) {
-        if (config.isEffective(projectId) && config.getConfig().get(projectId).getCommonConfig() != null && CollectionUtils.isNotEmpty(config.getConfig().get(projectId).getCommonConfig().getVariables())) {
+        if (config.isEffective(projectId) && config.get(projectId).getCommonConfig() != null && CollectionUtils.isNotEmpty(config.get(projectId).getCommonConfig().getVariables())) {
             ElementUtil.addApiCsvDataSet(httpSamplerTree,
-                    config.getConfig().get(projectId).getCommonConfig().getVariables(),
+                    config.get(projectId).getCommonConfig().getVariables(),
                     config, "shareMode.group");
             ElementUtil.addCounter(httpSamplerTree,
-                    config.getConfig().get(projectId).getCommonConfig().getVariables());
+                    config.get(projectId).getCommonConfig().getVariables());
             ElementUtil.addRandom(httpSamplerTree,
-                    config.getConfig().get(projectId).getCommonConfig().getVariables());
+                    config.get(projectId).getCommonConfig().getVariables());
         }
     }
 
@@ -867,7 +961,7 @@ public class ElementUtil {
         if (StringUtils.isEmpty(environmentId)) {
             if (config.getConfig() != null) {
                 if (StringUtils.isNotBlank(projectId) && config.getConfig().containsKey(projectId)) {
-                    return config.getConfig().get(projectId).getEnvironmentId();
+                    return config.get(projectId).getEnvironmentId();
                 } else {
                     if (CollectionUtils.isNotEmpty(config.getConfig().values())) {
                         Optional<EnvironmentConfig> values = config.getConfig().entrySet().stream().findFirst().map(Map.Entry::getValue);
@@ -903,7 +997,9 @@ public class ElementUtil {
         jdbcProcessor.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass(TEST_BEAN_GUI));
 
         ElementUtil.setBaseParams(jdbcProcessor, vo.getParent(), config, vo.getId(), vo.getIndex());
-        jdbcProcessor.setDataSource(ElementUtil.getDataSourceName(vo.getDataSource().getName()));
+        if (ObjectUtils.isNotEmpty(vo.getDataSource())) {
+            jdbcProcessor.setDataSource(ElementUtil.getDataSourceName(vo.getDataSource().getName()));
+        }
         jdbcProcessor.setProperty("dataSource", jdbcProcessor.getDataSource());
         jdbcProcessor.setProperty("query", vo.getQuery());
         jdbcProcessor.setProperty("queryTimeout", String.valueOf(vo.getQueryTimeout()));
@@ -914,6 +1010,9 @@ public class ElementUtil {
     }
 
     public static DataSourceElement jdbcDataSource(String sourceName, DatabaseConfig dataSource) {
+        if (dataSource == null) {
+            dataSource = new DatabaseConfig(MS_DEFAULT, MS_DEFAULT, 1, 1L, MS_DEFAULT, MS_DEFAULT, MS_DEFAULT, MS_DEFAULT);
+        }
         DataSourceElement dataSourceElement = new DataSourceElement();
         dataSourceElement.setEnabled(true);
         dataSourceElement.setName(sourceName + " JDBCDataSource");
@@ -922,7 +1021,7 @@ public class ElementUtil {
         dataSourceElement.setProperty("autocommit", true);
         dataSourceElement.setProperty("keepAlive", true);
         dataSourceElement.setProperty("preinit", false);
-        dataSourceElement.setProperty("dataSource", sourceName);
+        dataSourceElement.setProperty("dataSource", StringUtils.defaultIfBlank(sourceName, MS_DEFAULT));
         dataSourceElement.setProperty("dbUrl", dataSource.getDbUrl());
         dataSourceElement.setProperty("driver", dataSource.getDriver());
         dataSourceElement.setProperty("username", dataSource.getUsername());
@@ -1051,15 +1150,15 @@ public class ElementUtil {
         return false;
     }
 
-    public static DatabaseConfig selectDataSourceFromJDBCProcessor(String processorName, String environmentId, String dataSourceId, String projectId, ParameterConfig config) {
+    public static DatabaseConfig getDataSource(String processorName, String environmentId, String dataSourceId, String projectId, ParameterConfig config) {
         if (config == null) {
             return null;
         }
         DatabaseConfig dataSource = null;
         // 自选了数据源
-        if (config.isEffective(projectId) && CollectionUtils.isNotEmpty(config.getConfig().get(projectId).getDatabaseConfigs())
-                && isDataSource(dataSourceId, config.getConfig().get(projectId).getDatabaseConfigs())) {
-            EnvironmentConfig environmentConfig = config.getConfig().get(projectId);
+        if (config.isEffective(projectId) && CollectionUtils.isNotEmpty(config.get(projectId).getDatabaseConfigs())
+                && isDataSource(dataSourceId, config.get(projectId).getDatabaseConfigs())) {
+            EnvironmentConfig environmentConfig = config.get(projectId);
             if (environmentConfig.getDatabaseConfigs() != null && StringUtils.isNotEmpty(environmentConfig.getEnvironmentId())) {
                 environmentId = environmentConfig.getEnvironmentId();
             }
@@ -1069,14 +1168,14 @@ public class ElementUtil {
             }
         } else {
             // 取当前环境下默认的一个数据源
-            if (config.isEffective(projectId) && CollectionUtils.isNotEmpty(config.getConfig().get(projectId).getDatabaseConfigs())) {
+            if (config.isEffective(projectId) && CollectionUtils.isNotEmpty(config.get(projectId).getDatabaseConfigs())) {
                 LoggerUtil.info(processorName + "：开始获取当前环境下默认数据源");
-                DatabaseConfig dataSourceOrg = ElementUtil.dataSource(projectId, dataSourceId, config.getConfig().get(projectId));
+                DatabaseConfig dataSourceOrg = ElementUtil.dataSource(projectId, dataSourceId, config.get(projectId));
                 if (dataSourceOrg != null) {
                     dataSource = dataSourceOrg;
                 } else {
                     LoggerUtil.info(processorName + "：获取当前环境下默认数据源结束！未查找到默认数据源");
-                    dataSource = config.getConfig().get(projectId).getDatabaseConfigs().get(0);
+                    dataSource = config.get(projectId).getDatabaseConfigs().get(0);
                 }
             }
         }
@@ -1089,5 +1188,88 @@ public class ElementUtil {
             return true;
         }
         return false;
+    }
+
+    public static List<String> scriptList(String request) {
+        List<String> list = new ArrayList<>();
+        if (StringUtils.isBlank(request)) {
+            return list;
+        }
+        JSONObject element = JSONUtil.parseObject(request);
+        toList(element.getJSONArray(ElementConstants.HASH_TREE), scriptList, list);
+        return list;
+    }
+
+    private static void toList(JSONArray hashTree, List<String> scriptList, List<String> list) {
+        for (int i = 0; i < hashTree.length(); i++) {
+            JSONObject element = hashTree.optJSONObject(i);
+            if (element == null) {
+                continue;
+            }
+            if (scriptList.contains(element.optString(ElementConstants.TYPE))) {
+                JSONObject elementTarget = JSONUtil.parseObject(element.toString());
+                if (elementTarget.has(ElementConstants.HASH_TREE)) {
+                    elementTarget.remove(ElementConstants.HASH_TREE);
+                }
+                elementTarget.remove(MsHashTreeService.ACTIVE);
+                elementTarget.remove(MsHashTreeService.INDEX);
+                list.add(elementTarget.toString());
+            }
+            JSONArray jsrArray = element.optJSONArray(JSR);
+            if (jsrArray != null) {
+                for (int j = 0; j < jsrArray.length(); j++) {
+                    JSONObject jsr223 = jsrArray.optJSONObject(j);
+                    if (jsr223 != null) {
+                        list.add(jsr223.toString());
+                    }
+                }
+            }
+            if (element.has(ElementConstants.HASH_TREE)) {
+                JSONArray elementJSONArray = element.optJSONArray(ElementConstants.HASH_TREE);
+                toList(elementJSONArray, scriptList, list);
+            }
+        }
+    }
+
+    public static boolean isSend(List<String> org, List<String> target) {
+        if (org.size() != target.size()) {
+            if (CollectionUtils.isEmpty(org)) {
+                return true;
+            }
+            if (CollectionUtils.isEmpty(target)) {
+                return false;
+            }
+            return true;
+
+        }
+        List<String> diff = target.stream()
+                .filter(s -> !org.contains(s))
+                .collect(Collectors.toList());
+        if (CollectionUtils.isNotEmpty(diff)) {
+            return true;
+        }
+        return false;
+    }
+
+    @NotNull
+    public static List<String> getProjectIds(String scenarioDefinition) {
+        Pattern pattern = Pattern.compile("\"projectId\"\\s*:\\s*\"?([^\"]*)\"?,");
+        Matcher matcher = pattern.matcher(scenarioDefinition);
+        List<String> projectIdLists = new ArrayList<>();
+        while (matcher.find()) {
+            if (!projectIdLists.contains(matcher.group(1))) {
+                projectIdLists.add(matcher.group(1));
+            }
+        }
+        return projectIdLists;
+    }
+
+    public static Map<String, String> getProjectEnvMap(List<String> projectIdLists, Map<String, String> projectEnvMap) {
+        if (CollectionUtils.isNotEmpty(projectIdLists)) {
+            projectEnvMap = projectEnvMap.entrySet().stream()
+                    .filter(entry -> projectIdLists.contains(entry.getKey()))
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        }
+        return projectEnvMap;
     }
 }

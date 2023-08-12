@@ -16,6 +16,7 @@ import io.metersphere.dto.CustomFieldDao;
 import io.metersphere.dto.IssuesStatusCountDao;
 import io.metersphere.excel.domain.ExcelResponse;
 import io.metersphere.log.annotation.MsAuditLog;
+import io.metersphere.log.annotation.MsRequestLog;
 import io.metersphere.notice.annotation.SendNotice;
 import io.metersphere.platform.domain.SelectOption;
 import io.metersphere.request.PlatformOptionRequest;
@@ -116,21 +117,26 @@ public class IssuesController {
     }
 
     @GetMapping("/auth/{workspaceId}/{platform}")
+    @RequiresPermissions(PermissionConstants.WORKSPACE_SERVICE_READ)
     public void testAuth(@PathVariable String workspaceId, @PathVariable String platform) {
         issuesService.testAuth(workspaceId, platform);
     }
 
     @PostMapping("/user/auth")
+    @RequiresPermissions(PermissionConstants.PERSONAL_INFORMATION_READ_THIRD_ACCOUNT)
     public void userAuth(@RequestBody AuthUserIssueRequest authUserIssueRequest) {
         issuesService.userAuth(authUserIssueRequest);
     }
 
     @GetMapping("/close/{id}")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ_EDIT)
     public void closeLocalIssue(@PathVariable String id) {
         issuesService.closeLocalIssue(id);
     }
 
     @PostMapping("/delete/relate")
+    @MsRequestLog(module = OperLogModule.TRACK_BUG)
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ)
     public void deleteRelate(@RequestBody IssuesRequest request) {
         issuesService.deleteIssueRelate(request);
     }
@@ -145,37 +151,43 @@ public class IssuesController {
 
     @PostMapping("/batchDelete")
     @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ_DELETE)
-    @MsAuditLog(module = OperLogModule.TRACK_BUG, type = OperLogConstants.DELETE, beforeEvent = "#msClass.getLogDetails(#request)", msClass = IssuesService.class)
+    @MsAuditLog(module = OperLogModule.TRACK_BUG, type = OperLogConstants.DELETE, msClass = IssuesService.class)
     public void batchDelete(@RequestBody IssuesUpdateRequest request) {
         issuesService.batchDelete(request);
     }
 
     @PostMapping("/tapd/user")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ)
     public List<PlatformUser> getTapdUsers(@RequestBody IssuesRequest request) {
         return issuesService.getTapdProjectUsers(request);
     }
 
     @GetMapping("/tapd/current_owner/{id}")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ)
     public List<String> getTapdIssueCurrentOwner(@PathVariable String id) {
         return issuesService.getTapdIssueCurrentOwner(id);
     }
 
     @GetMapping("/sync/{projectId}")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ)
     public void syncThirdPartyIssues(@PathVariable String projectId) {
         issuesSyncService.syncIssues(projectId);
     }
 
     @PostMapping("/sync/all")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ_EDIT)
     public void syncThirdPartyAllIssues(@RequestBody IssueSyncRequest request) {
         issuesSyncService.syncAllIssues(request);
     }
 
     @GetMapping("/sync/check/{projectId}")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ_EDIT)
     public IssueSyncCheckResult checkSync(@PathVariable String projectId) {
         return issuesService.checkSync(projectId);
     }
 
     @PostMapping("/change/status")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ_EDIT)
     public void changeStatus(@RequestBody IssuesRequest request) {
         issuesService.changeStatus(request);
     }
@@ -186,21 +198,26 @@ public class IssuesController {
     }
 
     @GetMapping("/follow/{issueId}")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ)
     public List<String> getFollows(@PathVariable String issueId) {
         return issuesService.getFollows(issueId);
     }
 
     @PostMapping("/up/follows/{issueId}")
+    @MsRequestLog(module = OperLogModule.TRACK_BUG)
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ_EDIT)
     public void saveFollows(@PathVariable String issueId,@RequestBody List<String> follows) {
         issuesService.saveFollows(issueId,follows);
     }
 
     @GetMapping("/thirdpart/template/{projectId}")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ)
     public IssueTemplateDao getThirdPartTemplate(@PathVariable String projectId) {
         return issuesService.getThirdPartTemplate(projectId);
     }
 
     @GetMapping("/plugin/custom/fields/{projectId}")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ)
     public List<CustomFieldDao> getPluginCustomFields(@PathVariable String projectId) {
         return issuesService.getPluginCustomFields(projectId);
     }
@@ -211,31 +228,37 @@ public class IssuesController {
     }
 
     @GetMapping("/third/part/template/enable/{projectId}")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ)
     public boolean thirdPartTemplateEnable(@PathVariable String projectId) {
         return issuesService.thirdPartTemplateEnable(projectId);
     }
 
     @PostMapping("/platform/transitions")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ)
     public List<PlatformStatusDTO> getPlatformTransitions(@RequestBody PlatformIssueTypeRequest request) {
         return issuesService.getPlatformTransitions(request);
     }
 
     @PostMapping("/platform/status")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ)
     public List<PlatformStatusDTO> getPlatformStatus(@RequestBody PlatformIssueTypeRequest request) {
         return issuesService.getPlatformStatus(request);
     }
 
     @GetMapping("/platform/option")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ)
     public List<SelectOption> getPlatformOptions() {
         return platformPluginService.getPlatformOptions();
     }
 
     @PostMapping("/platform/form/option")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ)
     public List<SelectOption> getPlatformOptions(@RequestBody PlatformOptionRequest request) {
         return platformPluginService.getFormOption(request);
     }
 
     @PostMapping("/check/third/project")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ)
     public void checkThirdProjectExist(@RequestBody Project project) {
         issuesService.checkThirdProjectExist(project);
     }
@@ -248,6 +271,7 @@ public class IssuesController {
 
     @PostMapping("/import")
     @MsAuditLog(module = OperLogModule.TRACK_BUG, type = OperLogConstants.IMPORT, project = "#request.projectId")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ_EDIT)
     public ExcelResponse issueImport(@RequestPart("request") IssueImportRequest request,  @RequestPart("file") MultipartFile file) {
         baseCheckPermissionService.checkProjectOwner(request.getProjectId());
         return issuesService.issueImport(request, file);
@@ -255,6 +279,7 @@ public class IssuesController {
 
     @PostMapping("/export")
     @MsAuditLog(module = OperLogModule.TRACK_BUG, type = OperLogConstants.EXPORT, project = "#exportRequest.projectId")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_ISSUE_READ)
     public void exportIssues(@RequestBody IssueExportRequest exportRequest, HttpServletResponse response) {
         issuesService.issueExport(exportRequest, response);
     }

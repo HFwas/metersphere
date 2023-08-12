@@ -13,8 +13,6 @@ import plugins from "metersphere-frontend/src/plugins";
 import directives from "metersphere-frontend/src/directive";
 import filters from "metersphere-frontend/src/filters";
 import "metersphere-frontend/src/router/permission";
-import mavonEditor from "mavon-editor";
-import "mavon-editor/dist/css/index.css";
 import VuePapaParse from "vue-papa-parse";
 import VueShepherd from 'vue-shepherd' // 新手引导
 import 'metersphere-frontend/src/assets/shepherd/shepherd-theme.css'
@@ -29,7 +27,6 @@ Vue.use(ElementUI, {
   i18n: (key, value) => i18n.t(key, value),
 });
 
-Vue.use(mavonEditor);
 Vue.use(svg);
 Vue.use(icons);
 Vue.use(plugins);
@@ -55,6 +52,13 @@ function render(props = {}) {
     pinia,
     render: (h) => h(App),
   }).$mount(container ? container.querySelector("#app") : "#app");
+
+  // 解决qiankun下，vue-devtools不显示的问题
+  if (process.env.NODE_ENV === 'development') {
+    const instanceDiv = document.createElement('div')
+    instanceDiv.__vue__ = instance
+    document.body.appendChild(instanceDiv)
+  }
 }
 
 // 独立运行时
@@ -88,7 +92,16 @@ export async function unmount(props) {
 }
 
 /**
- * 可选生命周期钩子，仅使用 loadMicroApp 方式加载微应用时生效
+ * 更新钩子，目前只有routeParams更新，后续有其他属性更新再添加
  */
-export async function update(props) {
+export async function update (props) {
+  const { defaultPath, routeParams, routeName } = props;
+  // 微服务过来的路由
+  if (defaultPath || routeName) {
+    microRouter.push({
+      path: defaultPath,
+      params: routeParams,
+      name: routeName,
+    });
+  }
 }

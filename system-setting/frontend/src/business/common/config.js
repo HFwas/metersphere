@@ -25,6 +25,7 @@ export function LOG_TYPE(_this) {
     {id: 'BATCH_RESTORE', label: _this.$t('commons.batch_restore')},
     {id: 'BATCH_GC', label: _this.$t('commons.batch_gc')},
     {id: 'MINDER_OPERATION', label: _this.$t('commons.minder_operation')},
+    {id: 'REQUEST', label: _this.$t('operating_log.request_record')},
   ];
   return LOG_TYPE;
 }
@@ -54,6 +55,7 @@ export function LOG_TYPE_MAP(_this) {
     ['BATCH_RESTORE', _this.$t('commons.batch_restore')],
     ['BATCH_GC', _this.$t('commons.batch_gc')],
     ['MINDER_OPERATION', _this.$t('commons.minder_operation')],
+    ['REQUEST', _this.$t('operating_log.request_record')],
   ]);
   return LOG_TYPE_MAP;
 }
@@ -523,7 +525,7 @@ export function getUrl(d, _this) {
     case "测试用例" :
     case "測試用例" :
     case "Test case":
-      url += "/track/case/all?resourceId=" + resourceId;
+      url += "/track/case/edit/" + resourceId;
       break;
     case "系统-用户":
     case "System user":
@@ -572,16 +574,6 @@ export function getUrl(d, _this) {
     case "项目-模版设置-自定义字段" :
     case "項目-模版設置-自定義字段" :
     case "Project template settings field" :
-      url += "/project/template";
-      break;
-    case "项目-模版设置-用例模版" :
-    case "項目-模版設置-用例模板" :
-    case "Project template settings case" :
-      url += "/project/template";
-      break;
-    case "项目-模版设置-缺陷模版" :
-    case "項目-模版設置-缺陷模板" :
-    case "Project template settings issue" :
       url += "/project/template";
       break;
     case "项目-成员":

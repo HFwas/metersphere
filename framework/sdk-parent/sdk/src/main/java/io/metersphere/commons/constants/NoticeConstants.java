@@ -21,6 +21,7 @@ public interface NoticeConstants {
         String UI_DEFINITION_TASK = "UI_DEFINITION_TASK";
         String UI_HOME_TASK = "UI_HOME_TASK";
         String UI_REPORT_TASK = "UI_REPORT_TASK";
+        String ENV_TASK = "ENV_TASK";
     }
 
     interface Mode {
@@ -46,6 +47,7 @@ public interface NoticeConstants {
         String UPDATE = "UPDATE";
         String DELETE = "DELETE";
         String COMPLETE = "COMPLETE";
+        String REVIEW = "REVIEW";
 
         String CASE_CREATE = "CASE_CREATE";
         String CASE_UPDATE = "CASE_UPDATE";

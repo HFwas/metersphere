@@ -37,7 +37,13 @@
                   </el-input>
                 </div>
 
-                <div style="float: right">
+                <div
+                  style="float: right"
+                  v-permission="[
+                    'PROJECT_API_SCENARIO:READ+EDIT',
+                    'PROJECT_API_SCENARIO:READ+CREATE',
+                    'PROJECT_API_SCENARIO:READ+COPY',
+                  ]">
                   <el-select
                     v-model="selectType"
                     :placeholder="$t('test_resource_pool.type')"
@@ -142,15 +148,37 @@
                   <ms-edit-counter v-if="editData.type == 'COUNTER'" ref="counter" :editData.sync="editData" />
                   <ms-edit-random v-if="editData.type == 'RANDOM'" ref="random" :editData.sync="editData" />
                   <ms-edit-list-value v-if="editData.type == 'LIST'" ref="listValue" :editData="editData" />
-                  <ms-edit-csv v-if="editData.type === 'CSV' && !loading" ref="csv" :editData.sync="editData" :disabled="disabled"/>
+                  <ms-edit-csv
+                    v-if="editData.type === 'CSV' && !loading"
+                    ref="csv"
+                    :editData.sync="editData"
+                    :disabled="disabled" />
                   <div v-if="editData.type" style="float: right">
-                    <el-button size="small" style="margin-left: 10px" type="primary" @click="confirmVariable">
+                    <el-button
+                      size="small"
+                      style="margin-left: 10px"
+                      type="primary"
+                      @click="confirmVariable"
+                      v-permission="[
+                        'PROJECT_API_SCENARIO:READ+EDIT',
+                        'PROJECT_API_SCENARIO:READ+CREATE',
+                        'PROJECT_API_SCENARIO:READ+COPY',
+                      ]">
                       {{ $t('commons.confirm') }}
                     </el-button>
                     <el-button size="small" style="margin-left: 10px" @click="cancelVariable"
-                    >{{ $t('commons.cancel') }}
+                      >{{ $t('commons.cancel') }}
                     </el-button>
-                    <el-button v-if="showDelete" size="small" style="margin-left: 10px" @click="deleteVariable">
+                    <el-button
+                      v-if="showDelete"
+                      size="small"
+                      style="margin-left: 10px"
+                      @click="deleteVariable"
+                      v-permission="[
+                        'PROJECT_API_SCENARIO:READ+EDIT',
+                        'PROJECT_API_SCENARIO:READ+CREATE',
+                        'PROJECT_API_SCENARIO:READ+COPY',
+                      ]">
                       {{ $t('commons.delete') }}
                     </el-button>
                   </div>
@@ -167,7 +195,7 @@
               placement="top-start"
               slot="label">
               <span
-              >{{ $t('api_test.request.headers') }}
+                >{{ $t('api_test.request.headers') }}
                 <div class="el-step__icon is-text ms-api-col ms-header" v-if="headers.length > 1">
                   <div class="el-step__icon-inner">
                     {{ headers.length - 1 }}
@@ -188,7 +216,16 @@
         </el-tabs>
         <template v-slot:footer>
           <div>
-            <el-button type="primary" @click="save">{{ $t('commons.confirm') }}</el-button>
+            <el-button
+              type="primary"
+              @click="save"
+              v-permission="[
+                'PROJECT_API_SCENARIO:READ+EDIT',
+                'PROJECT_API_SCENARIO:READ+CREATE',
+                'PROJECT_API_SCENARIO:READ+COPY',
+              ]"
+              >{{ $t('commons.confirm') }}
+            </el-button>
           </div>
         </template>
       </el-collapse-transition>
@@ -212,12 +249,12 @@ import BatchAddParameter from '../../../definition/components/basis/BatchAddPara
 import { KeyValue } from '../../../definition/model/ApiTestModel';
 import { REQUEST_HEADERS } from 'metersphere-frontend/src/utils/constants';
 
+import { diff } from 'jsondiffpatch';
 import MsTable from 'metersphere-frontend/src/components/table/MsTable';
 import MsTableColumn from 'metersphere-frontend/src/components/table/MsTableColumn';
 import { getCustomTableHeader, getCustomTableWidth } from 'metersphere-frontend/src/utils/tableUtils';
 import VariableImport from '@/business/automation/scenario/variable/VariableImport';
-
-const jsondiffpatch = require('jsondiffpatch');
+import { hasPermissions } from 'metersphere-frontend/src/utils/permission';
 
 export default {
   name: 'MsVariableList',
@@ -468,10 +505,10 @@ export default {
         if (messages !== '') {
           this.$alert(
             this.$t('api_test.scenario.variables') +
-            '【' +
-            messages.substr(0, messages.length - 1) +
-            '】' +
-            this.$t('load_test.param_is_duplicate')
+              '【' +
+              messages.substr(0, messages.length - 1) +
+              '】' +
+              this.$t('load_test.param_is_duplicate')
           );
         }
       });
@@ -480,22 +517,36 @@ export default {
       this.visible = false;
     },
     close() {
-      this.visible = false;
       let saveVariables = [];
+      let isContinue = true;
       this.variables.forEach((item) => {
         item.hidden = undefined;
         if (item.name && item.name != '') {
           item.showMore = false;
           saveVariables.push(item);
         }
+        if (item.type === 'CSV' && item.files.length === 0) {
+          this.$warning(this.$t('api_test.variable') + item.name + ' ' + this.$t('api_test.automation.csv_warning'));
+          isContinue = false;
+          return;
+        }
       });
+      if (!isContinue) {
+        this.visible = true;
+        return;
+      }
       this.selectVariable = '';
       this.searchType = '';
       this.selectType = 'CONSTANT';
       this.editData = {};
       if (
-        jsondiffpatch.diff(JSON.parse(JSON.stringify(this.variables)), this.variablesOld) ||
-        jsondiffpatch.diff(JSON.parse(JSON.stringify(this.headers)), this.headersOld)
+        (diff(JSON.parse(JSON.stringify(this.variables)), this.variablesOld) ||
+          diff(JSON.parse(JSON.stringify(this.headers)), this.headersOld)) &&
+        hasPermissions(
+          'PROJECT_API_SCENARIO:READ+EDIT',
+          'PROJECT_API_SCENARIO:READ+CREATE',
+          'PROJECT_API_SCENARIO:READ+COPY'
+        )
       ) {
         this.$emit('setVariables', saveVariables, this.headers);
       }
@@ -506,6 +557,7 @@ export default {
       this.showDelete = false;
       if (this.editData.type === 'CSV' && this.$refs.csv) {
         this.$refs.csv.cleanPreview();
+        this.reload();
       }
       this.$refs.variableTable.cancelCurrentRow();
     },

@@ -135,7 +135,7 @@
         </el-col>
       </el-row>
     </el-tab-pane>
-    <ms-file-metadata-list ref="metadataList" @checkRows="checkRows"/>
+    <ms-file-metadata-list v-if="hasProjectFilePermission" ref="metadataList" @checkRows="checkRows"/>
     <ms-file-batch-move ref="module" @setModuleId="setModuleId"/>
   </el-tabs>
 </template>
@@ -155,16 +155,16 @@ import {testCaseCommentList} from "@/api/test-case-comment";
 import {
   attachmentList,
   deleteTestCaseAttachment, dumpAttachment,
-  relatedAttachment,
-  unrelatedAttachment,
-  uploadIssueAttachment
+  relatedTestCaseAttachment,
+  unrelatedTestCaseAttachment,
+  uploadTestCaseAttachment
 } from "@/api/attachment";
 import {getUUID} from "metersphere-frontend/src/utils"
 import {getCurrentProjectID} from "metersphere-frontend/src/utils/token"
 import {issueDemandList} from "@/api/issue";
 import {TokenKey} from "metersphere-frontend/src/utils/constants";
 import DependenciesList from "@/business/common/DependenciesList";
-import {byteToSize, getCurrentUser, getTypeByFileName} from "@/business/utils/sdk-utils";
+import {byteToSize, getCurrentUser, getTypeByFileName, hasPermission} from "@/business/utils/sdk-utils";
 import axios from "axios";
 import MsFileMetadataList from "metersphere-frontend/src/components/environment/commons/variable/QuoteFileList";
 import MsFileBatchMove from "metersphere-frontend/src/components/environment/commons/variable/FileBatchMove";
@@ -213,6 +213,9 @@ export default {
   computed: {
     isTesterPermission() {
       return true;
+    },
+    hasProjectFilePermission() {
+      return hasPermission("PROJECT_FILE:READ");
     }
   },
   watch: {
@@ -330,7 +333,7 @@ export default {
       let CancelToken = axios.CancelToken;
       let self = this;
 
-      uploadIssueAttachment(file, data, CancelToken, self.cancelFileToken, progressCallback)
+      uploadTestCaseAttachment(file, data, CancelToken, self.cancelFileToken, progressCallback)
         .then(response => { // 成功回调
           progress = 100;
           param.onSuccess(response);
@@ -425,7 +428,7 @@ export default {
               // 已经关联的记录
               this.unRelateFiles.push(file.id);
               let data = {'belongType': 'testcase', 'belongId': this.caseId, 'metadataRefIds': this.unRelateFiles};
-              unrelatedAttachment(data)
+              unrelatedTestCaseAttachment(data)
                 .then(() => {
                   this.$success(this.$t('commons.unrelated_success'));
                   this.result.loading = false;
@@ -516,7 +519,7 @@ export default {
           rows.forEach(row => metadataRefIds.push(row.id));
           let data = {'belongType': 'testcase', 'belongId': this.caseId, 'metadataRefIds': metadataRefIds};
           this.result.loading = true;
-          relatedAttachment(data)
+          relatedTestCaseAttachment(data)
             .then(() => {
               this.$success(this.$t('commons.relate_success'));
               this.result.loading = false;

@@ -2,14 +2,17 @@ package io.metersphere.commons.utils;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.core.StreamReadConstraints;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.type.CollectionType;
 import com.fasterxml.jackson.databind.type.TypeFactory;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParser;
@@ -45,6 +48,14 @@ public class JSONUtil {
         // 如果一个对象中没有任何的属性，那么在序列化的时候就会报错
         objectMapper.disable(SerializationFeature.FAIL_ON_EMPTY_BEANS);
         objectMapper.configure(DeserializationFeature.ACCEPT_SINGLE_VALUE_AS_ARRAY, true);
+        // 使用BigDecimal来序列化
+        objectMapper.configure(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS, true);
+        objectMapper.configure(com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_UNQUOTED_CONTROL_CHARS, true);
+        // 设置JSON处理字符长度限制
+        objectMapper.getFactory()
+                .setStreamReadConstraints(StreamReadConstraints.builder().maxStringLength(JSON.DEFAULT_MAX_STRING_LEN).build());
+        // 处理时间格式
+        objectMapper.registerModule(new JavaTimeModule());
 
     }
 
@@ -220,6 +231,17 @@ public class JSONUtil {
             }
             Map<String, Object> map = JSON.parseObject(value, Map.class);
             return new JSONObject(map);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    public static JsonNode parseNode(String value) {
+        try {
+            if (StringUtils.isEmpty(value)) {
+                MSException.throwException("value is null");
+            }
+            return objectMapper.readTree(value);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }

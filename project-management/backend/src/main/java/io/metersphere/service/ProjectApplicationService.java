@@ -257,7 +257,10 @@ public class ProjectApplicationService {
         String projectId = conf.getProjectId();
         String type = conf.getType();
         String value = conf.getTypeValue();
-        if (StringUtils.isBlank(projectId) || StringUtils.isBlank(type) || StringUtils.isEmpty(value)) {
+        //性能测试审核人，允许value值为空
+        if ( !StringUtils.equals(type, ProjectApplicationType.API_SCRIPT_REVIEWER.name())
+                && !StringUtils.equals(type, ProjectApplicationType.PERFORMANCE_SCRIPT_REVIEWER.name())
+                && (StringUtils.isBlank(projectId) || StringUtils.isBlank(type) || StringUtils.isEmpty(value))) {
             LogUtil.error("create or update project config error. project id or conf type or value is blank.");
             return;
         }

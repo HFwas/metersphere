@@ -18,6 +18,7 @@ import io.metersphere.dto.*;
 import io.metersphere.excel.constants.TestPlanTestCaseStatus;
 import io.metersphere.log.vo.DetailColumn;
 import io.metersphere.log.vo.OperatingLogDetails;
+import io.metersphere.log.vo.StatusReference;
 import io.metersphere.plan.dto.TestCaseReportStatusResultDTO;
 import io.metersphere.plan.dto.TestPlanReportDataStruct;
 import io.metersphere.plan.request.function.*;
@@ -108,7 +109,7 @@ public class TestPlanTestCaseService {
         ServiceUtils.buildCombineTagsToSupportMultiple(request);
         List<TestPlanCaseDTO> list = extTestPlanTestCaseMapper.list(request);
         Map<String, List<CustomFieldDao>> fieldMap =
-                customFieldTestCaseService.getMapByResourceIds(list.stream().map(TestPlanCaseDTO::getCaseId).collect(Collectors.toList()));
+                customFieldTestCaseService.getMapByResourceIdsForList(list.stream().map(TestPlanCaseDTO::getCaseId).collect(Collectors.toList()));
         list.forEach(i -> i.setFields(fieldMap.get(i.getCaseId())));
         if (CollectionUtils.isNotEmpty(list)) {
             // 设置版本信息
@@ -234,6 +235,7 @@ public class TestPlanTestCaseService {
     }
 
     public void editTestCaseBath(TestPlanCaseBatchRequest request) {
+        ServiceUtils.buildCombineTagsToSupportMultiple(request.getCondition());
         TestPlanTestCaseExample testPlanTestCaseExample = getBatchExample(request);
         TestPlanTestCaseWithBLOBs testPlanTestCase = new TestPlanTestCaseWithBLOBs();
         if (BooleanUtils.isFalse(request.isModifyExecutor()) && StringUtils.isNotBlank(SessionUtils.getUserId())) {
@@ -352,6 +354,7 @@ public class TestPlanTestCaseService {
     }
 
     public void deleteTestCaseBath(TestPlanCaseBatchRequest request) {
+        ServiceUtils.buildCombineTagsToSupportMultiple(request.getCondition());
         TestPlanTestCaseExample example = getBatchExample(request);
         testPlanTestCaseMapper.deleteByExample(example);
     }
@@ -480,8 +483,17 @@ public class TestPlanTestCaseService {
         TestPlanTestCaseWithBLOBs planTestCaseWithBLOBs = testPlanTestCaseMapper.selectByPrimaryKey(id);
         if (planTestCaseWithBLOBs != null) {
             TestCase testCase = testCaseMapper.selectByPrimaryKey(planTestCaseWithBLOBs.getCaseId());
-            TestPlan testPlan = testPlanMapper.selectByPrimaryKey(planTestCaseWithBLOBs.getPlanId());
-            OperatingLogDetails details = new OperatingLogDetails(JSON.toJSONString(id), testCase.getProjectId(), testCase.getName(), planTestCaseWithBLOBs.getCreateUser(), new LinkedList<>());
+            List<DetailColumn> columns = new LinkedList<>();
+            DetailColumn executeStatusColumn = new DetailColumn("状态", "lastExecuteResult", StatusReference.statusMap.get(testCase.getLastExecuteResult()), null);
+            columns.add(executeStatusColumn);
+            // 增加评论内容
+            List<TestCaseCommentDTO> dtos = testCaseCommentService.getCaseComments(planTestCaseWithBLOBs.getCaseId());
+            if (CollectionUtils.isNotEmpty(dtos)) {
+                List<String> names = dtos.stream().map(TestCaseCommentDTO::getDescription).collect(Collectors.toList());
+                DetailColumn detailColumn = new DetailColumn("评论", "comment", String.join(StringUtils.LF, names), null);
+                columns.add(detailColumn);
+            }
+            OperatingLogDetails details = new OperatingLogDetails(JSON.toJSONString(testCase.getId()), testCase.getProjectId(), testCase.getName(), planTestCaseWithBLOBs.getCreateUser(), columns);
             return JSON.toJSONString(details);
         }
         return null;

@@ -236,7 +236,7 @@
         <ms-table-column v-for="field in testCaseTemplate.customFields" :key="field.id"
                          :filters="getCustomFieldFilter(field)"
                          :field="item"
-                         column-key="priority"
+                         :column-key="field.columnKey ? field.columnKey : generateColumnKey(field)"
                          :fields-width="fieldsWidth"
                          :label="field.system ? $t(systemFiledMap[field.name]) :field.name"
                          :min-width="120"
@@ -247,7 +247,7 @@
                     :value="getCustomFieldValue(scope.row, field)" :priority-options="priorityOptions"/>
               </span>
             <span v-else-if="field.name === '用例状态'">
-                {{ getCustomFieldValue(scope.row, field, scope.row.status) }}
+                {{ getCustomFieldValue(scope.row, field, scope.row.caseStatus) }}
             </span>
             <span v-else>
                 {{ getCustomFieldValue(scope.row, field) }}
@@ -311,12 +311,11 @@ import {
   initCondition,
   getCustomFieldFilter,
   parseCustomFilesForList,
-  getCustomFieldValue as _getCustomFieldValue,
 } from "metersphere-frontend/src/utils/tableUtils";
 import MsTable from "metersphere-frontend/src/components/table/MsTable";
 import MsTableColumn from "metersphere-frontend/src/components/table/MsTableColumn";
 import {getProjectMember} from "@/api/user";
-import {getTestTemplate} from "@/api/custom-field-template";
+import {getTestTemplateForList} from "@/api/custom-field-template";
 import {
   editTestPlanTestCaseOrder,
   testPlanAutoCheck,
@@ -329,7 +328,7 @@ import TestPlanCaseIssueItem from "@/business/plan/view/comonents/functional/Tes
 import {
   getProjectMemberOption,
   getProjectVersions,
-  getAdvSearchCustomField, parseTag
+  getAdvSearchCustomField, parseTag, getCustomFieldValueForTrack, generateColumnKey
 } from "@/business/utils/sdk-utils";
 import {
   testPlanTestCaseBatchDelete,
@@ -435,6 +434,13 @@ export default {
     },
     planStatus: {
       type: String
+    },
+    searchSelectNodeIds: {
+      type: Array
+    },
+    searchSelect: {
+      type: Boolean,
+      default: false
     },
   },
   computed: {
@@ -542,6 +548,7 @@ export default {
     this.$EventBus.$off("openFailureTestCase", this.handleOpenFailureTestCase);
   },
   methods: {
+    generateColumnKey,
     loadIssue(row) {
       if (row.issuesSize && !row.hasLoadIssue) {
         getOriginIssuesByCaseId('PLAN_FUNCTIONAL', row.id)
@@ -574,7 +581,7 @@ export default {
         .then((response) => {
           this.members = response.data;
         });
-      let p2 = getTestTemplate();
+      let p2 = getTestTemplateForList();
       Promise.all([p1, p2]).then((data) => {
         let template = data[1];
         this.testCaseTemplate = template;
@@ -608,7 +615,7 @@ export default {
       return getCustomFieldFilter(field, this.userFilters);
     },
     getCustomFieldValue(row, field, defaultVal = '') {
-      let value = _getCustomFieldValue(row, field, this.members);
+      let value = getCustomFieldValueForTrack(row, field, this.members, 'caseStatus');
       if (field.name === '用例等级') {
         return row.priority;
       } else if (field.name === '责任人') {
@@ -636,8 +643,14 @@ export default {
         this.status = 'all';
       }
       this.condition.nodeIds = [];
-      if (this.selectNodeIds && this.selectNodeIds.length > 0) {
-        this.condition.nodeIds = this.selectNodeIds;
+      if (!this.searchSelect) {
+        if (this.selectNodeIds && this.selectNodeIds.length > 0) {
+          this.condition.nodeIds = this.selectNodeIds;
+        }
+      } else {
+        if (this.searchSelectNodeIds && this.searchSelectNodeIds.length > 0) {
+          this.condition.nodeIds = this.searchSelectNodeIds;
+        }
       }
       this.condition.projectId = getCurrentProjectID();
       if (this.planId) {
@@ -720,8 +733,8 @@ export default {
       this.initTableData();
     },
     search() {
-      this.initTableData();
       this.$emit('search');
+      this.initTableData();
     },
     buildPagePath(path) {
       return path + "/" + this.currentPage + "/" + this.pageSize;

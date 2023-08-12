@@ -2,7 +2,6 @@ package io.metersphere.service;
 
 import io.metersphere.api.dto.automation.ApiTestReportVariable;
 import io.metersphere.api.exec.scenario.ApiEnvironmentRunningParamService;
-import io.metersphere.utils.ReportStatusUtil;
 import io.metersphere.base.domain.*;
 import io.metersphere.base.mapper.ApiDefinitionExecResultMapper;
 import io.metersphere.base.mapper.ApiScenarioMapper;
@@ -13,7 +12,6 @@ import io.metersphere.commons.enums.ApiReportStatus;
 import io.metersphere.commons.utils.CommonBeanFactory;
 import io.metersphere.commons.utils.DateUtils;
 import io.metersphere.commons.utils.JSON;
-import io.metersphere.vo.ResultVO;
 import io.metersphere.constants.RunModeConstants;
 import io.metersphere.dto.BaseSystemConfigDTO;
 import io.metersphere.dto.RequestResult;
@@ -27,9 +25,12 @@ import io.metersphere.service.scenario.ApiScenarioExecutionInfoService;
 import io.metersphere.service.scenario.ApiScenarioReportService;
 import io.metersphere.service.scenario.ApiScenarioReportStructureService;
 import io.metersphere.service.scenario.ApiScenarioService;
+import io.metersphere.utils.ReportStatusUtil;
+import io.metersphere.vo.ResultVO;
 import jakarta.annotation.Resource;
 import org.apache.commons.beanutils.BeanMap;
 import org.apache.commons.collections4.CollectionUtils;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Service;
 
@@ -47,8 +48,6 @@ public class TestResultService {
     private ApiScenarioMapper apiScenarioMapper;
     @Resource
     private ApiEnvironmentRunningParamService apiEnvironmentRunningParamService;
-    @Resource
-    private RedisTemplateService redisTemplateService;
     @Resource
     private ApiScenarioExecutionInfoService scenarioExecutionInfoService;
     @Resource
@@ -79,53 +78,11 @@ public class TestResultService {
         this.add(ApiRunMode.JENKINS_SCENARIO_PLAN.name());
     }};
 
-    // 接口测试 用例/接口
-    private static final List<String> caseRunModes = new ArrayList<>() {{
-        this.add(ApiRunMode.DEFINITION.name());
-        this.add(ApiRunMode.JENKINS.name());
-        this.add(ApiRunMode.API_PLAN.name());
-    }};
-
-    // 测试计划 用例/接口
-    private static final List<String> planCaseRunModes = new ArrayList<>() {{
-        this.add(ApiRunMode.SCHEDULE_API_PLAN.name());
-        this.add(ApiRunMode.JENKINS_API_PLAN.name());
-        this.add(ApiRunMode.MANUAL_PLAN.name());
-    }};
-
     private static final List<String> apiRunModes = new ArrayList<>() {{
         this.add(ApiRunMode.DEFINITION.name());
         this.add(ApiRunMode.API_PLAN.name());
         this.add(ApiRunMode.SCHEDULE_API_PLAN.name());
     }};
-
-    /**
-     * 执行结果存储
-     *
-     * @param dto 执行结果
-     */
-    public void saveResults(ResultDTO dto) {
-        // 处理环境
-        List<String> environmentList = new LinkedList<>();
-        if (dto.getArbitraryData() != null && dto.getArbitraryData().containsKey("ENV")) {
-            environmentList = (List<String>) dto.getArbitraryData().get("ENV");
-        }
-        //处理环境参数
-        if (CollectionUtils.isNotEmpty(environmentList)) {
-            apiEnvironmentRunningParamService.parseEnvironment(environmentList);
-        }
-
-        // 测试计划用例触发结果处理
-        if (planCaseRunModes.contains(dto.getRunMode())) {
-            apiDefinitionExecResultService.saveApiResultByScheduleTask(dto);
-        } else if (caseRunModes.contains(dto.getRunMode())) {
-            // 手动触发/批量触发 用例结果处理
-            apiDefinitionExecResultService.saveApiResult(dto);
-        } else if (scenarioRunModes.contains(dto.getRunMode())) {
-            // 场景报告结果处理
-            apiScenarioReportService.saveResult(dto);
-        }
-    }
 
     /**
      * 批量存储来自NODE/K8s的执行结果
@@ -183,7 +140,7 @@ public class TestResultService {
         }
 
         // 发送通知
-        if (scenario != null && report != null) {
+        if (scenario != null && report != null && !StringUtils.equals(report.getExecuteType(), "Debug")) {
             apiScenarioReportService.sendNotice(scenario, report);
         }
         return report;
@@ -267,7 +224,7 @@ public class TestResultService {
                     sendTask(reportTask, dto.getTestId());
                 }
             }
-        } else if (apiRunModes.contains(dto.getRunMode())) {
+        } else if (apiRunModes.contains(dto.getRunMode()) && BooleanUtils.isTrue(dto.getErrorEnded())) {
             // 只处理RUNNING中的执行报告
             updateRunningResult(dto);
         }

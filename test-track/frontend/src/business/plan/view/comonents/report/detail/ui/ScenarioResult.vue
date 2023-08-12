@@ -3,17 +3,27 @@
     <div v-if="(node.children && node.children.length >0) || node.unsolicited
     || (node.type && this.stepFilter.get('AllSamplerProxy').indexOf(node.type) === -1)">
       <el-card class="ms-card">
-        <div class="el-step__icon is-text ms-api-col">
-          <div class="el-step__icon-inner">
-            {{ node.index }}
-          </div>
-        </div>
-        <el-tooltip effect="dark" :content="node.label" placement="top">
-          <el-link v-if="node.redirect" class="report-label-head" @click="isLink">
-            {{ getLabel(node.label) }}
-          </el-link>
-          <span v-else>{{ getLabel(node.label) }}</span>
-        </el-tooltip>
+        <el-row>
+          <el-col :span="22">
+            <div class="el-step__icon is-text ms-api-col">
+              <div class="el-step__icon-inner">
+                {{ node.index }}
+              </div>
+            </div>
+            <el-tooltip effect="dark" :content="node.label" placement="top">
+              <el-link v-if="node.redirect" class="report-label-head" @click="isLink">
+                {{ getLabel(node.label) }}
+              </el-link>
+              <span v-else>{{ getLabel(node.label) }}</span>
+            </el-tooltip>
+          </el-col>
+          <el-col :span="2">
+            <div style="float: right">
+              <ms-api-report-status :status="node.totalStatus" v-if="node.type !=='ConstantTimer' && node.type !=='Assertions'
+                                     && node.children && node.children.length > 0"/>
+            </div>
+          </el-col>
+        </el-row>
       </el-card>
     </div>
     <div v-else-if="node.type === 'MsUiCommand'">
@@ -38,6 +48,7 @@
         :total-status="node.totalStatus"
         :console="console"
         :isActive="isActive"
+        :is-template="isTemplate"
         :is-share="isShare"
         :share-id="shareId"
         v-on:requestResult="requestResult"
@@ -50,12 +61,15 @@
 import MsRequestResult from "./RequestResult";
 import {STEP} from "./Setting";
 import UiCommandResult from "./UiCommandResult";
+import MsApiReportStatus from "@/business/plan/view/comonents/report/detail/api/ApiReportStatus";
+
 
 export default {
   name: "MsScenarioResult",
   components: {
     UiCommandResult,
-    MsRequestResult
+    MsRequestResult,
+    MsApiReportStatus
   },
   props: {
     scenario: Object,
@@ -75,12 +89,16 @@ export default {
   methods: {
     getLabel(label) {
       switch (label) {
-        case "ConstantTimer":
-          return "等待控制器";
-        case "LoopController":
-          return "循环控制器";
-        case "Assertion":
-          return "场景断言";
+        case 'ConstantTimer':
+          return this.$t('api_test.automation.wait_controller');
+        case 'LoopController':
+          return this.$t('api_test.automation.loop_controller');
+        case 'Assertions':
+          return this.$t('api_test.definition.request.scenario_assertions');
+        case 'IfController':
+          return this.$t('api_test.automation.if_controller');
+        case 'TransactionController':
+          return this.$t('api_test.automation.transaction_controller');
         default:
           return label;
       }

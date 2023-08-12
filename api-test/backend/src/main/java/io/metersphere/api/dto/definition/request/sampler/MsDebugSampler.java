@@ -37,6 +37,7 @@ public class MsDebugSampler extends MsTestElement {
         if (!config.isOperating() && !this.isEnable()) {
             return;
         }
+        
         final HashTree groupTree = tree.add(debugSampler());
         if (CollectionUtils.isNotEmpty(hashTree)) {
             hashTree.forEach(el -> {

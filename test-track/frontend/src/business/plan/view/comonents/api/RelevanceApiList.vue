@@ -24,13 +24,17 @@
         @refreshTable="initTable"
         ref="apitable">
 
-        <template v-slot:header>
-          <ms-environment-select :project-id="projectId" :is-read-only="isReadOnly"
-                                 @setEnvironment="setEnvironment" ref="msEnvironmentSelect"/>
-        </template>
-
       </api-table-list>
-
+      <div>
+        <el-radio-group v-model="envType" style="float: left;margin-top: 8px;">
+          <el-radio label="default">{{ $t("api_test.environment.default_environment") }}</el-radio>
+          <el-radio label="newEnv">{{ $t("api_test.environment.choose_new_environment") }}</el-radio>
+        </el-radio-group>
+        <ms-environment-select v-if="envType==='newEnv'" :project-id="projectId" :is-read-only="isReadOnly"
+                               @setEnvironment="setEnvironment" ref="msEnvironmentSelect"
+                               style="float: left;margin-left: 16px"
+        />
+      </div>
     </api-list-container>
 
   </div>
@@ -60,6 +64,7 @@ export default {
       condition: {
         components: TEST_PLAN_RELEVANCE_API_DEFINITION_CONFIGS
       },
+      envType: 'default',
       result: {},
       screenHeight: 'calc(100vh - 400px)',//屏幕高度,
       tableData: [],
@@ -94,7 +99,7 @@ export default {
   },
   created() {
     this.condition.versionId = this.currentVersion;
-    this.initTable();
+
   },
   watch: {
     selectNodeIds() {
@@ -113,7 +118,7 @@ export default {
     currentVersion() {
       this.condition.versionId = this.currentVersion;
       this.initTable();
-    }
+    },
   },
   methods: {
     setSelectRow(setSelectRow) {
@@ -150,17 +155,19 @@ export default {
       this.condition.planId = this.planId;
       this.$nextTick(() => {
         this.result = {loading: true};
-        apiDefinitionListRelevance({pageNum: this.$refs.apitable.currentPage, pageSize: this.$refs.apitable.pageSize}, this.condition)
-          .then(response => {
-            this.result = {loading: false};
-            this.total = response.data.itemCount;
-            this.tableData = response.data.listObject;
-            this.tableData.forEach(item => {
-              if (item.tags && item.tags.length > 0) {
-                item.tags = JSON.parse(item.tags);
-              }
+        if (this.$refs.apitable) {
+          apiDefinitionListRelevance({pageNum: this.$refs.apitable.currentPage, pageSize: this.$refs.apitable.pageSize}, this.condition)
+            .then(response => {
+              this.result = {loading: false};
+              this.total = response.data.itemCount;
+              this.tableData = response.data.listObject;
+              this.tableData.forEach(item => {
+                if (item.tags && item.tags.length > 0) {
+                  item.tags = JSON.parse(item.tags);
+                }
+              });
             });
-          });
+        }
       });
     },
     setEnvironment(data) {

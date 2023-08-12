@@ -159,6 +159,7 @@
         <if test="request.executorOrPrincipal != null">
             LEFT JOIN test_plan_principal ON test_plan_principal.test_plan_id = test_plan.id
             LEFT JOIN test_plan_test_case on test_plan_test_case.plan_id = test_plan.id
+            LEFT JOIN test_case on test_case.id = test_plan_test_case.case_id
         </if>
         <where>
             <if test="request.combine != null">
@@ -202,7 +203,7 @@
                         <when test="key=='status'">
                             <choose>
                                 <when test="request.executorOrPrincipal != null">
-                                    AND (( test_plan_principal.principal_id =
+                                    and (( test_plan_principal.principal_id =
                                     '${@io.metersphere.commons.utils.SessionUtils@getUserId()}' and
                                     test_plan.status in
                                     <include refid="io.metersphere.base.mapper.ext.ExtBaseMapper.filterInWrapper"/>
@@ -214,6 +215,7 @@
                                     <include refid="io.metersphere.base.mapper.ext.ExtBaseMapper.filterInWrapper"/>
                                     ))
                                     and (test_plan.status is null or test_plan.status != 'Trash')
+                                    and (test_case.status is null or test_case.status != 'Trash')
                                 </when>
                                 <otherwise>
                                     and test_plan.status in
@@ -320,7 +322,8 @@
         SELECT p.name
         FROM test_plan tp
                  INNER JOIN project p ON p.id = tp.project_id
-        WHERE tp.id = #{0} limit 1;
+        WHERE tp.id = #{0}
+        limit 1;
     </select>
     <select id="findIdByPerformanceReportId" resultType="java.lang.String">
         SELECT report.id
@@ -412,19 +415,61 @@
         (select name from user where user.id = test_plan.creator) as userName
         from test_plan
         JOIN project on project.id = test_plan.project_id
+        <if test="request.executorOrPrincipal != null">
+            LEFT JOIN test_plan_principal ON test_plan_principal.test_plan_id = test_plan.id
+            LEFT JOIN test_plan_test_case on test_plan_test_case.plan_id = test_plan.id
+            LEFT JOIN test_case on test_case.id = test_plan_test_case.case_id
+        </if>
         <where>
+            <if test="request.combine != null">
+                <include refid="combine">
+                    <property name="condition" value="request.combine"/>
+                    <property name="name" value="request.name"/>
+                    <property name="objectKey" value="request.combine.tags"/>
+                </include>
+            </if>
+            <if test="request.name != null">
+                and test_plan.name like CONCAT('%', #{request.name},'%')
+            </if>
+            <if test="request.workspaceId != null">
+                AND test_plan.workspace_id = #{request.workspaceId}
+            </if>
             <if test="request.projectId != null">
                 AND test_plan.project_id = #{request.projectId}
             </if>
+            <if test="request.id != null">
+                AND test_plan.id = #{request.id}
+            </if>
+            <include refid="filter"/>
+            <if test="(request.filters == null or request.filters.size() == 0) and request.byFilter != true ">
+                and test_plan.status != 'Archived'
+            </if>
         </where>
+
+        <if test="request.orders != null and request.orders.size() > 0">
+            order by
+            <foreach collection="request.orders" separator="," item="order">
+                test_plan.${order.name} ${order.type}
+            </foreach>
+        </if>
     </select>
-    <update id="updateActualEndTimeIsNullById">
+    <update id="updateStatusAndActStartTimeAndSetActEndTimeNullById">
         update test_plan
-        set actual_end_time = null
-        where id = #{0}
+        set actual_start_time = #{actStartTime},
+            actual_end_time   = null,
+            status            = #{status}
+        where id = #{testPlanId}
     </update>
 
     <select id="checkSyncTestCaseExecResultByTestPlanId" resultType="java.lang.Boolean">
-        SELECT automatic_status_update FROM test_plan WHERE id = #{0}
+        SELECT automatic_status_update
+        FROM test_plan
+        WHERE id = #{0}
+    </select>
+    <select id="countExecutingReportCount" resultType="java.lang.Long">
+        SELECT COUNT(*)
+        FROM test_plan_report
+        WHERE test_plan_id = #{0}
+          AND status = 'RUNNING'
     </select>
 </mapper>

@@ -17,7 +17,7 @@
                   :key="index"
                   class="ms-api-header-select"
                   style="width: 180px"
-                  :readonly="!hasPermission('PROJECT_API_DEFINITION:READ+EDIT_CASE')"
+                  :readonly="!hasPermissions('PROJECT_API_DEFINITION:READ+EDIT_CASE', 'PROJECT_API_DEFINITION:READ+CREATE_CASE', 'PROJECT_API_DEFINITION:READ+COPY_CASE')"
                   :placeholder="$t('commons.input_name')"
                   ref="nameEdit" />
                 <span v-else>
@@ -267,8 +267,13 @@ import { createDefinition } from '@/api/definition';
 import { relationGet, updateRuleRelation } from '@/api/xpack';
 import { getUUID } from 'metersphere-frontend/src/utils';
 import { getCurrentProjectID, getCurrentUser } from 'metersphere-frontend/src/utils/token';
-import { hasLicense, hasPermission } from 'metersphere-frontend/src/utils/permission';
-import { _getBodyUploadFiles, mergeRequestDocumentData } from '@/business/definition/api-definition';
+import { hasLicense, hasPermissions } from 'metersphere-frontend/src/utils/permission';
+import {
+  _getBodyUploadFiles,
+  hisDataProcessing,
+  mergeRequestDocumentData,
+  stepCompute
+} from '@/business/definition/api-definition';
 import { API_METHOD_COLOUR, API_STATUS, PRIORITY } from '../../model/JsonData';
 import MsTag from 'metersphere-frontend/src/components/MsTag';
 import MsTipButton from 'metersphere-frontend/src/components/MsTipButton';
@@ -288,6 +293,7 @@ import { TYPE_TO_C } from '@/business/automation/scenario/Setting';
 import ApiCaseHeader from './ApiCaseHeader';
 import { deepClone } from 'metersphere-frontend/src/utils/tableUtils';
 import { useApiStore } from '@/store';
+import {Body, KeyValue} from "@/business/definition/model/ApiTestModel";
 
 const store = useApiStore();
 export default {
@@ -343,7 +349,6 @@ export default {
       beforeUpdateRequest: {},
       compare: [],
       isSave: false,
-      tagCount: 0,
       requestCount: 0,
       readonly: false,
       noShowSyncRuleRelation: false,
@@ -397,6 +402,7 @@ export default {
     this.$EventBus.$off('showXpackCaseSet');
   },
   created() {
+    this.init();
     window.addEventListener('resize', this.resizeTable, false);
     store.scenarioEnvMap = undefined;
     if (this.apiCase.request && this.apiCase.request.hashTree && this.apiCase.request.hashTree.length > 0) {
@@ -405,8 +411,11 @@ export default {
         this.apiCase.request.hashTree[index].document.nodeType = 'Case';
         this.apiCase.request.hashTree[index].document.apiDefinitionId = this.apiCase.apiDefinitionId;
       }
+      this.apiCase.request.hashTree.forEach(item =>{
+        item.projectId = this.apiCase.projectId;
+      })
     }
-    this.readonly = !hasPermission('PROJECT_API_DEFINITION:READ+EDIT_CASE');
+    this.readonly = !hasPermissions('PROJECT_API_DEFINITION:READ+EDIT_CASE', 'PROJECT_API_DEFINITION:READ+CREATE_CASE', 'PROJECT_API_DEFINITION:READ+COPY_CASE');
     if (this.apiCase && this.apiCase.id) {
       this.showFollow = false;
       getApiCaseFollow(this.apiCase.id).then((response) => {
@@ -453,20 +462,20 @@ export default {
       },
     },
     'apiCase.tags': {
-      handler(v) {
-        this.tagCount++;
-        if (this.tagCount > 2) {
+      handler(v, v1) {
+        if (v1) {
           this.saveStatus();
         }
-      },
+      }
     },
     'apiCase.request': {
       handler(v) {
         this.requestCount++;
-        if (this.requestCount > 1) {
+        if (this.requestCount > 2) {
           this.saveStatus();
         }
       },
+      deep: true
     },
     'caseSyncRuleRelation.showUpdateRule': {
       handler(v) {
@@ -532,7 +541,7 @@ export default {
     currentUser: () => {
       return getCurrentUser();
     },
-    hasPermission,
+    hasPermissions,
     openHis(row) {
       this.$refs.changeHistory.open(row.id, [
         '接口定义用例',
@@ -572,6 +581,7 @@ export default {
       mergeRequestDocumentData(data.request);
       if (data.apiMethod !== 'SQL' && data.apiMethod !== 'DUBBO' && data.apiMethod !== 'dubbo://') {
         data.request.useEnvironment = this.environment;
+        data.request.environmentId = this.environment;
       } else {
         data.request.useEnvironment = data.request.environmentId;
       }
@@ -736,7 +746,6 @@ export default {
           row.updateUser = getCurrentUser().name;
           row.type = null;
           this.$success(this.$t('commons.save_success'));
-          this.tagCount = 0;
           this.requestCount = 0;
           this.reload();
           this.isSave = false;
@@ -950,6 +959,43 @@ export default {
           this.citedScenarioCount = response.data;
         }
       });
+    },
+    initStepSize(array) {
+      stepCompute(array, this.apiCase.request);
+    },
+    historicalDataProcessing(array) {
+      hisDataProcessing(array, this.apiCase.request);
+    },
+    init() {
+      if (
+        Object.prototype.toString
+          .call(this.apiCase.request)
+          .match(/\[object (\w+)\]/)[1]
+          .toLowerCase() !== 'object'
+      ) {
+        this.apiCase.request = JSON.parse(this.apiCase.request);
+      }
+      if (!this.apiCase.request.body) {
+        this.apiCase.request.body = new Body();
+      }
+      if (!this.apiCase.request.body.kvs) {
+        this.apiCase.request.body.kvs = [];
+      }
+      if (!this.apiCase.request.rest) {
+        this.apiCase.request.rest = [];
+      }
+      if (!this.apiCase.request.arguments) {
+        this.apiCase.request.arguments = [];
+      }
+      if (!this.apiCase.request.headers) {
+        this.apiCase.request.headers = [];
+        this.apiCase.request.headers.push(new KeyValue({ enable: true, name: '', value: '' }));
+      }
+      this.apiCase.request.projectId = this.apiCase.projectId;
+      if (this.apiCase.request.hashTree) {
+        this.initStepSize(this.apiCase.request.hashTree);
+        this.historicalDataProcessing(this.apiCase.request.hashTree);
+      }
     },
   },
 };

@@ -48,18 +48,17 @@
                           :prop="'groups.' + index + '.ids'"
                           :rules="{required: true, message: $t('workspace.select'), trigger: 'change'}"
             >
-              <el-select filterable v-model="group.ids" :placeholder="$t('workspace.select')" multiple
+              <el-select filterable v-model="group.ids" :placeholder="$t('system_user.search_get_more_tip')" multiple
                          :filter-method="(value) => filterWorkspaceOption(value, group)"
                          @visible-change="(value) => resetWorkspaceOption(value, group)"
-                         class="edit-user-select" @change="updateWorkSpace(group.index,group.type)">
-                <el-option
+                         :popper-append-to-body="false"
+                         class="edit-user-select" @change="updateWorkSpace(group.index,group.type)" @focus="focusWorkspace" ref="workspaceContent">
+                <el-option :style="{width: workspaceOptionWidth}"
                     v-for="item in group.workspaceOptions"
                     :key="item.id"
                     :label="item.name"
-                    :value="item.id">
-                  <div style="text-align: center; color: #8a8b8d;" v-if="group.showSearchGetMore">
-                    {{ $t('system_user.search_get_more_tip') }}
-                  </div>
+                    :value="item.id"
+                    :title="item.name">
                 </el-option>
               </el-select>
             </el-form-item>
@@ -69,18 +68,17 @@
                           :prop="'groups.' + index + '.ids'"
                           :rules="{required: true, message: $t('user.select_project'), trigger: 'change'}"
             >
-              <el-select filterable v-model="group.ids" :placeholder="$t('user.select_project')" multiple
+              <el-select filterable v-model="group.ids" :placeholder="$t('system_user.search_get_more_tip')" multiple
                          :filter-method="(value) => filterProjectOption(value, group)"
                          @visible-change="(value) => resetProjectOption(value, group)"
-                         class="edit-user-select" @change="setWorkSpaceIds(group.ids,group.projects)">
-                <el-option
+                         :popper-append-to-body="false"
+                         class="edit-user-select" @change="setWorkSpaceIds(group.ids,group.projects)" @focus="focusProject" ref="projectContent">
+                <el-option :style="{width: projectOptionWidth}"
                     v-for="item in group.projectOptions"
                     :key="item.id"
                     :label="item.name"
-                    :value="item.id">
-                  <div style="text-align: center; color: #8a8b8d;" v-if="group.showSearchGetMore">
-                    {{ $t('system_user.search_get_more_tip') }}
-                  </div>
+                    :value="item.id"
+                    :title="item.name">
                 </el-option>
               </el-select>
             </el-form-item>
@@ -110,9 +108,9 @@
 <script>
 import {EMAIL_REGEX, PHONE_REGEX} from "metersphere-frontend/src/utils/regex";
 import {GROUP_TYPE} from "metersphere-frontend/src/utils/constants";
-import {getAllUserGroupByType, getUserAllGroups} from "../../../api/user-group";
-import {specialCreateUser, specialModifyUser} from "../../../api/user";
-import {getGroupResource} from "../../../api/workspace";
+import {getAllUserGroupByType, getUserAllGroups} from "@/api/user-group";
+import {specialCreateUser, specialModifyUser} from "@/api/user";
+import {getGroupResource} from "@/api/workspace";
 
 export default {
   name: "EditUser",
@@ -125,6 +123,8 @@ export default {
       createVisible: false,
       updateVisible: false,
       btnAddGroup: false,
+      workspaceOptionWidth: "100%",
+      projectOptionWidth: "100%",
       form: {
         groups: [{
           type: '',
@@ -138,7 +138,7 @@ export default {
           {
             required: true,
             pattern: '^[^\u4e00-\u9fa5]+$',
-            message: this.$t('user.special_characters_are_not_supported'),
+            message: this.$t('user.chinese_characters_are_not_supported'),
             trigger: 'blur'
           }
         ],
@@ -188,6 +188,18 @@ export default {
     }
   },
   methods: {
+    focusWorkspace() {
+      this.$nextTick(() => {
+        let el = this.$refs.workspaceContent;
+        this.workspaceOptionWidth = el[0].$el.offsetWidth + 'px'
+      });
+    },
+    focusProject() {
+      this.$nextTick(() => {
+        let el = this.$refs.projectContent;
+        this.projectOptionWidth = el[0].$el.offsetWidth + 'px'
+      });
+    },
     open(type, title, row) {
       this.type = type ? type : this.type;
       this.title = title ? title : this.title;
@@ -531,4 +543,27 @@ export default {
   width: 80%;
 }
 
+:deep(.el-select__tags-text) {
+  display: inline-block;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:deep(.el-tag.el-tag--info .el-tag__close) {
+  top: -5px;
+}
+
+:deep(.el-select-dropdown) {
+    position: absolute !important;
+    z-index: 1001;
+    border: 1px solid #E4E7ED;
+    border-radius: 4px;
+    background-color: #FFF;
+    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+    box-sizing: border-box;
+    margin: 10px -5px;
+    top: auto !important;
+}
 </style>

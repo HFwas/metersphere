@@ -33,7 +33,7 @@
               v-if="testCase === undefined && !scenario">
               {{ $t('commons.test') }}
               <el-dropdown-menu slot="dropdown">
-                <el-dropdown-item command="save_as"
+                <el-dropdown-item command="save_as" v-permission="['PROJECT_API_DEFINITION:READ+CREATE_CASE']"
                   >{{ $t('api_test.definition.request.save_as_case') }}
                 </el-dropdown-item>
               </el-dropdown-menu>
@@ -245,6 +245,7 @@ export default {
     saveAs() {
       this.$refs['debugForm'].validate((valid) => {
         if (valid) {
+          let url = this.debugForm.url;
           this.request.id = getUUID();
           this.request.method = this.debugForm.method;
           this.request.path = this.debugForm.path;
@@ -261,6 +262,7 @@ export default {
             this.compatibleHistory(this.debugForm.request.hashTree);
           }
           this.$refs.caseList.saveApiAndCase(this.debugForm);
+          this.debugForm.url = url;
         } else {
           return false;
         }
@@ -268,9 +270,6 @@ export default {
     },
     urlChange() {
       if (!this.debugForm.url) return;
-      if (!this.debugForm.url.startsWith("http")) {
-        this.debugForm.url = "http://" + this.debugForm.url;
-      }
       let url = this.getURL(this.debugForm.url);
       if (url && url.pathname) {
         if (this.debugForm.url.indexOf('?') != -1) {
@@ -279,6 +278,10 @@ export default {
         this.debugForm.path = url.pathname;
       } else {
         this.debugForm.path = url;
+        this.debugForm.url = url;
+      }
+      if (!this.debugForm.url.startsWith('http') && !this.debugForm.url.startsWith('https')) {
+        this.debugForm.url = 'http://' + this.debugForm.url;
       }
     },
     getURL(urlStr) {
@@ -306,6 +309,9 @@ export default {
         }
         return url;
       } catch (e) {
+        if (!urlStr.startsWith("http") && !urlStr.startsWith("https")) {
+          urlStr = "http://" + urlStr;
+        }
         return urlStr;
       }
     },

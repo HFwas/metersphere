@@ -15,13 +15,13 @@
           v-permission="['PROJECT_ENVIRONMENT:READ+IMPORT']"
           icon="el-icon-box"
           :content="$t('commons.import')"
-          @click="importJSON" />
+          @click="importJSON"/>
         <el-dropdown
           @command="handleExportCommand"
           class="scenario-ext-btn"
           trigger="hover"
           v-permission="['PROJECT_ENVIRONMENT:READ+EXPORT']">
-          <ms-table-button style="margin-left: 10px" icon="el-icon-box" :content="$t('commons.export')" />
+          <ms-table-button style="margin-left: 10px" icon="el-icon-box" :content="$t('commons.export')"/>
           <el-dropdown-menu slot="dropdown">
             <el-dropdown-item command="exportApi">{{ $t('envrionment.export_variable_tip') }}</el-dropdown-item>
           </el-dropdown-menu>
@@ -44,22 +44,24 @@
       <ms-table
         v-loading="loading"
         row-key="id"
-        :data="variables"
+        :data="pageData"
         :screen-height="screenHeight"
         :batch-operators="batchButtons"
         :remember-order="true"
         :highlightCurrentRow="true"
         :page-size="pageSize"
         :total="total"
+        enableSelection
+        :condition="condition"
+        @filter="filter"
         @refresh="onChange"
         ref="variableTable">
-        <ms-table-column prop="num" sortable label="ID" min-width="60" />
+        <ms-table-column prop="num" sortable label="ID" min-width="60"/>
         <ms-table-column
           prop="scope"
           sortable
           :label="$t('commons.scope')"
           :filters="scopeTypeFilters"
-          :filter-method="filterScope"
           min-width="120">
           <template slot-scope="scope">
             <el-select
@@ -67,7 +69,7 @@
               :placeholder="$t('commons.please_select')"
               size="mini"
               @change="changeType(scope.row)">
-              <el-option v-for="item in scopeTypeFilters" :key="item.value" :label="item.text" :value="item.value" />
+              <el-option v-for="item in scopeTypeFilters" :key="item.value" :label="item.text" :value="item.value"/>
             </el-select>
           </template>
         </ms-table-column>
@@ -80,7 +82,7 @@
               maxlength="200"
               :placeholder="$t('api_test.variable_name')"
               show-word-limit
-              @change="change" />
+              @change="change"/>
           </template>
         </ms-table-column>
         <ms-table-column prop="type" :label="$t('test_track.case.type')" min-width="140" sortable>
@@ -91,7 +93,7 @@
               :placeholder="$t('commons.please_select')"
               size="mini"
               @change="changeType(scope.row)">
-              <el-option v-for="item in typeSelectOptions" :key="item.value" :label="item.label" :value="item.value" />
+              <el-option v-for="item in typeSelectOptions" :key="item.value" :label="item.label" :value="item.value"/>
             </el-select>
 
             <el-select v-else v-model="scope.row.type" :placeholder="$t('commons.please_select')" size="mini">
@@ -99,7 +101,7 @@
                 v-for="item in uiTypeSelectOptions"
                 :key="item.value"
                 :label="item.label"
-                :value="item.value" />
+                :value="item.value"/>
             </el-select>
           </template>
         </ms-table-column>
@@ -111,20 +113,20 @@
               size="mini"
               v-if="scope.row.type !== 'CSV'"
               :placeholder="valueText(scope.row)"
-              :disabled="scope.row.type === 'COUNTER' || scope.row.type === 'RANDOM'" />
-            <csv-file-upload :parameter="scope.row" v-if="scope.row.type === 'CSV'" />
+              :disabled="scope.row.type === 'COUNTER' || scope.row.type === 'RANDOM'"/>
+            <csv-file-upload :parameter="scope.row" v-if="scope.row.type === 'CSV'"/>
           </template>
         </el-table-column>
         <ms-table-column prop="description" :label="$t('commons.remark')" min-width="160" sortable>
           <template slot-scope="scope">
-            <el-input v-model="scope.row.description" size="mini" />
+            <el-input v-model="scope.row.description" size="mini"/>
           </template>
         </ms-table-column>
 
         <ms-table-column :label="$t('commons.operating')" width="150">
           <template v-slot:default="scope">
             <span>
-              <el-switch v-model="scope.row.enable" size="mini" />
+              <el-switch v-model="scope.row.enable" size="mini"/>
               <el-button
                 icon="el-icon-delete"
                 type="danger"
@@ -132,7 +134,7 @@
                 size="mini"
                 style="margin-left: 10px"
                 @click="remove(scope.row)"
-                v-if="isDisable(scope.row)" />
+                v-if="isDisable(scope.row)"/>
               <el-button
                 v-if="(!scope.row.scope || scope.row.scope == 'api') && scope.row.type !== 'LIST'"
                 icon="el-icon-setting"
@@ -140,25 +142,25 @@
                 size="mini"
                 style="margin-left: 10px"
                 @click="openSetting(scope.row)"
-                @change="change" />
+                @blur="change"/>
             </span>
           </template>
         </ms-table-column>
       </ms-table>
       <ms-table-pagination
-        :change="nextPage"
+        :change="queryPage"
         :current-page.sync="currentPage"
         :page-size.sync="pageSize"
-        :total="total" />
+        :total="total"/>
     </div>
-    <batch-add-parameter @batchSave="batchSave" ref="batchAdd" />
-    <api-variable-setting ref="apiVariableSetting"></api-variable-setting>
+    <batch-add-parameter @batchSave="batchSave" ref="batchAdd"/>
+    <api-variable-setting ref="apiVariableSetting" @changeData="change"></api-variable-setting>
     <variable-import ref="variableImport" @mergeData="mergeData"></variable-import>
   </div>
 </template>
 
 <script>
-import { KeyValue } from '../../../model/EnvTestModel';
+import {KeyValue} from '../../../model/EnvTestModel';
 import MsApiVariableInput from './ApiVariableInput';
 import BatchAddParameter from './BatchAddParameter';
 import MsTableButton from '../../MsTableButton';
@@ -166,9 +168,9 @@ import MsTable from '../../table/MsTable';
 import MsTableColumn from '../../table/MsTableColumn';
 import ApiVariableSetting from './ApiVariableSetting';
 import CsvFileUpload from './variable/CsvFileUpload';
-import { downloadFile, getUUID, operationConfirm } from '../../../utils';
+import {downloadFile, getUUID, operationConfirm} from '../../../utils';
 import VariableImport from './variable/VariableImport';
-import _ from 'lodash';
+import {forEach} from 'lodash-es';
 import MsTablePagination from '../../pagination/TablePagination';
 
 export default {
@@ -205,6 +207,7 @@ export default {
       pageSize: 10,
       total: 0,
       loading: false,
+      refreshOver: true,
       screenHeight: '460px',
       batchButtons: [
         {
@@ -213,37 +216,37 @@ export default {
         },
       ],
       typeSelectOptions: [
-        { value: 'CONSTANT', label: this.$t('api_test.automation.constant') },
-        { value: 'LIST', label: this.$t('test_track.case.list') },
-        { value: 'CSV', label: 'CSV' },
-        { value: 'COUNTER', label: this.$t('api_test.automation.counter') },
-        { value: 'RANDOM', label: this.$t('api_test.automation.random') },
+        {value: 'CONSTANT', label: this.$t('api_test.automation.constant')},
+        {value: 'LIST', label: this.$t('test_track.case.list')},
+        {value: 'CSV', label: 'CSV'},
+        {value: 'COUNTER', label: this.$t('api_test.automation.counter')},
+        {value: 'RANDOM', label: this.$t('api_test.automation.random')},
       ],
       uiTypeSelectOptions: [
-        { value: 'STRING', label: this.$t('api_test.automation.string') },
-        { value: 'ARRAY', label: this.$t('api_test.automation.array') },
-        { value: 'JSON', label: this.$t('api_test.automation.json') },
-        { value: 'NUMBER', label: this.$t('api_test.automation.number') },
+        {value: 'STRING', label: this.$t('api_test.automation.string')},
+        {value: 'ARRAY', label: this.$t('api_test.automation.array')},
+        {value: 'JSON', label: this.$t('api_test.automation.json')},
+        {value: 'NUMBER', label: this.$t('api_test.automation.number')},
       ],
-      variables: {},
+      pageData: [],
       selectVariable: '',
       editData: {},
       allData: [],
       lastPage: 1,
       scopeTypeFilters: [
-        { text: this.$t('commons.api'), value: 'api' },
-        { text: this.$t('commons.ui_test'), value: 'ui' },
+        {text: this.$t('commons.api'), value: 'api'},
+        {text: this.$t('commons.ui_test'), value: 'ui'},
       ],
+      condition: {
+        selectAll: false,
+        unSelectIds: [],
+      },
     };
   },
   watch: {
     items: {
       handler(v) {
-        this.allData = v;
-        this.pageSize = 10;
-        this.total = this.allData.length;
         this.sortParameters();
-        this.nextPage();
       },
       immediate: true,
       deep: true,
@@ -251,30 +254,24 @@ export default {
   },
   methods: {
     remove: function (index) {
-      const dataIndex = this.variables.findIndex((d) => d.name === index.name);
-      this.variables.splice(dataIndex, 1);
+      const dataIndex = this.pageData.findIndex((d) => d.name === index.name);
+      this.pageData.splice(dataIndex, 1);
 
       const allDataIndex = this.allData.findIndex((d) => d.name === index.name);
       this.allData.splice(allDataIndex, 1);
-      this.nextPage();
+      this.sortParameters();
+      this.currentPage = Math.ceil(this.allData.length / this.pageSize);
+      this.queryPage();
     },
-    nextPage() {
-      if (
-        this.$refs.variableTable &&
-        this.$refs.variableTable.selectRows &&
-        this.$refs.variableTable.selectRows.size > 0
-      ) {
-        return;
-      }
-      // 如果是第一页，则截取0到pageSize（每页显示多少条数据）即可
-      if (this.currentPage == 1) {
-        this.variables = this.allData.slice(0, this.pageSize);
-        return;
-      }
+    queryPage() {
+      this.total = this.allData.length;
       let start = (this.currentPage - 1) * this.pageSize;
       let end = this.currentPage * this.pageSize;
-      this.variables = this.allData.slice(start, end);
-      this.total = this.allData.length;
+      this.pageData = this.allData.slice(start, end);
+      this.pageData.forEach((item) => {
+        item.showMore = false;
+        delete item.hashTree;
+      });
     },
     change: function () {
       let isNeedCreate = true;
@@ -305,11 +302,14 @@ export default {
         );
       }
       if (isNeedCreate) {
-        this.items.push(new KeyValue({ enable: true, id: getUUID(), type: 'CONSTANT', scope: 'api' }));
+        this.items.push(new KeyValue({enable: true, id: getUUID(), type: 'CONSTANT', scope: 'api'}));
+        this.currentPage = Math.ceil(this.allData.length / this.pageSize);
       }
-      this.currentPage = Math.ceil(this.items.length / this.pageSize);
+      // 需过滤数据
+      this.allData = [];
+      this._filter();
+      this.queryPage();
       this.$emit('change', this.items);
-      // TODO 检查key重复
     },
     changeType(data) {
       data.value = '';
@@ -338,11 +338,11 @@ export default {
     },
     querySearch(queryString, cb) {
       let restaurants = [
-        { value: 'UTF-8' },
-        { value: 'UTF-16' },
-        { value: 'GB2312' },
-        { value: 'ISO-8859-15' },
-        { value: 'US-ASCll' },
+        {value: 'UTF-8'},
+        {value: 'UTF-16'},
+        {value: 'GB2312'},
+        {value: 'ISO-8859-15'},
+        {value: 'US-ASCll'},
       ];
       let results = queryString ? restaurants.filter(this.createFilter(queryString)) : restaurants;
       // 调用 callback 返回建议列表的数据
@@ -370,58 +370,95 @@ export default {
     },
     handleDeleteBatch() {
       operationConfirm(this, this.$t('api_test.environment.variables_delete_info') + ' ？', () => {
-        let ids = this.$refs.variableTable.selectRows;
-        ids.forEach((row) => {
-          if (row.id) {
-            const index = this.variables.findIndex((d) => d.id === row.id);
-            const allIndex = this.allData.findIndex((d) => d.id === row.id);
-            if (index !== this.variables.length - 1) {
-              this.variables.splice(index, 1);
+        if (this.condition.selectAll) {
+          let deleteIndex = 0;
+          let deleteRows = this.items.filter((item) => {
+            return this.condition.unSelectIds.indexOf(item.id) < 0;
+          });
+          deleteRows.forEach(deleteRow => {
+            const index = this.items.findIndex((d) => d.id === deleteRow.id);
+            this.items.splice(index, 1);
+          })
+          this.allData = this.items;
+          this.currentPage = 1;
+          this.queryPage();
+        } else {
+          let ids = this.$refs.variableTable.selectRows;
+          ids.forEach((row) => {
+            if (row.id) {
+              const index = this.pageData.findIndex((d) => d.id === row.id);
+              const allIndex = this.allData.findIndex((d) => d.id === row.id);
+              if (index !== this.pageData.length - 1) {
+                this.pageData.splice(index, 1);
+              }
+              if (allIndex !== this.allData.length - 1) {
+                this.allData.splice(allIndex, 1);
+              }
             }
-            if (allIndex !== this.allData.length - 1) {
-              this.allData.splice(allIndex, 1);
-            }
-          }
-        });
+          });
+        }
         this.sortParameters();
         this.$refs.variableTable.cancelCurrentRow();
         this.$refs.variableTable.clear();
-        this.variables.forEach((item) => {
+        this.pageData.forEach((item) => {
           item.showMore = false;
         });
+
       });
     },
-    filter(scope) {
-      let datas = [];
-      this.items.forEach((item) => {
-        if (this.selectVariable && this.selectVariable != '' && item.name) {
-          if (item.name.toLowerCase().indexOf(this.selectVariable.toLowerCase()) === -1) {
+    filter() {
+      // 过滤
+      this.currentPage = 1;
+      this.allData = [];
+      this._filter();
+      this.sortParameters();
+      this.queryPage();
+    },
+    _filter() {
+      // filter by scope
+      let scopeFilterData = [];
+      if (!this.condition.filters || !this.condition.filters.scope || this.condition.filters.scope.length === 0) {
+        // 重置或者清空
+        forEach(this.items, (item) => {
+          delete item.hidden;
+          if (!item.scope) {
+            this.$set(item, 'scope', 'api');
+          }
+        });
+        scopeFilterData = this.items;
+      } else {
+        let scopes = this.condition.filters.scope;
+        this.items.forEach((item) => {
+          if (scopes.indexOf(item.scope) === -1) {
             item.hidden = true;
           } else {
             item.hidden = undefined;
           }
+          if (!item.hidden) {
+            scopeFilterData.push(item);
+          }
+        });
+      }
+      // filter by keyword
+      if (!scopeFilterData || scopeFilterData.length === 0) {
+        return scopeFilterData;
+      }
+      let keyword = this.selectVariable;
+      scopeFilterData.forEach((filterData) => {
+        if (keyword && keyword !== '' && filterData.name) {
+          if (filterData.name.toLowerCase().indexOf(keyword.toLowerCase()) === -1) {
+            filterData.hidden = true;
+          } else {
+            filterData.hidden = undefined;
+          }
         } else {
-          item.hidden = undefined;
+          filterData.hidden = undefined;
         }
-        if (!item.hidden) {
-          datas.push(item);
+        if (!filterData.hidden) {
+          this.allData.push(filterData);
         }
       });
-      this.total = datas.length;
-      // 如果是第一页，则截取0到pageSize（每页显示多少条数据）即可
-      if (this.currentPage == 1) {
-        this.variables = datas.slice(0, this.pageSize);
-        return;
-      }
-      let start = (this.currentPage - 1) * this.pageSize;
-      let end = this.currentPage * this.pageSize;
-      this.variables = datas.slice(start, end);
-    },
-    filterScope(value, row) {
-      if (value == 'ui') {
-        return row.scope == 'ui';
-      }
-      return !row.scope || row.scope == 'api';
+      return this.allData;
     },
     openSetting(data) {
       this.$refs.apiVariableSetting.open(data);
@@ -472,12 +509,14 @@ export default {
           });
           if (isAdd) {
             this.items.splice(
-              this.variables.indexOf((i) => !i.name),
+              this.pageData.indexOf((i) => !i.name),
               0,
               keyValue
             );
           }
+          this.allData = this.items;
         });
+        this.queryPage();
       }
       this.currentPage = Math.ceil(this.items.length / this.pageSize);
     },
@@ -499,6 +538,9 @@ export default {
       let variablesJson = [];
       let messages = '';
       let rows = this.$refs.variableTable.selectRows;
+      if (this.condition.selectAll) {
+        rows = this.allData;
+      }
       rows.forEach((row) => {
         if (row.type === 'CSV') {
           messages = this.$t('variables.csv_download');
@@ -530,7 +572,11 @@ export default {
           this.items.splice(this.items.length - 1, 0, importData);
         }
       });
-      this.currentPage = Math.ceil(this.items.length / this.pageSize);
+      this.allData = [];
+      this._filter();
+      this.currentPage = Math.ceil(this.allData.length / this.pageSize);
+      this.sortParameters();
+      this.queryPage();
     },
     handleExportCommand(command) {
       this.exportJSON();
@@ -538,19 +584,18 @@ export default {
   },
   created() {
     if (this.items.length === 0) {
-      this.items.push(new KeyValue({ enable: true, scope: 'api' }));
+      this.items.push(new KeyValue({enable: true, scope: 'api'}));
     } else {
       //历史数据默认是 api 应用场景
-      _.forEach(this.items, (item) => {
+      forEach(this.items, (item) => {
         delete item.hidden;
         if (!item.scope) {
           this.$set(item, 'scope', 'api');
         }
       });
       this.allData = this.items;
-      this.nextPage();
+      this.queryPage();
     }
-    this.total = this.allData.length;
   },
 };
 </script>
@@ -573,7 +618,4 @@ export default {
   width: 60px;
 }
 
-:deep(.table-select-icon) {
-  display: none !important;
-}
 </style>

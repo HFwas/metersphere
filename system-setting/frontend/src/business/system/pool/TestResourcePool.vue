@@ -81,11 +81,11 @@
             <el-checkbox :label="$t('commons.performance')" v-model="form.performance"></el-checkbox>
           </el-form-item>
           <el-form-item label="JMeter HEAP" prop="HEAP">
-            <el-input v-model="form.heap" placeholder="-Xms1g -Xmx1g -XX:MaxMetaspaceSize=256m"/>
+            <el-input v-model="form.heap" placeholder="-Xms1g -Xmx1g -XX:MaxMetaspaceSize=256m" maxlength="200" show-word-limit/>
           </el-form-item>
           <el-form-item label="JMeter GC_ALGO" prop="GC_ALGO">
             <el-input v-model="form.gcAlgo"
-                      placeholder="-XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:G1ReservePercent=20"/>
+                      placeholder="-XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:G1ReservePercent=20" maxlength="200" show-word-limit/>
           </el-form-item>
           <el-form-item prop="type" :label="$t('test_resource_pool.type')">
             <el-select v-model="form.type" :placeholder="$t('test_resource_pool.select_pool_type')"
@@ -324,6 +324,9 @@ export default {
             trigger: 'blur'
           }
         ],
+        image: [
+          {max: 100, message: this.$t('commons.input_limit', [0, 100])}
+        ],
         description: [
           {max: 60, message: this.$t('commons.input_limit', [0, 60]), trigger: 'blur'}
         ],
@@ -554,7 +557,9 @@ export default {
       if (row.status === 'INVALID') {
         this.checkHaveTestUsePool(row).then(() => {
           if (this.updatePool && this.updatePool.haveTestUsePool) {
-            this.$confirm(this.$t('test_resource_pool.update_prompt', [this.updatePool.testName]), this.$t('commons.prompt'), {
+            let testIndex = this.updatePool.testName.indexOf(";")
+            let subPrompt = this.updatePool.testName.substring(0, testIndex);
+            this.$confirm(this.$t('test_resource_pool.update_prompt', [subPrompt]), this.$t('commons.prompt'), {
               confirmButtonText: this.$t('commons.confirm'),
               cancelButtonText: this.$t('commons.cancel'),
               type: 'warning'
@@ -578,7 +583,7 @@ export default {
     },
     updatePoolStatus(row) {
       modifyResourcePoolStatus(row.id, row.status).then(() => {
-        this.$success(this.$t('test_resource_pool.status_change_success'));
+        this.$success(row.status === 'VALID' ? this.$t('commons.enable_success') : this.$t('commons.disable_success'));
       }).catch(() => {
         this.$error(this.$t('test_resource_pool.status_change_failed'));
         row.status = 'INVALID';

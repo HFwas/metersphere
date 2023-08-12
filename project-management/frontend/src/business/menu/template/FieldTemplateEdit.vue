@@ -25,7 +25,7 @@
             <slot name="base"></slot>
 
             <el-form-item :label="$t('commons.description')" prop="description" :label-width="labelWidth">
-              <el-input :autosize="{ minRows: 2, maxRows: 4}" type="textarea" v-model="form.description"></el-input>
+              <el-input :autosize="{ minRows: 3, maxRows: 4}" type="textarea" v-model="form.description" maxlength="255" show-word-limit></el-input>
             </el-form-item>
 
             <ms-form-divider :title="$t('custom_field.template_setting')"/>
@@ -207,6 +207,10 @@ export default {
               item.defaultValue = JSON.parse(item.defaultValue);
             } else if (item.type === 'checkbox') {
               item.defaultValue = [];
+            }
+            if (item.type === 'int' && item.defaultValue === null) {
+              // el-input-number 需要设置成 undefined，默认值才能设置为空
+              item.defaultValue = undefined;
             }
             this.templateContainIds.add(item.fieldId);
           });

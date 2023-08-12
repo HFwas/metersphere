@@ -2,10 +2,12 @@ package io.metersphere.environment.controller;
 
 import com.github.pagehelper.Page;
 import com.github.pagehelper.PageHelper;
+import io.metersphere.base.domain.ApiTestEnvironment;
 import io.metersphere.base.domain.ApiTestEnvironmentWithBLOBs;
 import io.metersphere.base.domain.EnvironmentGroup;
 import io.metersphere.commons.constants.OperLogConstants;
 import io.metersphere.commons.constants.OperLogModule;
+import io.metersphere.commons.constants.PermissionConstants;
 import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.utils.*;
 import io.metersphere.environment.dto.*;
@@ -17,12 +19,14 @@ import io.metersphere.environment.utils.TcpTreeTableDataParser;
 import io.metersphere.i18n.Translator;
 import io.metersphere.log.annotation.MsAuditLog;
 import io.metersphere.request.EnvironmentRequest;
+import jakarta.annotation.Resource;
+import org.apache.shiro.authz.annotation.Logical;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import jakarta.annotation.Resource;
 import java.sql.DriverManager;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +44,11 @@ public class TestEnvironmentController {
     @GetMapping("/list/{projectId}")
     public List<ApiTestEnvironmentWithBLOBs> list(@PathVariable String projectId) {
         return baseEnvironmentService.list(projectId);
+    }
+
+    @PostMapping("/project-env")
+    public List<ApiTestEnvironment> projectEnv(@RequestBody List<String> projectIds) {
+        return baseEnvironmentService.selectList(projectIds);
     }
 
     /**
@@ -68,6 +77,7 @@ public class TestEnvironmentController {
     }
 
     @PostMapping("/add")
+    @RequiresPermissions(value = {PermissionConstants.PROJECT_ENVIRONMENT_READ_CREATE, PermissionConstants.PROJECT_ENVIRONMENT_READ_COPY, PermissionConstants.WORKSPACE_PROJECT_ENVIRONMENT_READ_CREATE, PermissionConstants.WORKSPACE_PROJECT_ENVIRONMENT_READ_COPY}, logical = Logical.OR)
     @MsAuditLog(module = OperLogModule.PROJECT_ENVIRONMENT_SETTING, type = OperLogConstants.CREATE, title = "#apiTestEnvironmentWithBLOBs.name", project = "#apiTestEnvironmentWithBLOBs.projectId", msClass = BaseEnvironmentService.class)
     public String create(@RequestPart("request") TestEnvironmentDTO apiTestEnvironmentWithBLOBs, @RequestPart(value = "files", required = false) List<MultipartFile> sslFiles, @RequestPart(value = "variablesFiles", required = false) List<MultipartFile> variableFile) {
         checkParams(apiTestEnvironmentWithBLOBs);
@@ -75,12 +85,14 @@ public class TestEnvironmentController {
     }
 
     @PostMapping("/import")
+    @RequiresPermissions(value = {PermissionConstants.PROJECT_ENVIRONMENT_READ_IMPORT, PermissionConstants.WORKSPACE_PROJECT_ENVIRONMENT_READ_IMPORT}, logical = Logical.OR)
     public String create(@RequestBody List<TestEnvironmentDTO> environments) {
         environments.forEach(this::checkParams);
         return baseEnvironmentService.importEnvironment(environments);
     }
 
     @PostMapping(value = "/update")
+    @RequiresPermissions("PROJECT_ENVIRONMENT:READ+EDIT")
     @MsAuditLog(module = OperLogModule.PROJECT_ENVIRONMENT_SETTING, type = OperLogConstants.UPDATE, beforeEvent = "#msClass.getLogDetails(#apiTestEnvironment.id)", content = "#msClass.getLogDetails(#apiTestEnvironment.id)", msClass = BaseEnvironmentService.class)
     public void update(@RequestPart("request") TestEnvironmentDTO apiTestEnvironment, @RequestPart(value = "files", required = false) List<MultipartFile> sslFiles, @RequestPart(value = "variablesFiles", required = false) List<MultipartFile> variableFile) {
         checkParams(apiTestEnvironment);
@@ -115,6 +127,7 @@ public class TestEnvironmentController {
     }
 
     @GetMapping("/delete/{id}")
+    @RequiresPermissions("PROJECT_ENVIRONMENT:READ+DELETE")
     @MsAuditLog(module = OperLogModule.PROJECT_ENVIRONMENT_SETTING, type = OperLogConstants.DELETE, beforeEvent = "#msClass.getLogDetails(#id)", msClass = BaseEnvironmentService.class)
     public void delete(@PathVariable String id) {
         baseEnvironmentService.delete(id);

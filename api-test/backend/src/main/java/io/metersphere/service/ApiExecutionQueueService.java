@@ -5,16 +5,13 @@ import io.metersphere.api.exec.api.ApiCaseSerialService;
 import io.metersphere.api.exec.queue.DBTestQueue;
 import io.metersphere.api.exec.scenario.ApiScenarioSerialService;
 import io.metersphere.api.jmeter.JMeterService;
-import io.metersphere.api.jmeter.JMeterThreadUtils;
 import io.metersphere.base.domain.*;
 import io.metersphere.base.mapper.*;
 import io.metersphere.base.mapper.ext.BaseApiExecutionQueueMapper;
 import io.metersphere.base.mapper.ext.ExtApiDefinitionExecResultMapper;
 import io.metersphere.base.mapper.ext.ExtApiScenarioReportMapper;
 import io.metersphere.base.mapper.plan.ext.ExtTestPlanApiCaseMapper;
-import io.metersphere.commons.constants.ApiRunMode;
-import io.metersphere.commons.constants.KafkaTopicConstants;
-import io.metersphere.commons.constants.TestPlanReportStatus;
+import io.metersphere.commons.constants.*;
 import io.metersphere.commons.enums.ApiReportStatus;
 import io.metersphere.commons.utils.BeanUtils;
 import io.metersphere.commons.utils.JSON;
@@ -23,13 +20,15 @@ import io.metersphere.constants.RunModeConstants;
 import io.metersphere.dto.ResultDTO;
 import io.metersphere.dto.RunModeConfigDTO;
 import io.metersphere.service.scenario.ApiScenarioReportService;
+import io.metersphere.utils.JsonUtils;
 import io.metersphere.utils.LoggerUtil;
+import io.metersphere.vo.ResultVO;
 import jakarta.annotation.Resource;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
 import org.apache.commons.lang3.BooleanUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.jmeter.services.FileServer;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
@@ -87,9 +86,11 @@ public class ApiExecutionQueueService {
         Map<String, String> detailMap = new HashMap<>();
         List<ApiExecutionQueueDetail> queueDetails = new LinkedList<>();
         // 初始化API/用例队列
+        String redisLockType = TestPlanExecuteCaseType.SCENARIO.name();
         if (StringUtils.equalsAnyIgnoreCase(type, ApiRunMode.DEFINITION.name(), ApiRunMode.API_PLAN.name())) {
             Map<String, ApiDefinitionExecResult> runMap = (Map<String, ApiDefinitionExecResult>) runObj;
             initApi(runMap, resQueue, config, detailMap, queueDetails);
+            redisLockType = TestPlanExecuteCaseType.API_CASE.name();
         }
         // 初始化场景
         else {
@@ -99,10 +100,15 @@ public class ApiExecutionQueueService {
         if (CollectionUtils.isNotEmpty(queueDetails)) {
             extApiExecutionQueueMapper.sqlInsert(queueDetails);
         }
+        //redis移除key （执行测试计划时会添加key)
+        redisTemplateService.unlock(reportId, redisLockType, reportId);
         resQueue.setDetailMap(detailMap);
         LoggerUtil.info("报告【" + type + "】生成执行链结束", reportId);
         return resQueue;
     }
+
+    @Resource
+    private RedisTemplateService redisTemplateService;
 
     private void initScenario(Map<String, RunModeDataDTO> runMap, DBTestQueue resQueue, RunModeConfigDTO config, Map<String, String> detailMap, List<ApiExecutionQueueDetail> queueDetails) {
         final int[] sort = {0};
@@ -177,22 +183,34 @@ public class ApiExecutionQueueService {
     private boolean failure(DBTestQueue executionQueue, ResultDTO dto) {
         LoggerUtil.info("进入失败停止处理：" + executionQueue.getId());
         boolean isError = false;
-        if (StringUtils.contains(dto.getRunMode(), ApiRunMode.SCENARIO.name())) {
-            if (StringUtils.equals(dto.getReportType(), RunModeConstants.SET_REPORT.toString())) {
-                ApiScenarioReportResultExample example = new ApiScenarioReportResultExample();
-                example.createCriteria().andReportIdEqualTo(dto.getReportId()).andStatusEqualTo(ApiReportStatus.ERROR.name());
-                long error = apiScenarioReportResultMapper.countByExample(example);
-                isError = error > 0;
+        String status = null;
+        if (MapUtils.isNotEmpty(dto.getArbitraryData()) && dto.getArbitraryData().containsKey(CommonConstants.LOCAL_STATUS_KEY)) {
+            ResultVO resultVO = JsonUtils.convertValue(dto.getArbitraryData().get(CommonConstants.LOCAL_STATUS_KEY), ResultVO.class);
+            if (ObjectUtils.isNotEmpty(resultVO)) {
+                status = resultVO.getStatus();
+            }
+            if (StringUtils.equalsIgnoreCase(status, ApiReportStatus.ERROR.name())) {
+                isError = true;
+            }
+        }
+        if (StringUtils.isBlank(status)) {
+            if (StringUtils.contains(dto.getRunMode(), ApiRunMode.SCENARIO.name())) {
+                if (StringUtils.equals(dto.getReportType(), RunModeConstants.SET_REPORT.toString())) {
+                    ApiScenarioReportResultExample example = new ApiScenarioReportResultExample();
+                    example.createCriteria().andReportIdEqualTo(dto.getReportId()).andStatusEqualTo(ApiReportStatus.ERROR.name());
+                    long error = apiScenarioReportResultMapper.countByExample(example);
+                    isError = error > 0;
+                } else {
+                    ApiScenarioReport report = apiScenarioReportMapper.selectByPrimaryKey(executionQueue.getCompletedReportId());
+                    if (report != null && StringUtils.equalsIgnoreCase(report.getStatus(), ApiReportStatus.ERROR.name())) {
+                        isError = true;
+                    }
+                }
             } else {
-                ApiScenarioReport report = apiScenarioReportMapper.selectByPrimaryKey(executionQueue.getCompletedReportId());
-                if (report != null && StringUtils.equalsIgnoreCase(report.getStatus(), ApiReportStatus.ERROR.name())) {
+                ApiDefinitionExecResult result = apiDefinitionExecResultMapper.selectByPrimaryKey(executionQueue.getCompletedReportId());
+                if (result != null && StringUtils.equalsIgnoreCase(result.getStatus(), ApiReportStatus.ERROR.name())) {
                     isError = true;
                 }
-            }
-        } else {
-            ApiDefinitionExecResult result = apiDefinitionExecResultMapper.selectByPrimaryKey(executionQueue.getCompletedReportId());
-            if (result != null && StringUtils.equalsIgnoreCase(result.getStatus(), ApiReportStatus.ERROR.name())) {
-                isError = true;
             }
         }
         if (isError) {
@@ -372,10 +390,6 @@ public class ApiExecutionQueueService {
             if (StringUtils.isNotEmpty(queue.getPoolId()) && jMeterService.getRunningQueue(queue.getPoolId(), item.getReportId())) {
                 continue;
             }
-            // 检查执行报告是否还在等待队列中或执行线程中
-            if (JMeterThreadUtils.isRunning(item.getReportId(), item.getTestId())) {
-                continue;
-            }
             // 检查是否已经超时
             ResultDTO dto = new ResultDTO();
             dto.setQueueId(item.getQueueId());
@@ -430,9 +444,6 @@ public class ApiExecutionQueueService {
                         TestPlanReportStatus.RUNNING.name(), ApiReportStatus.PENDING.name()) && (report.getUpdateTime() < timeout)) {
                     report.setStatus(ApiReportStatus.ERROR.name());
                     apiScenarioReportMapper.updateByPrimaryKeySelective(report);
-                    if (FileServer.getFileServer() != null) {
-                        FileServer.getFileServer().closeCsv(item.getReportId());
-                    }
                 }
             });
         }
@@ -458,9 +469,6 @@ public class ApiExecutionQueueService {
     }
 
     public void stop(String reportId) {
-        if (FileServer.getFileServer() != null) {
-            FileServer.getFileServer().closeCsv(reportId);
-        }
         ApiExecutionQueueDetailExample example = new ApiExecutionQueueDetailExample();
         example.createCriteria().andReportIdEqualTo(reportId);
         List<ApiExecutionQueueDetail> details = executionQueueDetailMapper.selectByExample(example);
@@ -484,12 +492,6 @@ public class ApiExecutionQueueService {
         if (CollectionUtils.isEmpty(reportIds)) {
             return;
         }
-        // 清理CSV
-        reportIds.forEach(item -> {
-            if (FileServer.getFileServer() != null) {
-                FileServer.getFileServer().closeCsv(item);
-            }
-        });
         ApiExecutionQueueDetailExample example = new ApiExecutionQueueDetailExample();
         example.createCriteria().andReportIdIn(reportIds);
         List<ApiExecutionQueueDetail> details = executionQueueDetailMapper.selectByExample(example);

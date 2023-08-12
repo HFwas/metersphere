@@ -26,6 +26,7 @@ import io.metersphere.request.LoginRequest;
 import io.metersphere.request.member.EditPassWordRequest;
 import io.metersphere.request.member.EditSeleniumServerRequest;
 import io.metersphere.request.member.QueryMemberRequest;
+import jakarta.annotation.Resource;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.shiro.SecurityUtils;
@@ -36,7 +37,6 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import jakarta.annotation.Resource;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -718,6 +718,19 @@ public class BaseUserService {
         return baseUserGroupMapper.getMemberList(request);
     }
 
+    public List<User> getAddProjectMemberOption(String projectId) {
+        Project project = projectMapper.selectByPrimaryKey(projectId);
+        QueryMemberRequest request = new QueryMemberRequest();
+        request.setWorkspaceId(project.getWorkspaceId());
+        List<User> memberList = getMemberList(request);
+        request.setProjectId(projectId);
+        Set<String> projectUserIds = getProjectMemberList(request)
+                .stream().map(i -> i.getId())
+                .collect(Collectors.toSet());
+        return memberList.stream().filter(i -> !projectUserIds.contains(i.getId()))
+                .collect(Collectors.toList());
+    }
+
     public void createOssUser(User user) {
         user.setCreateTime(System.currentTimeMillis());
         user.setUpdateTime(System.currentTimeMillis());
@@ -770,7 +783,7 @@ public class BaseUserService {
     public void updateCurrentUserByResourceId(String resourceId) {
         Project project = baseProjectMapper.selectProjectByResourceId(resourceId);
         if (project == null) {
-            return;
+            MSException.throwException(Translator.get("select_resource_error_and_check"));
         }
         SessionUser user = SessionUtils.getUser();
         user.setLastProjectId(project.getId());
@@ -788,5 +801,22 @@ public class BaseUserService {
     public List<String> getAllUserIds() {
         List<User> users = userMapper.selectByExample(new UserExample());
         return users.stream().map(User::getId).collect(Collectors.toList());
+    }
+
+    public void checkUserAndProject(String userId, String projectId) {
+        User user = userMapper.selectByPrimaryKey(userId);
+        if (user == null) {
+            MSException.throwException(Translator.get("user_not_exist") + userId);
+        }
+        UserGroupExample userGroupExample = new UserGroupExample();
+        userGroupExample.createCriteria().andUserIdEqualTo(userId).andSourceIdEqualTo(projectId);
+        if (userGroupMapper.countByExample(userGroupExample) == 0) {
+            //检查是否是超级管理员
+            userGroupExample.clear();
+            userGroupExample.createCriteria().andUserIdEqualTo(userId).andGroupIdEqualTo(UserGroupConstants.SUPER_GROUP);
+            if (userGroupMapper.countByExample(userGroupExample) == 0) {
+                MSException.throwException(Translator.get("user_not_exists") + userId);
+            }
+        }
     }
 }

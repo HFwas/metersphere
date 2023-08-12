@@ -79,9 +79,6 @@
 
 <script>
 import { baseSocket } from '@/api/base-network';
-import MsRequestResult from './components/RequestResult';
-import MsRequestResultTail from './components/RequestResultTail';
-import MsScenarioResult from './components/ScenarioResult';
 import MsMetricChart from './components/MetricChart';
 import MsScenarioResults from './components/ScenarioResults';
 import MsContainer from 'metersphere-frontend/src/components/MsContainer';
@@ -102,10 +99,7 @@ export default {
     MsMainContainer,
     MsContainer,
     MsScenarioResults,
-    MsRequestResultTail,
     MsMetricChart,
-    MsScenarioResult,
-    MsRequestResult,
   },
   data() {
     return {
@@ -187,13 +181,13 @@ export default {
     getType(type) {
       switch (type) {
         case 'LoopController':
-          return '循环控制器';
+          return this.$t('api_test.automation.loop_controller');
         case 'TransactionController':
-          return '事物控制器';
+          return this.$t('api_test.automation.transaction_controller');
         case 'ConstantTimer':
-          return '等待控制器';
+          return this.$t('api_test.automation.wait_controller');
         case 'IfController':
-          return '条件控制器';
+          return this.$t('api_test.automation.if_controller');
       }
       return type;
     },
@@ -512,7 +506,7 @@ export default {
       }
 
       if (e.data && e.data.indexOf('MS_TEST_END') !== -1) {
-        this.getReport();
+        setTimeout(this.getReport, 3000);
         this.messageWebSocket.close();
         this.cleanHeartBeat();
         this.$EventBus.$emit('hide', this.scenarioId);

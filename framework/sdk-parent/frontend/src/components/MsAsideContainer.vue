@@ -4,6 +4,7 @@
             :style="{
               'margin-left': !asideHidden ? 0 : '-' + width,
               'min-width': minWidth + 'px',
+              'max-width': maxWidth + 'px',
               'height': calHeight,
              }">
     <div v-if="enableAsideHidden" class="hiddenBottom" :style="{'top': hiddenBottomTop ? hiddenBottomTop : 0}" @click="asideHidden = !asideHidden">
@@ -13,13 +14,14 @@
     <div style="overflow: scroll" class="ms-aside-node-tree" :style="{'height': containerCalHeight }">
       <slot></slot>
     </div>
-    <ms-horizontal-drag-bar/>
+    <ms-horizontal-drag-bar v-if="draggable"/>
   </el-aside>
 </template>
 
 <script>
 import MsHorizontalDragBar from "./dragbar/MsLeft2RightDragBar";
 import {getUUID} from "../utils";
+import {boolean} from "../../public/js/dev/mock";
 
 export default {
   name: "MsAsideContainer",
@@ -37,6 +39,10 @@ export default {
       type: String,
       default: null
     },
+    maxWidth: {
+      type: String,
+      default: null
+    },
     height: {
       type: String,
       default: null
@@ -49,6 +55,10 @@ export default {
       type: Number,
       default: null
     },
+    draggable: {
+      type: Boolean,
+      default: true,
+    }
   },
   watch: {
     asideHidden() {

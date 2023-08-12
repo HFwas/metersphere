@@ -27,10 +27,6 @@ export function getScenarioByProjectId(projectId) {
   return get('/api/automation/env-project-ids/' + projectId);
 }
 
-export function checkScenarioEnv(scenarioId) {
-  return get('/api/automation/env-valid/' + scenarioId);
-}
-
 export function execStop(reportId) {
   return get('/api/automation/stop/' + reportId);
 }
@@ -103,8 +99,19 @@ export function listWithIds(params) {
   return post('/api/automation/list-blobs', params);
 }
 
+export function getUploadConfig(url, formData) {
+  return {
+    method: 'POST',
+    url: url,
+    data: formData,
+    headers: {
+      'Content-Type': 'application/octet-stream',
+    },
+  };
+}
+
 export function getApiScenarioEnv(params) {
-  return post('/api/automation/scenario-env', params);
+  return post('/api/automation/project-valid', params);
 }
 
 export function batchEditScenario(params) {

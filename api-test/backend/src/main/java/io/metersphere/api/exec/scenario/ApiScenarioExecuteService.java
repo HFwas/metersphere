@@ -7,6 +7,7 @@ import io.metersphere.api.dto.automation.ApiScenarioReportResult;
 import io.metersphere.api.dto.automation.ExecuteType;
 import io.metersphere.api.dto.automation.RunScenarioRequest;
 import io.metersphere.api.dto.definition.RunDefinitionRequest;
+import io.metersphere.api.dto.definition.request.ElementUtil;
 import io.metersphere.api.dto.definition.request.ParameterConfig;
 import io.metersphere.api.dto.plan.TestPlanApiScenarioInfoDTO;
 import io.metersphere.api.exec.api.ApiCaseExecuteService;
@@ -121,9 +122,6 @@ public class ApiScenarioExecuteService {
         }
         // 检查执行内容合规性
         PerformInspectionUtil.scenarioInspection(apiScenarios);
-        // 环境检查
-        LoggerUtil.info("Scenario run-执行脚本装载-开始针对所有执行场景进行环境检查");
-        apiScenarioEnvService.checkEnv(request, apiScenarios);
         // 集合报告设置
         if (!request.isRerun() && GenerateHashTreeUtil.isSetReport(request.getConfig())) {
             if (isSerial(request)) {
@@ -161,7 +159,7 @@ public class ApiScenarioExecuteService {
         DBTestQueue executionQueue = apiExecutionQueueService.add(
                 executeQueue, request.getConfig().getResourcePoolId(),
                 ApiRunMode.SCENARIO.name(), planReportId, reportType,
-                request.getRunMode(),  request.getConfig());
+                request.getRunMode(), request.getConfig());
 
         // 预生成报告
         if (!request.isRerun() && !GenerateHashTreeUtil.isSetReport(request.getConfig())) {
@@ -347,7 +345,7 @@ public class ApiScenarioExecuteService {
                 apiScenarioReportStructureService.save(scenario, report.getId(), request.getConfig() != null ? request.getConfig().getReportType() : null);
             }
             // 执行中资源锁住，防止重复更新造成LOCK WAIT
-            redisTemplateService.lock(planApiScenario.getId());
+            redisTemplateService.lock(planApiScenario.getId(), report.getId());
             // 重置报告ID
             reportId = UUID.randomUUID().toString();
         }
@@ -411,7 +409,7 @@ public class ApiScenarioExecuteService {
         if (StringUtils.equals(request.getEnvironmentType(), EnvironmentType.GROUP.toString())) {
             request.setEnvironmentMap(environmentGroupProjectService.getEnvMap(request.getEnvironmentGroupId()));
         }
-        ParameterConfig config = new ParameterConfig();
+        ParameterConfig config = new ParameterConfig(request.getProjectId(), false);
         config.setScenarioId(request.getScenarioId());
         if (MapUtils.isNotEmpty(request.getEnvironmentMap())) {
             apiScenarioEnvService.setEnvConfig(request.getEnvironmentMap(), config);
@@ -431,6 +429,10 @@ public class ApiScenarioExecuteService {
                 report.setVersionId(scenario.getVersionId());
                 String scenarioDefinition = JSON.toJSONString(request.getTestElement().getHashTree().get(0).getHashTree().get(0));
                 scenario.setScenarioDefinition(scenarioDefinition);
+                List<String> projectIdLists = ElementUtil.getProjectIds(scenarioDefinition);
+                Map<String, String> envMap = ElementUtil.getProjectEnvMap(projectIdLists, request.getEnvironmentMap());
+                request.getConfig().setEnvMap(envMap);
+                report.setEnvConfig(JSON.toJSONString(request.getConfig()));
                 apiScenarioReportStructureService.save(scenario, report.getId(), request.getConfig().getReportType());
             } else {
                 if (request.getTestElement() != null && CollectionUtils.isNotEmpty(request.getTestElement().getHashTree())) {
@@ -440,6 +442,10 @@ public class ApiScenarioExecuteService {
                     if (testElement != null) {
                         apiScenario.setName(testElement.getName());
                         apiScenario.setScenarioDefinition(JSON.toJSONString(testElement));
+                        List<String> projectIdLists = ElementUtil.getProjectIds(apiScenario.getScenarioDefinition());
+                        Map<String, String> envMap = ElementUtil.getProjectEnvMap(projectIdLists, request.getEnvironmentMap());
+                        request.getConfig().setEnvMap(envMap);
+                        report.setEnvConfig(JSON.toJSONString(request.getConfig()));
                         apiScenarioReportStructureService.save(apiScenario, report.getId(), request.getConfig().getReportType());
                     }
                 }
@@ -451,6 +457,7 @@ public class ApiScenarioExecuteService {
         uploadBodyFiles(request.getBodyFileRequestIds(), bodyFiles);
         FileUtils.createBodyFiles(request.getScenarioFileIds(), scenarioFiles);
         this.testElement(request);
+
         HashTree hashTree = request.getTestElement().generateHashTree(config);
         String runMode = StringUtils.isEmpty(request.getRunMode()) ? ApiRunMode.SCENARIO.name() : request.getRunMode();
         JmeterRunRequestDTO runRequest = new JmeterRunRequestDTO(request.getId(), request.getId(), runMode, hashTree);

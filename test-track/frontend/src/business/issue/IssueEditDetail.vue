@@ -43,6 +43,7 @@
             :default-open="richTextDefaultOpen"
             :form-label-width="formLabelWidth"
             :issue-template="issueTemplate"
+            form-prop="id"
             @inputSearch="handleInputSearch"
             ref="customFieldItem"
           />
@@ -176,7 +177,7 @@
         <issue-comment :issues-id="form.id"
                        @getComments="getComments"
                        ref="issueComment"/>
-        <ms-file-metadata-list ref="metadataList" @checkRows="checkRows"/>
+        <ms-file-metadata-list v-if="hasProjectFilePermission" ref="metadataList" @checkRows="checkRows"/>
         <ms-file-batch-move ref="module" @setModuleId="setModuleId"/>
       </el-form>
     </el-scrollbar>
@@ -188,7 +189,7 @@
 import TemplateComponentEditHeader from "@/business/plan/view/comonents/report/TemplateComponentEditHeader";
 import MsFormDivider from "metersphere-frontend/src/components/MsFormDivider";
 import FormRichTextItem from "metersphere-frontend/src/components/FormRichTextItem";
-import {buildCustomFields, parseCustomField} from "metersphere-frontend/src/utils/custom_field";
+import {buildCustomFields, parseCustomField, parseCustomFieldForId} from "metersphere-frontend/src/utils/custom_field";
 import CustomFiledComponent from "metersphere-frontend/src/components/template/CustomFiledComponent";
 import TestCaseIssueList from "@/business/issue/TestCaseIssueList";
 import IssueEditDetail from "@/business/issue/IssueEditDetail";
@@ -199,7 +200,7 @@ import {
   getCurrentWorkspaceId,
   getCurrentUserId
 } from "metersphere-frontend/src/utils/token"
-import {hasLicense} from "metersphere-frontend/src/utils/permission";
+import {hasLicense, hasPermission} from "metersphere-frontend/src/utils/permission";
 import {
   enableThirdPartTemplate,
   getIssuePartTemplateWithProject,
@@ -213,8 +214,8 @@ import {
   uploadIssueAttachment,
   attachmentList,
   deleteIssueAttachment,
-  unrelatedAttachment,
-  relatedAttachment, dumpAttachment
+  unrelatedIssueAttachment,
+  relatedIssueAttachment, dumpAttachment
 } from "@/api/attachment";
 import CustomFiledFormItem from "metersphere-frontend/src/components/form/CustomFiledFormItem";
 import MsMarkDownText from "metersphere-frontend/src/components/MsMarkDownText";
@@ -349,6 +350,9 @@ export default {
     projectId() {
       return getCurrentProjectID();
     },
+    hasProjectFilePermission() {
+      return hasPermission("PROJECT_FILE:READ");
+    }
   },
   watch: {
     tabActiveName() {
@@ -405,7 +409,7 @@ export default {
     getTapdCurrentOwner() {
       getTapdCurrentOwner(this.form.id).then(res => {
         if (res && res.data && res.data[0]) {
-          this.form.tapdUsers = res.data[0].split(';');
+          this.form.tapdUsers = res.data[0].split(';').filter(i => i);
         }
       })
     },
@@ -495,7 +499,7 @@ export default {
           this.form.creator = getCurrentUserId();
         }
       }
-      this.customFieldForm = parseCustomField(this.form, this.issueTemplate, this.customFieldRules);
+      this.customFieldForm = parseCustomFieldForId(this.form, this.issueTemplate, this.customFieldRules);
       this.comments = [];
       this.$nextTick(() => {
         if (this.$refs.testCaseIssueList) {
@@ -748,6 +752,7 @@ export default {
         optionMethod: data.optionMethod,
         workspaceId: getCurrentWorkspaceId(),
         platform: this.issueTemplate.platform,
+        projectId: this.form.projectId ? this.form.projectId : this.projectId,
         query
       }).then((r) => {
         data.options = r.data;
@@ -810,7 +815,7 @@ export default {
                 this.unRelateFiles.push(file.id);
                 let data = {'belongType': 'issue', 'belongId': this.issueId, 'metadataRefIds': this.unRelateFiles};
                 this.result.loading = true;
-                unrelatedAttachment(data)
+                unrelatedIssueAttachment(data)
                   .then(() => {
                     this.$success(this.$t('commons.unrelated_success'));
                     this.result.loading = false;
@@ -870,7 +875,7 @@ export default {
           rows.forEach(row => metadataRefIds.push(row.id));
           let data = {'belongType': 'issue', 'belongId': this.issueId, 'metadataRefIds': metadataRefIds};
           this.result.loading = true;
-          relatedAttachment(data)
+          relatedIssueAttachment(data)
             .then(() => {
               this.$success(this.$t('commons.relate_success'));
               this.result.loading = false;

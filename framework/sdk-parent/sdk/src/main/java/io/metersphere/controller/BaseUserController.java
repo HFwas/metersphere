@@ -1,8 +1,12 @@
 package io.metersphere.controller;
 
 import io.metersphere.base.domain.User;
+import io.metersphere.base.domain.UserGroup;
 import io.metersphere.commons.constants.OperLogConstants;
 import io.metersphere.commons.constants.OperLogModule;
+import io.metersphere.commons.constants.PermissionConstants;
+import io.metersphere.commons.constants.UserGroupConstants;
+import io.metersphere.commons.user.SessionUser;
 import io.metersphere.commons.utils.SessionUtils;
 import io.metersphere.dto.UserDTO;
 import io.metersphere.log.annotation.MsAuditLog;
@@ -11,12 +15,11 @@ import io.metersphere.request.member.EditPassWordRequest;
 import io.metersphere.request.member.EditSeleniumServerRequest;
 import io.metersphere.request.member.QueryMemberRequest;
 import io.metersphere.service.BaseUserService;
+import jakarta.annotation.Resource;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.web.bind.annotation.*;
 
-import jakarta.annotation.Resource;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 @RestController
 @RequestMapping("/user")
@@ -26,11 +29,23 @@ public class BaseUserController {
 
     @GetMapping("/ws/current/member/list")
     public List<User> getCurrentWorkspaceMember() {
+        SessionUser user = SessionUtils.getUser();
+        Optional<UserGroup> any = user.getUserGroups().stream()
+                .filter(ug -> (ug.getSourceId().equals(SessionUtils.getCurrentWorkspaceId()) || ug.getGroupId().equals(UserGroupConstants.SUPER_GROUP)))
+                .findAny();
+        if (any.isEmpty()) {
+            return new ArrayList<>();
+        }
         QueryMemberRequest request = new QueryMemberRequest();
         request.setWorkspaceId(SessionUtils.getCurrentWorkspaceId());
         return baseUserService.getMemberList(request);
     }
 
+    @GetMapping("/add/project/member/option/{projectId}")
+    @RequiresPermissions(PermissionConstants.PROJECT_USER_READ)
+    public List<User> getAddProjectMemberOption(@PathVariable(value = "projectId") String projectId) {
+        return baseUserService.getAddProjectMemberOption(projectId);
+    }
 
     @GetMapping("/switch/source/ws/{sourceId}")
     public UserDTO switchWorkspace(@PathVariable(value = "sourceId") String sourceId) {
@@ -56,6 +71,13 @@ public class BaseUserController {
 
     @GetMapping("/project/member/list")
     public List<User> getProjectMemberListAll() {
+        SessionUser user = SessionUtils.getUser();
+        Optional<UserGroup> any = user.getUserGroups().stream()
+                .filter(ug -> (ug.getSourceId().equals(SessionUtils.getCurrentProjectId()) || ug.getGroupId().equals(UserGroupConstants.SUPER_GROUP)))
+                .findAny();
+        if (any.isEmpty()) {
+            return new ArrayList<>();
+        }
         QueryMemberRequest request = new QueryMemberRequest();
         request.setProjectId(SessionUtils.getCurrentProjectId());
         return baseUserService.getProjectMemberList(request);
@@ -68,6 +90,13 @@ public class BaseUserController {
 
     @GetMapping("/project/member/{projectId}")
     public List<User> getProjectMembers(@PathVariable String projectId) {
+        SessionUser user = SessionUtils.getUser();
+        Optional<UserGroup> any = user.getUserGroups().stream()
+                .filter(ug -> (ug.getSourceId().equals(projectId) || ug.getGroupId().equals(UserGroupConstants.SUPER_GROUP)))
+                .findAny();
+        if (any.isEmpty()) {
+            return new ArrayList<>();
+        }
         QueryMemberRequest request = new QueryMemberRequest();
         request.setProjectId(projectId);
         return baseUserService.getProjectMemberList(request);
@@ -81,9 +110,9 @@ public class BaseUserController {
     /**
      * 根据userId 获取 user 所属工作空间和所属工作项目
      */
-    @GetMapping("/get/ws-pj/{userId}")
-    public Map<Object, Object> getWSAndProjectByUserId(@PathVariable String userId) {
-        return baseUserService.getWSAndProjectByUserId(userId);
+    @GetMapping("/get/ws-pj")
+    public Map<Object, Object> getWSAndProjectByUserId() {
+        return baseUserService.getWSAndProjectByUserId(SessionUtils.getUserId());
     }
 
 

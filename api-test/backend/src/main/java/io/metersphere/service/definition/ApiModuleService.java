@@ -13,6 +13,7 @@ import io.metersphere.base.mapper.ext.ExtApiTestCaseMapper;
 import io.metersphere.commons.constants.*;
 import io.metersphere.commons.enums.ApiTestDataStatus;
 import io.metersphere.commons.exception.MSException;
+import io.metersphere.commons.utils.DateUtils;
 import io.metersphere.commons.utils.JSON;
 import io.metersphere.commons.utils.LogUtil;
 import io.metersphere.commons.utils.SessionUtils;
@@ -22,6 +23,7 @@ import io.metersphere.log.vo.DetailColumn;
 import io.metersphere.log.vo.OperatingLogDetails;
 import io.metersphere.log.vo.api.ModuleReference;
 import io.metersphere.service.NodeTreeService;
+import io.metersphere.service.ServiceUtils;
 import jakarta.annotation.Resource;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -161,10 +163,18 @@ public class ApiModuleService extends NodeTreeService<ApiModuleDTO> {
             request.setVersionId(versionId);
         }
         apiDefinitionService.checkFilterHasCoverage(request);
+        ServiceUtils.setBaseQueryRequestCustomMultipleFields(request);
         List<ApiModuleDTO> countMNodes;
         if (isCaseRelevance) {
             countMNodes = extApiDefinitionMapper.moduleCaseCountByCollection(request);
         } else {
+            if (request.isSelectThisWeedData()) {
+                Map<String, Date> weekFirstTimeAndLastTime = DateUtils.getWeedFirstTimeAndLastTime(new Date());
+                Date weekFirstTime = weekFirstTimeAndLastTime.get("firstTime");
+                if (weekFirstTime != null) {
+                    request.setCreateTime(weekFirstTime.getTime());
+                }
+            }
             countMNodes = extApiDefinitionMapper.moduleCountByCollection(request);
         }
         return getNodeTrees(apiModules, getCountMap(countMNodes));
@@ -236,10 +246,6 @@ public class ApiModuleService extends NodeTreeService<ApiModuleDTO> {
     }
 
     private void validateNode(ApiModule node) {
-        if (node.getLevel() > TestCaseConstants.MAX_NODE_DEPTH) {
-            MSException.throwException(Translator.get("test_case_node_level_tip")
-                    + TestCaseConstants.MAX_NODE_DEPTH + Translator.get("test_case_node_level"));
-        }
         checkApiModuleExist(node);
     }
 

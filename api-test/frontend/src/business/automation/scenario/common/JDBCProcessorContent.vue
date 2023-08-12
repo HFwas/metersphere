@@ -210,7 +210,6 @@ export default {
       this.basisData.method = this.basisData.protocol;
       this.$emit('saveApi', this.basisData);
     },
-    runTest() {},
     itselfEnvironment(environmentId) {
       let id = this.request.projectId ? this.request.projectId : this.projectId;
       this.result = getEnvironmentByProjectId(id).then((response) => {
@@ -220,6 +219,9 @@ export default {
           parseEnvironment(environment);
           // 找到原始环境和数据源名称
           if (environment.id === this.request.environmentId) {
+            if (!environmentId) {
+              environmentId = environment.id;
+            }
             if (environment.config && environment.config.databaseConfigs) {
               environment.config.databaseConfigs.forEach((item) => {
                 if (item.id === this.request.dataSourceId) {
@@ -231,13 +233,28 @@ export default {
         });
         if (environmentId) {
           this.request.environmentId = environmentId;
+        } else {
+          this.request.environmentId = null;
         }
         this.initDataSource(undefined, undefined, targetDataSourceName);
       });
     },
-    getEnvironments(environmentId, isCreated) {
-      let envId = '';
+    // 跨项目步骤如果没有环境则走当前场景环境
+    async selectProjectId(environmentId) {
       let id = this.request.projectId ? this.request.projectId : this.projectId;
+      // 来自单接口请求
+      if (environmentId) {
+        return id;
+      }
+      let scenarioEnvId = this.scenarioId !== '' ? this.scenarioId + '_' + id : id;
+      if (store.scenarioEnvMap && store.scenarioEnvMap instanceof Map && store.scenarioEnvMap.has(scenarioEnvId)) {
+        return id;
+      }
+      return this.projectId;
+    },
+    async getEnvironments(environmentId, isCreated) {
+      let envId = '';
+      let id = await this.selectProjectId(environmentId);
       let scenarioEnvId = this.scenarioId !== '' ? this.scenarioId + '_' + id : id;
       if (store.scenarioEnvMap && store.scenarioEnvMap instanceof Map && store.scenarioEnvMap.has(scenarioEnvId)) {
         envId = store.scenarioEnvMap.get(scenarioEnvId);
@@ -293,7 +310,7 @@ export default {
           }
         });
         if (!hasEnvironment) {
-          this.request.environmentId = "";
+          this.request.environmentId = '';
         }
         this.initDataSource(envId, currentEnvironment, targetDataSourceName);
       });
@@ -395,14 +412,6 @@ export default {
 
 .one-row .el-form-item:nth-child(2) {
   margin-left: 60px;
-}
-
-.ms-left-cell {
-  margin-top: 40px;
-}
-
-.ms-left-buttion {
-  margin: 6px 0px 8px 30px;
 }
 
 .environment-button {

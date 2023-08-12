@@ -29,8 +29,7 @@
                 v-show="versionEnable"
                 ref="versionHistory"
                 :current-id="currentTestCaseInfo.id"
-                :is-read="readOnly"
-                :is-public-show="isPublicShow || hasReadonlyPermission"
+                :is-public-show="isPublicShow"
                 :current-version-id="form.versionId"
                 @confirmOtherInfo="confirmOtherInfo"
                 :current-project-id="projectId"
@@ -90,6 +89,7 @@
             class="edit-public-row head-opt"
             v-if="isPublicShow"
             @click="editPublicCase"
+            :class="[!hasReadonlyPermission === true ? '' : 'div-readOnly']"
           >
             <div class="icon-row">
               <img src="/assets/module/figma/icon_edit_outlined.svg" alt="" />
@@ -100,6 +100,7 @@
             class="copy-public-row head-opt"
             v-if="isPublicShow"
             @click="copyPublicCase"
+            :class="[hasCopyPermission === true ? '' : 'div-readOnly']"
           >
             <div class="icon-row">
               <img src="/assets/module/figma/icon_copy_outlined.svg" alt="" />
@@ -327,6 +328,7 @@ import {
 import {
   hasLicense,
   hasPermission,
+  hasPermissionForProjectId
 } from "metersphere-frontend/src/utils/permission";
 import {
   getUUID,
@@ -628,6 +630,16 @@ export default {
         !hasPermission("PROJECT_TRACK_CASE:READ+CREATE") &&
         !hasPermission("PROJECT_TRACK_CASE:READ+EDIT")
       );
+    },
+    versionReadOnly() {
+      if (this.isPublicShow || this.hasReadonlyPermission) {
+        return true;
+      }
+      const { rowClickHasPermission } = this.currentTestCaseInfo;
+      if (rowClickHasPermission !== undefined) {
+        return !rowClickHasPermission;
+      }
+      return hasPermission('PROJECT_TRACK_CASE:READ');
     },
     caseId() {
       return !this.isPublicShow ? this.$route.params.caseId : this.publicCaseId;
@@ -999,11 +1011,21 @@ export default {
           this.testCaseTemplate,
           this.customFieldRules
         );
+        this.setSystemFieldDefault();
         this.reload();
         this.loading = false;
       }
       if (callback) {
         callback();
+      }
+    },
+    setSystemFieldDefault() {
+      this.form.name = this.testCaseTemplate.caseName;
+      this.form.prerequisite = this.testCaseTemplate.prerequisite;
+      this.form.stepDescription = this.testCaseTemplate.stepDescription;
+      this.form.expectedResult = this.testCaseTemplate.expectedResult;
+      if (this.testCaseTemplate.steps) {
+        this.form.steps = JSON.parse(this.testCaseTemplate.steps);
       }
     },
     async checkCurrentProject() {
@@ -1017,6 +1039,11 @@ export default {
         this.projectId = this.routeProjectId;
         if (this.projectId) {
           // 带了 routeProjectId 校验是否是当前项目
+          if (!hasPermissionForProjectId('PROJECT_TRACK_CASE:READ', this.projectId)) {
+            // 没有该项目权限，跳转到根目录
+            this.$router.push({path: "/"});
+            return;
+          }
           if (getCurrentProjectID() !== this.projectId) {
             setCurrentProjectID(this.projectId);
             location.reload();
@@ -1235,7 +1262,7 @@ export default {
               this.close();
               if (this.saveType === 2) {
                 // 保存并创建
-                this.this.initLatestVersionId = param.versionId;
+                this.initLatestVersionId = param.versionId;
                 this.resetForm();
                 this.initEdit();
               } else {
@@ -1526,7 +1553,7 @@ export default {
     checkoutByVersionId(versionId) {
       getTestCaseByVersionId(this.form.refId, versionId)
         .then((response) => {
-          this.routerToEdit(response.data.id);
+          this.freshTestCase(response.data.id);
         });
     },
     checkout(testCase) {
@@ -1750,7 +1777,9 @@ export default {
 
 <style scoped lang="scss">
 @import "@/business/style/index.scss";
-
+.div-readOnly{
+  pointer-events: none;
+}
 .case-edit-wrap {
   padding: 12px 24px 0px;
   box-sizing: border-box;

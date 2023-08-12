@@ -40,6 +40,7 @@ public class MsJSR223Processor extends MsTestElement {
                 return;
             }
         }
+        
         // 非导出操作，且不是启用状态则跳过执行
         if (!config.isOperating() && !this.isEnable()) {
             return;

@@ -107,4 +107,21 @@ public enum ProjectApplicationType {
      * 资源池ID
      */
     RESOURCE_POOL_ID,
+
+    /**
+     * 性能测试是否评审脚本
+     */
+    PERFORMANCE_REVIEW_LOAD_TEST_SCRIPT,
+    /**
+     * 性能测试脚本评审人
+     */
+    PERFORMANCE_SCRIPT_REVIEWER,
+    /**
+     * 接口测试是否评审脚本
+     */
+    API_REVIEW_TEST_SCRIPT,
+    /**
+     * 接口测试脚本评审人
+     */
+    API_SCRIPT_REVIEWER,
 }

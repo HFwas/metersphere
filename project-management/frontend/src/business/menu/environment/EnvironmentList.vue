@@ -60,13 +60,14 @@
 
         <!-- 创建、编辑、复制环境时的对话框 -->
         <el-dialog :visible.sync="dialogVisible" :close-on-click-modal="false" width="66%" top="50px"
-                   :fullscreen="isFullScreen">
+                   :fullscreen="isFullScreen" destroy-on-close>
           <template #title>
             <ms-dialog-header :title="dialogTitle" :hide-button="true"
                               @cancel="dialogVisible = false"
                               @confirm="save" @fullScreen="fullScreen"/>
           </template>
           <environment-edit
+            v-if="dialogVisible"
             :if-create="ifCreate"
             :environment="currentEnvironment"
             ref="environmentEdit"
@@ -75,6 +76,7 @@
             @confirm="save"
             :project-id="currentProjectId"
             :is-project="true"
+            :key="currentEnvironment.id"
             @refreshAfterSave="refresh">
           </environment-edit>
         </el-dialog>
@@ -148,7 +150,7 @@ import MsMainContainer from "metersphere-frontend/src/components/MsMainContainer
 import MsContainer from "metersphere-frontend/src/components/MsContainer";
 import MsDialogHeader from "metersphere-frontend/src/components/MsDialogHeader";
 import {listAllProject} from "../../../api/project";
-import {delEnvironmentById, getEnvironmentPages} from "../../../api/environment";
+import {delEnvironmentById, getEnvironmentPages, getEnvironment} from "../../../api/environment";
 import i18n from "@/i18n";
 
 export default {
@@ -196,7 +198,18 @@ export default {
       isFullScreen: false //是否全屏
     }
   },
-  created() {
+  mounted() {
+    //跳转环境编辑页面
+    if (this.$route && this.$route.query && this.$route.query.resourceId) {
+      let id = this.$route.query.resourceId;
+      getEnvironment(id).then(response => {
+        if (response.data) {
+          this.editEnv(response.data);
+        } else {
+          this.$error(this.$t('environment.get_env_failed'));
+        }
+      })
+    }
   },
 
   activated() {

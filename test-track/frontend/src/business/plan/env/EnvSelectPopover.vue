@@ -7,12 +7,14 @@
       class="radio-change"
     >
       <el-radio :label="ENV_TYPE.JSON">{{
-        $t("workspace.env_group.env_list")
-      }}</el-radio>
+          $t("workspace.env_group.env_list")
+        }}
+      </el-radio>
       <el-radio :label="ENV_TYPE.GROUP" v-if="showEnvGroup"
-        >{{ $t("workspace.env_group.name")
+      >{{
+          $t("workspace.env_group.name")
         }}<i class="el-icon-tickets mode-span" @click="viewGroup"></i
-      ></el-radio>
+        ></el-radio>
     </el-radio-group>
     <div
       v-for="(pe, pIndex) in eventData"
@@ -37,7 +39,7 @@
         />
         <span class="project-name" :title="getProjectName(pe.id)">
           {{ getProjectName(pe.id) }} </span
-        ><br />
+        ><br/>
         <div v-if="pe.expendStatus === 'open'">
           <el-radio-group
             v-model="pe.envRadio"
@@ -46,20 +48,25 @@
             class="radio-change"
           >
             <el-radio label="DEFAULT_ENV" style="margin-top: 7px">{{
-              $t("api_test.environment.default_environment")
-            }}</el-radio>
+                $t("api_test.environment.default_environment")
+              }}
+            </el-radio>
             <el-radio label="CUSTOMIZE_ENV" style="margin-top: 7px">{{
-              $t("api_test.environment.choose_new_environment")
-            }}</el-radio>
+                $t("api_test.environment.choose_new_environment")
+              }}
+            </el-radio>
           </el-radio-group>
-          <el-tag
-            v-show="!pe.showEnvSelect"
-            v-for="(itemName, index) in selectedEnvName.get(pe.id)"
-            :key="index"
-            size="mini"
-            style="margin-left: 0; margin-right: 2px; margin-top: 8px"
-            >{{ itemName }}</el-tag
-          >
+          <div v-if="isEnvSaved">
+            <el-tag
+              v-show="!pe.showEnvSelect"
+              v-for="(itemName, index) in selectedEnvName.get(pe.id)"
+              :key="index"
+              size="mini"
+              style="margin-left: 0; margin-right: 2px; margin-top: 8px"
+            >
+              {{ itemName }}
+            </el-tag>
+          </div>
           <el-select
             v-show="pe.showEnvSelect"
             v-model="pe['selectEnv']"
@@ -141,19 +148,16 @@
 </template>
 
 <script>
-import { ENV_TYPE } from "metersphere-frontend/src/utils/constants";
-import {
-  environmentGetALL,
-  getEnvironmentOptions,
-} from "metersphere-frontend/src/api/environment";
+import {ENV_TYPE} from "metersphere-frontend/src/utils/constants";
+import {environmentGetALL, getEnvironmentOptions,} from "metersphere-frontend/src/api/environment";
 import MsTag from "metersphere-frontend/src/components/MsTag";
 import EnvironmentGroup from "@/business/plan/env/EnvironmentGroupList";
-import { getEnvironmentByProjectId } from "@/api/remote/api/api-environment";
-import { parseEnvironment } from "metersphere-frontend/src/model/EnvironmentModel";
+import {getEnvironmentByProjectId} from "@/api/remote/api/api-environment";
+import {parseEnvironment} from "metersphere-frontend/src/model/EnvironmentModel";
 
 export default {
   name: "EnvSelectPopover",
-  components: { MsTag, EnvironmentGroup },
+  components: {MsTag, EnvironmentGroup},
   data() {
     return {
       radio: this.environmentType,
@@ -189,6 +193,11 @@ export default {
     },
     projectIds: Set,
     projectList: Array,
+    //环境是否保存过
+    isEnvSaved: {
+      type: Boolean,
+      default: true,
+    },
     projectEnvMap: Object,
     envMap: Map,
     environmentType: String,
@@ -233,7 +242,7 @@ export default {
           this.groups = data ? data : [];
         });
       } else {
-        getEnvironmentOptions({ projectIds: [...this.projectIds] }).then(
+        getEnvironmentOptions({projectIds: [...this.projectIds]}).then(
           (res) => {
             let groups = res.data;
             this.disabledGroups = groups.filter(

@@ -3,7 +3,7 @@
   <div style="border: 1px #dcdfe6 solid" v-if="!loading">
     <el-tabs v-model="activeName" class="request-tabs">
       <!-- 请求头-->
-      <el-tab-pane :label="$t('api_test.request.headers')" name="headers" v-if="request.header">
+      <el-tab-pane :label="request.columnName === 'request' ? $t('api_test.request.headers') : $t('api_test.definition.request.response_header')" name="headers" v-if="request.header">
         <ms-api-key-value-detail :items="request.header" :showDesc="true" :format="request.headerId" />
       </el-tab-pane>
       <el-tab-pane :label="$t('api_test.definition.request.status_code')" name="statusCode" v-if="request.statusCode">
@@ -29,7 +29,7 @@
 
       <!--请求体-->
       <el-tab-pane
-        :label="$t('api_test.request.body')"
+        :label="request.columnName === 'request' ? $t('api_test.request.body') : $t('api_test.definition.request.response_body')"
         name="body"
         v-if="
           request.body && (request.body.form || request.body.jsonSchema || request.body.raw_1 || request.body.raw_2)
@@ -107,9 +107,9 @@
 <script>
 import MsJsonCodeEdit from './json-view/ComparedEditor';
 import MsApiKeyValueDetail from './common/ApiKeyValueDetail';
+import {formatters, diff} from 'jsondiffpatch';
 
-const jsondiffpatch = require('jsondiffpatch');
-const formattersHtml = jsondiffpatch.formatters.html;
+const formattersHtml = formatters.html;
 
 export default {
   name: 'MsApiHttpRequestParams',
@@ -180,7 +180,7 @@ export default {
       this.reloadCodeEdit();
     },
     getDiff(v1, v2) {
-      let delta = jsondiffpatch.diff(v1, v2);
+      let delta = diff(v1, v2);
       return formattersHtml.format(delta, v1);
     },
     reloadCodeEdit() {

@@ -5,7 +5,7 @@ import com.github.pagehelper.PageHelper;
 import io.metersphere.api.dto.ApiCaseRelevanceRequest;
 import io.metersphere.api.dto.EnvironmentType;
 import io.metersphere.api.dto.RelevanceScenarioRequest;
-import io.metersphere.api.dto.ScenarioEnv;
+import io.metersphere.api.dto.EnvironmentCheckDTO;
 import io.metersphere.api.dto.automation.*;
 import io.metersphere.api.dto.plan.*;
 import io.metersphere.api.exec.scenario.ApiScenarioEnvService;
@@ -237,7 +237,7 @@ public class TestPlanScenarioCaseService {
             Map<String, String> newEnvMap = new HashMap<>(16);
             List<String> list = mapping.get(id);
             if (CollectionUtils.isEmpty(list)) {
-                ScenarioEnv scenarioEnv = apiAutomationService.getApiScenarioProjectId(id);
+                EnvironmentCheckDTO scenarioEnv = apiAutomationService.getApiScenarioProjectId(id);
                 list = new ArrayList<>(scenarioEnv.getProjectIds());
             }
             list.forEach(l -> newEnvMap.put(l, envMap == null ? StringUtils.EMPTY : envMap.getOrDefault(l, StringUtils.EMPTY)));
@@ -248,6 +248,7 @@ public class TestPlanScenarioCaseService {
             testPlanApiScenario.setTestPlanId(request.getPlanId());
             testPlanApiScenario.setCreateTime(System.currentTimeMillis());
             testPlanApiScenario.setUpdateTime(System.currentTimeMillis());
+            newEnvMap.remove(null);
             String environmentJson = JSON.toJSONString(newEnvMap);
             if (StringUtils.equals(envType, EnvironmentType.JSON.name())) {
                 testPlanApiScenario.setEnvironment(environmentJson);

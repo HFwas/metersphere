@@ -14,9 +14,11 @@ import io.metersphere.api.dto.definition.request.auth.MsAuthManager;
 import io.metersphere.api.dto.definition.request.sampler.MsHTTPSamplerProxy;
 import io.metersphere.api.dto.definition.request.sampler.MsJDBCSampler;
 import io.metersphere.api.dto.definition.request.sampler.MsTCPSampler;
+import io.metersphere.api.dto.scenario.Body;
 import io.metersphere.api.dto.swaggerurl.SwaggerTaskResult;
 import io.metersphere.api.dto.swaggerurl.SwaggerUrlRequest;
 import io.metersphere.api.exec.api.ApiExecuteService;
+import io.metersphere.api.exec.generator.JSONSchemaParser;
 import io.metersphere.api.jmeter.JMeterService;
 import io.metersphere.api.parse.ApiImportParser;
 import io.metersphere.api.parse.api.ApiDefinitionImport;
@@ -44,6 +46,7 @@ import io.metersphere.notice.sender.NoticeModel;
 import io.metersphere.notice.service.NoticeSendService;
 import io.metersphere.plugin.core.MsTestElement;
 import io.metersphere.quota.service.BaseQuotaService;
+import io.metersphere.request.OrderRequest;
 import io.metersphere.request.RelationshipEdgeRequest;
 import io.metersphere.request.ResetOrderRequest;
 import io.metersphere.request.SyncApiDefinitionRequest;
@@ -167,6 +170,8 @@ public class ApiDefinitionService {
     private BaseQuotaService baseQuotaService;
     @Resource
     private BaseEnvGroupProjectService environmentGroupProjectService;
+    @Resource
+    private ApiCaseResultService apiCaseResultService;
 
 
     private static final String COPY = "Copy";
@@ -175,10 +180,17 @@ public class ApiDefinitionService {
     public static final String ARGUMENTS = "arguments";
     public static final String BODY = "body";
     private static final String SCHEDULE = "schedule";
+    public static final String TYPE = "type";
+    public static final String HTTP = "HTTPSamplerProxy";
+    public static final String CLAZZ = "className";
+    public static final String FORMAT = "format";
+    public static final String RAW = "raw";
+    public static final String JSONSCHEMA = "jsonSchema";
 
 
     public List<ApiDefinitionResult> list(ApiDefinitionRequest request) {
         request = this.initRequest(request, true, true);
+        ServiceUtils.setBaseQueryRequestCustomMultipleFields(request);
         List<ApiDefinitionResult> resList = extApiDefinitionMapper.list(request);
         buildUserInfo(resList);
         if (StringUtils.isNotBlank(request.getProjectId())) {
@@ -189,6 +201,12 @@ public class ApiDefinitionService {
         }
         buildCustomField(resList);
         return resList;
+    }
+
+    private void setCustomFieldsOrder(ApiDefinitionRequest request) {
+        if (request.getCombine() != null && !request.getCombine().isEmpty()) {
+            request.setIsCustomSorted(true);
+        }
     }
 
     /**
@@ -287,8 +305,17 @@ public class ApiDefinitionService {
             return new ArrayList<>(0);
         } else {
             ApiDefinitionRequest request = new ApiDefinitionRequest();
+            request.setOrders(
+                    new ArrayList<>() {{
+                        add(new OrderRequest() {{
+                                this.setName("update_time");
+                                this.setType("desc");
+                            }}
+                        );
+                    }}
+            );
             request.setProjectId(projectId);
-            request = this.initRequest(request, true, true);
+            request = this.initRequest(request, false, true);
             request.setNotEqStatus(ApiTestDataStatus.TRASH.getValue());
             if (StringUtils.isNotBlank(versionId)) {
                 request.setVersionId(versionId);
@@ -308,6 +335,22 @@ public class ApiDefinitionService {
             return new ArrayList<>();
         }
         List<ApiDefinitionResult> resList = extApiDefinitionMapper.listByIds(request.getIds());
+        resList.forEach(item -> {
+            JSONObject jsonObject = JSONUtil.parseObject(item.getRequest());
+            if (jsonObject != null && jsonObject.has(TYPE) && jsonObject.optString(TYPE).equals(HTTP)) {
+                jsonObject.put(CLAZZ, MsHTTPSamplerProxy.class.getCanonicalName());
+                JSONObject body = jsonObject.optJSONObject(BODY);
+                if (StringUtils.isNotBlank(body.optString(TYPE))
+                        && StringUtils.equals(body.optString(TYPE), Body.JSON_STR)
+                        && StringUtils.isNotEmpty(body.optString(FORMAT))
+                        && body.optJSONObject(JSONSCHEMA) != null
+                        && Body.JSON_SCHEMA.equals(body.optString(FORMAT))) {
+                    body.put(RAW, JSONSchemaParser.preview(body.optString(JSONSCHEMA)));
+                    jsonObject.put(BODY, body);
+                }
+                item.setRequest(jsonObject.toString());
+            }
+        });
         // 排序
         FixedOrderComparator<String> fixedOrderComparator = new FixedOrderComparator<String>(request.getIds());
         fixedOrderComparator.setUnknownObjectBehavior(FixedOrderComparator.UnknownObjectBehavior.BEFORE);
@@ -874,6 +917,15 @@ public class ApiDefinitionService {
     }
 
     private ApiDefinitionResult createTest(SaveApiDefinitionRequest request) {
+        if (StringUtils.isEmpty(request.getModuleId()) || "default-module".equals(request.getModuleId())) {
+            ApiModuleExample example = new ApiModuleExample();
+            example.createCriteria().andProjectIdEqualTo(request.getProjectId()).andProtocolEqualTo(request.getProtocol()).andNameEqualTo(ProjectModuleDefaultNodeEnum.API_MODULE_DEFAULT_NODE.getNodeName()).andLevelEqualTo(1);
+            List<ApiModule> modules = apiModuleMapper.selectByExample(example);
+            if (CollectionUtils.isNotEmpty(modules)) {
+                request.setModuleId(modules.get(0).getId());
+                request.setModulePath("/未规划接口");
+            }
+        }
         checkNameExist(request, false);
         final ApiDefinitionWithBLOBs test = new ApiDefinitionWithBLOBs();
         test.setId(request.getId());
@@ -895,9 +947,6 @@ public class ApiDefinitionService {
         test.setRefId(request.getId());
         test.setVersionId(request.getVersionId());
         test.setLatest(true); // 新建一定是最新的
-        if (StringUtils.isEmpty(request.getModuleId()) || "default-module".equals(request.getModuleId())) {
-            initModulePathAndId(test.getProjectId(), test);
-        }
         test.setResponse(JSON.toJSONString(request.getResponse()));
         test.setEnvironmentId(request.getEnvironmentId());
         test.setNum(getNextNum(request.getProjectId()));
@@ -1134,6 +1183,7 @@ public class ApiDefinitionService {
             SqlSessionUtils.closeSqlSession(sqlSession, sqlSessionFactory);
         }
     }
+
     private void batchEditDefinitionTags(ApiBatchRequest request) {
         if (request.getTagList().isEmpty()) {
             return;
@@ -1527,9 +1577,12 @@ public class ApiDefinitionService {
          */
         List<ApiDefinitionWithBLOBs> specifyData = new ArrayList<>();
         if (StringUtils.isNotBlank(mockApiResourceId)) {
-            ApiDefinitionWithBLOBs apiDefinition = apiDefinitionMapper.selectByPrimaryKey(mockApiResourceId);
-            if (apiDefinition != null) {
-                specifyData.add(apiDefinition);
+            ApiDefinitionExample apiDefinitionExample = new ApiDefinitionExample();
+            apiDefinitionExample.createCriteria().andIdEqualTo(mockApiResourceId).andStatusNotEqualTo("Trash");
+            List<ApiDefinitionWithBLOBs> apiDefinitions = apiDefinitionMapper.selectByExampleWithBLOBs(apiDefinitionExample);
+            ApiDefinitionWithBLOBs apiDefinition;
+            if (CollectionUtils.isNotEmpty(apiDefinitions)) {
+                specifyData.add(apiDefinitions.get(0));
             } else {
                 ApiTestCase testCase = apiTestCaseMapper.selectByPrimaryKey(mockApiResourceId);
                 if (testCase != null) {
@@ -1712,11 +1765,21 @@ public class ApiDefinitionService {
         ApiDefinitionRequest request = new ApiDefinitionRequest();
         request.setId(id);
         List<ApiDefinitionResult> list = extApiDefinitionMapper.list(request);
+        buildCustomField(list);
         ApiDefinitionResult result = null;
         if (CollectionUtils.isNotEmpty(list)) {
             result = list.get(0);
         }
         return result;
+    }
+
+    public List<ApiDefinitionResult> getApiByIds(List<String> ids) {
+        if (CollectionUtils.isNotEmpty(ids)) {
+            List<ApiDefinitionResult> list = extApiDefinitionMapper.selectApiByIds(ids);
+            buildCustomField(list);
+            return list;
+        }
+        return new ArrayList<>();
     }
 
 
@@ -1898,6 +1961,10 @@ public class ApiDefinitionService {
                 // 检查附件复制出附件
                 ApiFileUtil.copyBodyFiles(sourceId, api.getId());
 
+                List<CustomFieldResourceDTO> byResourceId = customFieldApiService.getByResourceId(sourceId);
+                if (CollectionUtils.isNotEmpty(byResourceId)) {
+                    customFieldApiService.addFields(api.getId(), byResourceId);
+                }
                 mapper.insert(api);
                 if (i % 50 == 0) sqlSession.flushStatements();
             }
@@ -2017,7 +2084,8 @@ public class ApiDefinitionService {
                 result.setEnvConfig(JSON.toJSONString(runModeConfigDTO));
             }
             result.setActuator(request.getConfig().getResourcePoolId());
-            apiDefinitionExecResultMapper.insert(result);
+            apiCaseResultService.batchSave(result);
+
         }
         if (request.isEditCaseRequest() && CollectionUtils.isNotEmpty(request.getTestElement().getHashTree()) && CollectionUtils.isNotEmpty(request.getTestElement().getHashTree().get(0).getHashTree())) {
             ApiTestCaseWithBLOBs record = new ApiTestCaseWithBLOBs();

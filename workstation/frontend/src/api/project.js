@@ -1,5 +1,5 @@
 import {get, post} from "metersphere-frontend/src/plugins/request"
-import {getCurrentProjectID} from "metersphere-frontend/src/utils/token";
+import {getCurrentProjectID, getCurrentWorkspaceId} from "metersphere-frontend/src/utils/token";
 
 export function listAllProject() {
   return get("/project/listAll")
@@ -32,4 +32,13 @@ export function getCurrentProject(callback) {
 
 export function getProjectApplication(projectId){
   return get('/project_application/get/config/' + projectId + '/OPEN_UPDATE_RULE')
+}
+
+export function getProjectConfig(projectId) {
+  let url = '/project_application/get/config/' + projectId;
+  return get(url);
+}
+
+export function getAll() {
+  return get('/project/listAll/' + getCurrentWorkspaceId());
 }

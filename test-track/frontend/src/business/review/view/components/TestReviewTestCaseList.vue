@@ -63,7 +63,7 @@
           :field="item"
           sortable
           :fields-width="fieldsWidth"
-          :label="$t('commons.name')"
+          :label="$t('test_track.case.name')"
           min-width="120px"/>
 
         <ms-table-column
@@ -163,6 +163,19 @@
             <span>{{ scope.row.updateTime | datetimeFormat }}</span>
           </template>
         </ms-table-column>
+
+        <ms-table-column
+          sortable
+          prop="createTime"
+          :field="item"
+          :fields-width="fieldsWidth"
+          :label="$t('commons.create_time')"
+          min-width="120px">
+          <template v-slot:default="scope">
+            <span>{{ scope.row.createTime | datetimeFormat }}</span>
+          </template>
+        </ms-table-column>
+
       </span>
 
     </ms-table>

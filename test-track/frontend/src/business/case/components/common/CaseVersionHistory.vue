@@ -14,9 +14,8 @@
       width="392"
       trigger="click"
       popper-class="version-popover"
-      v-loading="loading"
     >
-      <div class="version-history-wrap">
+      <div class="version-history-wrap" v-loading="loading">
         <div class="label-row">
           <div class="label">{{ $t("project.version.name") }}</div>
         </div>
@@ -47,14 +46,14 @@
               <div
                 class="updated opt-row"
                 @click.stop="setLatest(item)"
-                v-if="showSetNew(item)"
+                v-if="caseVersionMap.has(item.id) && showSetNew(item)"
               >
                 {{ $t("case.set_new") }}
               </div>
               <div
                 class="create opt-row"
                 v-if="!caseVersionMap.has(item.id)
-                  && !isRead"
+                  && hasCreatePermission"
                 @click.stop="create(item)"
               >
                 {{ $t("commons.create") }}
@@ -64,7 +63,7 @@
                 @click.stop="del(item)"
                 v-if="caseVersionMap.has(item.id)
                   && !(item.id === currentVersionId)
-                  && !isRead"
+                  && hasDeletePermission"
               >
                 {{ $t("commons.delete") }}
               </div>
@@ -82,7 +81,7 @@
       </div>
 
       <!-- origin -->
-      <span slot="reference">
+      <span slot="reference" v-loading="loading">
         <slot
           name="versionLabel"
           v-if="versionEnable && currentVersion.id"
@@ -99,6 +98,11 @@
       <div class="compare-wrap">
         <div class="version-left-box">
           <el-select v-model="versionLeftId" size="small" clearable>
+            <template #prefix>
+              <span class="compare-version-lasted" v-if="versionLeftId === dataLatestId">
+                {{ $t("case.last_version") }}
+              </span>
+            </template>
             <el-option
               v-for="item in versionLeftCompareOptions"
               :key="item.id"
@@ -115,6 +119,11 @@
         <div class="desc">{{ $t("case.compare") }}</div>
         <div class="version-right-box">
           <el-select v-model="versionRightId" size="small" clearable>
+            <template #prefix>
+              <span class="compare-version-lasted" v-if="versionRightId === dataLatestId">
+                {{ $t("case.last_version") }}
+              </span>
+            </template>
             <el-option
               v-for="item in versionRightCompareOptions"
               :key="item.id"
@@ -147,7 +156,7 @@
 
 <script>
 import {getCurrentProjectID} from "metersphere-frontend/src/utils/token";
-import {hasLicense} from "metersphere-frontend/src/utils/permission";
+import {hasLicense, hasPermission} from "metersphere-frontend/src/utils/permission";
 import {
   getProjectMembers,
   getProjectVersions,
@@ -163,10 +172,6 @@ export default {
     testUsers: Array,
     useExternalUsers: Boolean,
     isTestCaseVersion: {
-      type: Boolean,
-      default: false,
-    },
-    isRead: {
       type: Boolean,
       default: false,
     },
@@ -208,6 +213,15 @@ export default {
     },
     compareDisable() {
       return !this.versionCompareOptions || this.versionCompareOptions.length < 2;
+    },
+    hasCreatePermission() {
+      return hasPermission("PROJECT_TRACK_CASE:READ+CREATE")
+    },
+    hasEditPermission() {
+      return hasPermission("PROJECT_TRACK_CASE:READ+EDIT")
+    },
+    hasDeletePermission() {
+      return hasPermission("PROJECT_TRACK_CASE:READ+DELETE");
     }
   },
   beforeDestroy() {
@@ -309,7 +323,7 @@ export default {
       let isNotDataLatestVersionCase = item.id === this.dataLatestId;
       return hasVersionCase // 有当前版本的用例
           && latestVersionCondition  // 有最新版本的用例，则非最新版本的其他版本不显示置新
-          && !this.isRead // 不是只读
+          && this.hasEditPermission
           && !isNotDataLatestVersionCase // 已经是最新版本，不显示置新
     },
     handleVersionOptions() {
@@ -596,6 +610,16 @@ export default {
 
   margin-top: 24px;
   margin-bottom: 24px;
+}
+
+:deep(.el-input--prefix .el-input__inner) {
+  padding-left: 15px;
+}
+
+:deep(.el-input__prefix) {
+  left: 60px;
+  transition: all 0.3s;
+  top: 5px;
 }
 </style>
 <style>

@@ -11,6 +11,8 @@ import io.metersphere.api.dto.definition.request.ElementUtil;
 import io.metersphere.api.dto.definition.request.MsTestPlan;
 import io.metersphere.api.dto.definition.request.MsThreadGroup;
 import io.metersphere.api.dto.definition.request.sampler.MsHTTPSamplerProxy;
+import io.metersphere.api.dto.scenario.Body;
+import io.metersphere.api.exec.generator.JSONSchemaParser;
 import io.metersphere.base.domain.*;
 import io.metersphere.base.mapper.*;
 import io.metersphere.base.mapper.ext.*;
@@ -28,9 +30,12 @@ import io.metersphere.log.utils.ReflexObjectUtil;
 import io.metersphere.log.vo.DetailColumn;
 import io.metersphere.log.vo.OperatingLogDetails;
 import io.metersphere.log.vo.api.DefinitionReference;
+import io.metersphere.notice.service.NotificationService;
 import io.metersphere.plugin.core.MsTestElement;
 import io.metersphere.request.OrderRequest;
 import io.metersphere.request.ResetOrderRequest;
+import io.metersphere.service.BaseProjectApplicationService;
+import io.metersphere.service.BaseProjectService;
 import io.metersphere.service.BaseUserService;
 import io.metersphere.service.ServiceUtils;
 import io.metersphere.service.ext.ExtFileAssociationService;
@@ -104,6 +109,13 @@ public class ApiTestCaseService {
     private ExtTestPlanApiCaseMapper extTestPlanApiCaseMapper;
     @Resource
     private ExtApiScenarioReferenceIdMapper extApiScenarioReferenceIdMapper;
+    @Resource
+    private BaseProjectApplicationService baseProjectApplicationService;
+    @Resource
+    private NotificationService notificationService;
+    @Resource
+    private BaseProjectService baseProjectService;
+
 
     private static final String BODY_FILE_DIR = FileUtils.BODY_FILE_DIR;
 
@@ -276,11 +288,12 @@ public class ApiTestCaseService {
     }
 
     public List<ApiTestCaseInfo> selectByCaseIds(List<String> ids) {
-        if(CollectionUtils.isEmpty(ids)){
+        if (CollectionUtils.isEmpty(ids)) {
             return new ArrayList<>();
         }
         return extApiTestCaseMapper.selectByCaseIds(ids);
     }
+
     public ApiTestCaseInfo getResult(String id) {
         return extApiTestCaseMapper.selectApiCaseInfoByPrimaryKey(id);
     }
@@ -395,6 +408,7 @@ public class ApiTestCaseService {
         request.setRequest(tcpApiParamService.parseMsTestElement(request.getRequest()));
         final ApiTestCaseWithBLOBs test = apiTestCaseMapper.selectByPrimaryKey(request.getId());
         if (test != null) {
+            String requestOrg = test.getRequest();
             test.setName(request.getName());
             test.setCaseStatus(request.getCaseStatus());
             if (StringUtils.isEmpty(request.getCaseStatus())) {
@@ -420,6 +434,15 @@ public class ApiTestCaseService {
             }
             apiTestCaseMapper.updateByPrimaryKeySelective(test);
             saveFollows(test.getId(), request.getFollows());
+            this.checkAndSendReviewMessage(test.getId(),
+                    test.getName(),
+                    test.getProjectId(),
+                    "接口用例通知",
+                    NoticeConstants.TaskType.API_DEFINITION_TASK,
+                    requestOrg,
+                    test.getRequest(),
+                    test.getCreateUserId()
+            );
         }
         // 存储附件关系
         extFileAssociationService.saveApi(test.getId(), request.getRequest(), FileAssociationTypeEnums.CASE.name());
@@ -486,6 +509,15 @@ public class ApiTestCaseService {
             apiTestCaseMapper.insert(test);
             saveFollows(test.getId(), request.getFollows());
         }
+        this.checkAndSendReviewMessage(test.getId(),
+                test.getName(),
+                test.getProjectId(),
+                "接口用例通知",
+                NoticeConstants.TaskType.API_DEFINITION_TASK,
+                null,
+                test.getRequest(),
+                test.getCreateUserId()
+        );
         // 存储附件关系
         extFileAssociationService.saveApi(test.getId(), request.getRequest(), FileAssociationTypeEnums.CASE.name());
         return test;
@@ -818,6 +850,22 @@ public class ApiTestCaseService {
             list = new ArrayList<>();
         } else {
             list = extApiTestCaseMapper.getCaseInfo(request);
+            list.forEach(item -> {
+                JSONObject jsonObject = JSONUtil.parseObject(item.getRequest());
+                if (jsonObject != null && jsonObject.has(ApiDefinitionService.TYPE) && jsonObject.optString(ApiDefinitionService.TYPE).equals(ApiDefinitionService.HTTP)) {
+                    jsonObject.put(ApiDefinitionService.CLAZZ, MsHTTPSamplerProxy.class.getCanonicalName());
+                    JSONObject body = jsonObject.optJSONObject(ApiDefinitionService.BODY);
+                    if (StringUtils.isNotBlank(body.optString(ApiDefinitionService.TYPE))
+                            && StringUtils.equals(body.optString(ApiDefinitionService.TYPE), Body.JSON_STR)
+                            && StringUtils.isNotEmpty(body.optString(ApiDefinitionService.FORMAT))
+                            && body.optJSONObject(ApiDefinitionService.JSONSCHEMA) != null
+                            && Body.JSON_SCHEMA.equals(body.optString(ApiDefinitionService.FORMAT))) {
+                        body.put(ApiDefinitionService.RAW, JSONSchemaParser.preview(body.optString(ApiDefinitionService.JSONSCHEMA)));
+                        jsonObject.put(ApiDefinitionService.BODY, body);
+                    }
+                    item.setRequest(jsonObject.toString());
+                }
+            });
         }
         // 排序
         FixedOrderComparator<String> fixedOrderComparator = new FixedOrderComparator<String>(request.getIds());
@@ -1306,4 +1354,52 @@ public class ApiTestCaseService {
         return extApiTestCaseMapper.findPassRateById(id);
 
     }
+
+    //检查并发送脚本审核的通知
+    @Async
+    public void checkAndSendReviewMessage(
+            String id,
+            String name,
+            String projectId,
+            String title,
+            String resourceType,
+            String requestOrg,
+            String requestTarget,
+            String sendUser) {
+
+        try {
+            ProjectApplication scriptEnable = baseProjectApplicationService
+                    .getProjectApplication(projectId, ProjectApplicationType.API_REVIEW_TEST_SCRIPT.name());
+
+            if (BooleanUtils.toBoolean(scriptEnable.getTypeValue())) {
+                List<String> org = ElementUtil.scriptList(requestOrg);
+                List<String> target = ElementUtil.scriptList(requestTarget);
+                boolean isSend = ElementUtil.isSend(org, target);
+                if (isSend) {
+                    ProjectApplication reviewer = baseProjectApplicationService
+                            .getProjectApplication(projectId, ProjectApplicationType.API_SCRIPT_REVIEWER.name());
+                    if (StringUtils.isNotEmpty(reviewer.getTypeValue())) {
+                        sendUser = reviewer.getTypeValue();
+                    }
+                    if (baseProjectService.isProjectMember(projectId, sendUser)) {
+                        Notification notification = new Notification();
+                        notification.setTitle(title);
+                        notification.setOperator(reviewer.getTypeValue());
+                        notification.setOperation(NoticeConstants.Event.REVIEW);
+                        notification.setResourceId(id);
+                        notification.setResourceName(name);
+                        notification.setResourceType(resourceType);
+                        notification.setType(NotificationConstants.Type.SYSTEM_NOTICE.name());
+                        notification.setStatus(NotificationConstants.Status.UNREAD.name());
+                        notification.setCreateTime(System.currentTimeMillis());
+                        notification.setReceiver(sendUser);
+                        notificationService.sendAnnouncement(notification);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LogUtil.error("发送通知失败", e);
+        }
+    }
+
 }

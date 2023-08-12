@@ -4,6 +4,7 @@ import io.metersphere.commons.constants.MicroServiceName;
 import io.metersphere.commons.constants.TestPlanLoadCaseStatus;
 import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.utils.LogUtil;
+import io.metersphere.commons.utils.SubListUtil;
 import io.metersphere.dto.PlanReportCaseDTO;
 import io.metersphere.dto.TestPlanLoadCaseDTO;
 import io.metersphere.dto.TestPlanLoadResultReportDTO;
@@ -15,6 +16,7 @@ import io.metersphere.plan.request.performance.LoadPlanReportDTO;
 import io.metersphere.plan.service.TestPlanService;
 import io.metersphere.plan.utils.TestPlanReportUtil;
 import io.metersphere.plan.utils.TestPlanStatusCalculator;
+import io.metersphere.utils.BatchProcessingUtil;
 import io.metersphere.utils.DiscoveryUtil;
 import jakarta.annotation.Resource;
 import org.apache.commons.collections.CollectionUtils;
@@ -138,7 +140,11 @@ public class PlanTestPlanLoadCaseService extends LoadTestService {
         if (CollectionUtils.isEmpty(loadCases)) {
             return null;
         }
-        List<TestPlanLoadCaseDTO> returnList = microService.postForDataArray(serviceName, BASE_UEL + "/build/response", loadCases, TestPlanLoadCaseDTO.class);
+        //分批处理参数时为了不影响初始参数，这里使用新的对象进行处理
+        List<TestPlanLoadCaseDTO> returnList = new ArrayList<>();
+        SubListUtil.dealForSubList(loadCases, 20, (paramList) -> {
+            returnList.addAll(microService.postForDataArray(serviceName, BASE_UEL + "/build/response", paramList, TestPlanLoadCaseDTO.class));
+        });
         return returnList;
     }
 

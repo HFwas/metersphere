@@ -9,6 +9,7 @@ import io.metersphere.api.dto.definition.ApiTestCaseInfo;
 import io.metersphere.api.dto.definition.RunDefinitionRequest;
 import io.metersphere.api.dto.definition.request.*;
 import io.metersphere.api.dto.definition.request.sampler.MsHTTPSamplerProxy;
+import io.metersphere.api.dto.definition.request.variable.ScenarioVariable;
 import io.metersphere.api.dto.export.ScenarioToPerformanceInfoDTO;
 import io.metersphere.api.dto.scenario.ApiScenarioParamDTO;
 import io.metersphere.api.exec.scenario.ApiScenarioEnvService;
@@ -47,10 +48,12 @@ import io.metersphere.notice.sender.NoticeModel;
 import io.metersphere.notice.service.NoticeSendService;
 import io.metersphere.plugin.core.MsTestElement;
 import io.metersphere.quota.service.BaseQuotaService;
+import io.metersphere.request.BodyFile;
 import io.metersphere.request.ResetOrderRequest;
 import io.metersphere.sechedule.ApiScenarioTestJob;
 import io.metersphere.sechedule.SwaggerUrlImportJob;
 import io.metersphere.service.*;
+import io.metersphere.service.definition.ApiTestCaseService;
 import io.metersphere.service.definition.TcpApiParamService;
 import io.metersphere.service.ext.ExtApiScheduleService;
 import io.metersphere.service.ext.ExtFileAssociationService;
@@ -64,6 +67,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.session.ExecutorType;
 import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
+import org.apache.jmeter.protocol.http.sampler.HTTPSamplerProxy;
 import org.apache.jorphan.collections.HashTree;
 import org.apache.jorphan.collections.ListedHashTree;
 import org.jetbrains.annotations.NotNull;
@@ -162,6 +166,10 @@ public class ApiScenarioService {
     private BaseQuotaService baseQuotaService;
     @Resource
     private ApiAutomationRelationshipEdgeService apiAutomationRelationshipEdgeService;
+    @Resource
+    private ApiTestCaseService apiTestCaseService;
+    @Resource
+    private BaseProjectService baseProjectService;
 
     private ThreadLocal<Long> currentScenarioOrder = new ThreadLocal<>();
 
@@ -266,7 +274,7 @@ public class ApiScenarioService {
         extApiScenarioMapper.removeToGcByExample(example);
     }
 
-    public ApiScenario create(SaveApiScenarioRequest request, List<MultipartFile> bodyFiles, List<MultipartFile> scenarioFiles) {
+    public ApiScenarioWithBLOBs create(SaveApiScenarioRequest request, List<MultipartFile> bodyFiles, List<MultipartFile> scenarioFiles) {
         checkQuota(request.getProjectId());
         request.setId(UUID.randomUUID().toString());
         if (request.getScenarioDefinition() == null) {
@@ -294,6 +302,16 @@ public class ApiScenarioService {
         apiScenarioReferenceIdService.saveApiAndScenarioRelation(scenario);
         // 存储依赖关系
         apiAutomationRelationshipEdgeService.initRelationshipEdge(null, scenario);
+        apiTestCaseService.checkAndSendReviewMessage(
+                scenario.getId(),
+                scenario.getName(),
+                scenario.getProjectId(),
+                "场景用例通知",
+                NoticeConstants.TaskType.API_AUTOMATION_TASK,
+                null,
+                scenario.getScenarioDefinition(),
+                scenario.getPrincipal()
+        );
 
         uploadFiles(request, bodyFiles, scenarioFiles);
         return scenario;
@@ -352,7 +370,7 @@ public class ApiScenarioService {
         }
     }
 
-    public ApiScenario update(SaveApiScenarioRequest request, List<MultipartFile> bodyFiles, List<MultipartFile> scenarioFiles) {
+    public ApiScenarioWithBLOBs update(SaveApiScenarioRequest request, List<MultipartFile> bodyFiles, List<MultipartFile> scenarioFiles) {
         checkNameExist(request, false);
         checkScenarioNum(request);
         //如果场景有TCP步骤的话，也要做参数计算处理
@@ -399,6 +417,17 @@ public class ApiScenarioService {
         // 存储依赖关系
         apiAutomationRelationshipEdgeService.initRelationshipEdge(beforeScenario, scenario);
 
+        apiTestCaseService.checkAndSendReviewMessage(
+                scenario.getId(),
+                scenario.getName(),
+                scenario.getProjectId(),
+                "场景用例通知",
+                NoticeConstants.TaskType.API_AUTOMATION_TASK,
+                beforeScenario.getScenarioDefinition(),
+                scenario.getScenarioDefinition(),
+                scenario.getPrincipal()
+        );
+
         String defaultVersion = baseProjectVersionMapper.getDefaultVersion(request.getProjectId());
         if (StringUtils.equalsIgnoreCase(request.getVersionId(), defaultVersion)) {
             checkAndSetLatestVersion(beforeScenario.getRefId());
@@ -437,14 +466,51 @@ public class ApiScenarioService {
      */
     public void deleteUpdateBodyFile(ApiScenarioWithBLOBs scenario, ApiScenarioWithBLOBs oldScenario) {
         try {
-            Set<String> newRequestIds = getRequestIds(scenario.getScenarioDefinition());
-            MsTestElement msTestElement = GenerateHashTreeUtil.parseScenarioDefinition(oldScenario.getScenarioDefinition());
+            MsScenario msScenario = GenerateHashTreeUtil.parseScenarioDefinition(scenario.getScenarioDefinition());
+            // 获取所有请求
+            List<MsHTTPSamplerProxy> httpSampleFromHashTree = MsHTTPSamplerProxy.findHttpSampleFromHashTree(msScenario);
+            Set<String> newRequestIds = httpSampleFromHashTree.stream().map(MsHTTPSamplerProxy::getId).collect(Collectors.toSet());
+
+            MsScenario msTestElement = GenerateHashTreeUtil.parseScenarioDefinition(oldScenario.getScenarioDefinition());
             List<MsHTTPSamplerProxy> oldRequests = MsHTTPSamplerProxy.findHttpSampleFromHashTree(msTestElement);
             oldRequests.forEach(item -> {
                 if (item.isCustomizeReq() && !newRequestIds.contains(item.getId())) {
                     ApiFileUtil.deleteBodyFiles(item.getId());
                 }
             });
+            // 清理场景csv附件
+            if (CollectionUtils.isNotEmpty(msScenario.getVariables())
+                    && CollectionUtils.isNotEmpty(msTestElement.getVariables())) {
+                List<ScenarioVariable> newVariables = msScenario.getVariables().stream()
+                        .filter(ScenarioVariable::isCSVValid)
+                        .filter(ScenarioVariable::isEnable).collect(toList());
+
+                List<ScenarioVariable> oldVariables = msTestElement.getVariables().stream()
+                        .filter(ScenarioVariable::isCSVValid)
+                        .filter(ScenarioVariable::isEnable).collect(toList());
+
+                if (CollectionUtils.isNotEmpty(oldVariables) && CollectionUtils.isNotEmpty(newVariables)) {
+                    List<String> ids = newVariables.stream()
+                            .flatMap(nv -> Optional.ofNullable(nv.getFiles()).orElse(List.of()).stream())
+                            .map(BodyFile::getId)
+                            .toList();
+                    oldVariables.forEach(item -> {
+                        if (CollectionUtils.isNotEmpty(item.getFiles()) &&
+                                StringUtils.isNotBlank(item.getFiles().get(0).getId()) &&
+                                !ids.contains(item.getFiles().get(0).getId())) {
+                            ApiFileUtil.deleteBodyFiles(item.getFiles().get(0).getId() + "_" + item.getFiles().get(0).getName());
+                        }
+                    });
+                }
+                if (CollectionUtils.isEmpty(newVariables) && CollectionUtils.isNotEmpty(oldVariables)) {
+                    oldVariables.forEach(item -> {
+                        if (CollectionUtils.isNotEmpty(item.getFiles()) &&
+                                StringUtils.isNotBlank(item.getFiles().get(0).getId())) {
+                            ApiFileUtil.deleteBodyFiles(item.getFiles().get(0).getId() + "_" + item.getFiles().get(0).getName());
+                        }
+                    });
+                }
+            }
         } catch (Exception e) {
             LogUtil.error("Historical data processing exception");
         }
@@ -776,16 +842,20 @@ public class ApiScenarioService {
 
     public ParameterConfig getConfig(ApiScenarioDTO scenario) {
         try {
-            Map<String, String> environmentMap = new HashMap<>();
+            ParameterConfig config = new ParameterConfig(scenario.getProjectId(), false);
+            Map<String, String> environmentMap;
             String environmentType = scenario.getEnvironmentType();
             String environmentGroupId = scenario.getEnvironmentGroupId();
             String environmentJson = scenario.getEnvironmentJson();
-            if (StringUtils.equals(environmentType, EnvironmentType.GROUP.name())) {
+            if (StringUtils.equals(environmentType, EnvironmentType.GROUP.name())
+                    && StringUtils.isNotEmpty(environmentGroupId)) {
                 environmentMap = environmentGroupProjectService.getEnvMap(environmentGroupId);
-            } else if (StringUtils.equals(environmentType, EnvironmentType.JSON.name())) {
+            } else if (StringUtils.equals(environmentType, EnvironmentType.JSON.name())
+                    && StringUtils.isNotEmpty(environmentJson)) {
                 environmentMap = JSON.parseObject(environmentJson, Map.class);
+            } else {
+                return config;
             }
-            ParameterConfig config = new ParameterConfig();
             apiScenarioEnvService.setEnvConfig(environmentMap, config);
             return config;
         } catch (Exception e) {
@@ -813,12 +883,12 @@ public class ApiScenarioService {
                 String scenarioId = request.getId();
                 ApiScenarioDTO scenario = getNewApiScenario(scenarioId);
                 if (scenario != null) {
-                    String referenced = element.optString("referenced");
-                    if (StringUtils.equalsIgnoreCase("REF", referenced)) {
+                    String referenced = element.optString(MsHashTreeConstants.REFERENCED);
+                    if (StringUtils.equalsIgnoreCase(MsHashTreeConstants.REF, referenced)) {
                         JSONObject source = JSONUtil.parseObject(scenario.getScenarioDefinition());
                         element = jsonMerge(source, element);
                     }
-                    element.put("referenced", referenced);
+                    element.put(MsHashTreeConstants.REFERENCED, referenced);
                     String environmentType = scenario.getEnvironmentType();
                     String environmentGroupId = scenario.getEnvironmentGroupId();
                     String environmentJson = scenario.getEnvironmentJson();
@@ -829,8 +899,11 @@ public class ApiScenarioService {
                     }
                 }
             }
+            String projectId = StringUtils.isNotBlank(request.getProjectId())
+                    ? request.getProjectId()
+                    : element.optString(PropertyConstant.PROJECT_ID);
 
-            ParameterConfig config = new ParameterConfig();
+            ParameterConfig config = new ParameterConfig(projectId, false);
             apiScenarioEnvService.setEnvConfig(environmentMap, config);
             if (config.getConfig() != null && !config.getConfig().isEmpty()) {
                 ElementUtil.dataSetDomain(element.optJSONArray(ElementConstants.HASH_TREE), config);
@@ -844,6 +917,7 @@ public class ApiScenarioService {
     public int getScenarioStep(List<String> ids) {
         return extApiScenarioReferenceIdMapper.selectByScenarioIds(ids);
     }
+
     public List<ApiScenarioDTO> getScenarioDetail(List<String> ids) {
         if (CollectionUtils.isEmpty(ids)) {
             return new ArrayList<>();
@@ -864,6 +938,7 @@ public class ApiScenarioService {
                 }
                 if (StringUtils.isNotBlank(dto.getEnvironmentJson())) {
                     ApiScenarioEnvRequest request = new ApiScenarioEnvRequest();
+                    request.setProjectId(dto.getProjectId());
                     request.setEnvironmentEnable(false);
                     request.setDefinition(dto.getScenarioDefinition());
                     request.setEnvironmentMap(JSON.parseObject(dto.getEnvironmentJson(), Map.class));
@@ -906,7 +981,7 @@ public class ApiScenarioService {
         projectIds.add(projectId);
         testPlan.setName(apiScenario.getName());
         testPlan.setHashTree(new LinkedList<>());
-        ParameterConfig config = new ParameterConfig();
+        ParameterConfig config = new ParameterConfig(apiScenario.getProjectId(), false);
         config.setOperating(true);
         config.getExcludeScenarioIds().add(apiScenario.getId());
         config.setScenarioId(apiScenario.getId());
@@ -1424,7 +1499,7 @@ public class ApiScenarioService {
             request.setVersionId(defaultVersion);
         }
 
-        UpdateScenarioModuleDTO updateScenarioModuleDTO = apiScenarioModuleService.checkScenarioModule(request, initData, StringUtils.equals("fullCoverage", request.getModeId()), request.getCoverModule());
+        UpdateScenarioModuleDTO updateScenarioModuleDTO = apiScenarioModuleService.checkScenarioModule(request, initData, StringUtils.equals("fullCoverage", request.getModeId()), request.getCoverModule(), defaultVersion);
         List<ApiScenarioModule> moduleList = updateScenarioModuleDTO.getModuleList();
         List<ApiScenarioWithBLOBs> data = updateScenarioModuleDTO.getApiScenarioWithBLOBsList();
         List<ApiScenarioWithBLOBs> needUpdateList = updateScenarioModuleDTO.getNeedUpdateList();
@@ -1666,7 +1741,7 @@ public class ApiScenarioService {
     public byte[] exportZip(ApiScenarioBatchRequest request) {
         List<ApiScenarioWithBLOBs> scenarios = getExportResult(request);
         //环境检查
-        checkExportEnv(scenarios);
+        // checkExportEnv(scenarios);
         // 生成jmx
         Map<String, byte[]> files = new LinkedHashMap<>();
         scenarios.forEach(item -> {
@@ -1689,7 +1764,7 @@ public class ApiScenarioService {
         return ApiFileUtil.listBytesToZip(files);
     }
 
-    private void checkExportEnv(List<ApiScenarioWithBLOBs> scenarios) {
+    private void checkExportEnv(List<? extends ApiScenarioWithBLOBs> scenarios) {
         StringBuilder builder = new StringBuilder();
         for (ApiScenarioWithBLOBs apiScenarioWithBLOBs : scenarios) {
             try {
@@ -1698,6 +1773,8 @@ public class ApiScenarioService {
                 if (!haveEnv) {
                     builder.append(apiScenarioWithBLOBs.getName()).append("; ");
                 }
+            } catch (RuntimeException e) {
+                MSException.throwException(Translator.get("scenario_warning"));
             } catch (Exception e) {
                 MSException.throwException("场景：" + builder.toString() + "运行环境未配置，请检查!");
             }
@@ -1830,9 +1907,9 @@ public class ApiScenarioService {
         return apiIdList;
     }
 
-    public ScenarioEnv getApiScenarioProjectId(String id) {
+    public EnvironmentCheckDTO getApiScenarioProjectId(String id) {
         ApiScenarioWithBLOBs scenario = apiScenarioMapper.selectByPrimaryKey(id);
-        ScenarioEnv scenarioEnv = new ScenarioEnv();
+        EnvironmentCheckDTO scenarioEnv = new EnvironmentCheckDTO();
         if (scenario == null) {
             return scenarioEnv;
         }
@@ -1860,7 +1937,7 @@ public class ApiScenarioService {
             example.createCriteria().andIdIn(request.getIds());
             List<ApiScenarioWithBLOBs> scenarioList = apiScenarioMapper.selectByExampleWithBLOBs(example);
             for (ApiScenarioWithBLOBs scenario : scenarioList) {
-                ScenarioEnv scenarioEnv = new ScenarioEnv();
+                EnvironmentCheckDTO scenarioEnv = new EnvironmentCheckDTO();
                 if (scenario == null) {
                     continue;
                 }
@@ -1932,9 +2009,10 @@ public class ApiScenarioService {
 
         List<String> ids = request.getIds();
         List<ApiScenarioDTO> apiScenarioList = extApiScenarioMapper.selectIds(ids);
+        //检查运行环境
+        checkExportEnv(apiScenarioList);
         if (CollectionUtils.isEmpty(apiScenarioList)) {
             returnDTO.setScenarioJmxList(new ArrayList<>());
-            return returnDTO;
         } else {
             Map<String, List<String>> projectEnvironments = apiScenarioEnvService.selectApiScenarioEnv(apiScenarioList);
             apiScenarioList.forEach(item -> {
@@ -1952,8 +2030,8 @@ public class ApiScenarioService {
                 returnDTO.setProjectEnvMap(projectEnvironments);
             }
             returnDTO.setJmxInfoDTOList(jmxInfoList);
-            return returnDTO;
         }
+        return returnDTO;
     }
 
     public void batchCopy(ApiScenarioBatchRequest request) {
@@ -2069,9 +2147,11 @@ public class ApiScenarioService {
     }
 
     public boolean verifyScenarioEnv(String scenarioId) {
-        ApiScenarioWithBLOBs apiScenarioWithBLOBs = apiScenarioMapper.selectByPrimaryKey(scenarioId);
+        return true;
+        // 暂时去除环境校验
+        /*ApiScenarioWithBLOBs apiScenarioWithBLOBs = apiScenarioMapper.selectByPrimaryKey(scenarioId);
         apiScenarioEnvService.setScenarioEnv(apiScenarioWithBLOBs, null);
-        return apiScenarioEnvService.verifyScenarioEnv(apiScenarioWithBLOBs);
+        return apiScenarioEnvService.verifyScenarioEnv(apiScenarioWithBLOBs);*/
     }
 
     public List<String> getFollows(String scenarioId) {
@@ -2085,8 +2165,12 @@ public class ApiScenarioService {
         return follows.stream().map(ApiScenarioFollow::getFollowId).distinct().collect(Collectors.toList());
     }
 
-    public ScenarioEnv getApiScenarioEnv(String definition) {
-        return apiScenarioEnvService.getApiScenarioEnv(definition);
+    public EnvironmentCheckDTO getApiScenarioEnv(List<String> projectIds) {
+        List<Project> projects = baseProjectService.getProjectByIds(projectIds);
+        projectIds.removeIf(id -> !projects.stream().map(Project::getId).collect(Collectors.toSet()).contains(id));
+        EnvironmentCheckDTO checkDTO = new EnvironmentCheckDTO();
+        checkDTO.setProjectIds(new HashSet<>(projectIds));
+        return checkDTO;
     }
 
     public List<MsExecResponseDTO> run(RunScenarioRequest request) {
@@ -2135,7 +2219,7 @@ public class ApiScenarioService {
         List<String> strings = new LinkedList<>();
         apiScenarios.forEach(item -> {
             if (StringUtils.isNotEmpty(item.getScenarioDefinition())) {
-                ScenarioEnv env = getApiScenarioEnv(item.getScenarioDefinition());
+                EnvironmentCheckDTO env = apiScenarioEnvService.getApiScenarioEnv(item.getScenarioDefinition());
                 if (!strings.contains(item.getProjectId())) {
                     strings.add(item.getProjectId());
                 }
@@ -2175,7 +2259,8 @@ public class ApiScenarioService {
             } else {
                 //将复制的或者类型不是引用case的步骤赋予当前项目id，目的是为了运行的时候可以配置运行环境
                 object.put("projectId", projectId);
-                if (StringUtils.isEmpty(object.optString("url"))) {
+                if (StringUtils.isEmpty(object.optString("url"))
+                        && StringUtils.equals(object.optString("type"), HTTPSamplerProxy.class.getCanonicalName())) {
                     object.put("isRefEnvironment", true);
                 }
             }
@@ -2362,7 +2447,7 @@ public class ApiScenarioService {
             example.createCriteria().andIdIn(scenarioIdList);
             List<ApiScenarioWithBLOBs> scenarioWithBLOBsList = apiScenarioMapper.selectByExampleWithBLOBs(example);
             for (ApiScenarioWithBLOBs scenario : scenarioWithBLOBsList) {
-                ScenarioEnv scenarioEnv = apiScenarioEnvService.getApiScenarioEnv(scenario.getScenarioDefinition());
+                EnvironmentCheckDTO scenarioEnv = apiScenarioEnvService.getApiScenarioEnv(scenario.getScenarioDefinition());
                 if (CollectionUtils.isNotEmpty(scenarioEnv.getProjectIds())) {
                     scenarioEnv.getProjectIds().forEach(projectId -> {
                         if (!returnDTO.getProjectIdList().contains(projectId)) {

@@ -20,7 +20,13 @@
       </template>
 
       <el-container class="main-content">
-        <el-aside class="tree-aside" width="270px">
+        <ms-aside-container
+          :min-width="'350'"
+          :max-width="'600'"
+          :enable-aside-hidden="false"
+          :default-hidden-bottom-top="200"
+          :enable-auto-height="true"
+        >
           <select-menu
             :data="projects"
             width="173px"
@@ -35,7 +41,7 @@
                      @nodeSelectEvent="nodeChange"
                      :tree-nodes="treeNodes"
                      ref="nodeTree"/>
-        </el-aside>
+        </ms-aside-container>
 
         <el-container>
           <el-main class="case-content">
@@ -57,9 +63,26 @@
                       ref="table">
 
               <el-table-column
+                v-if="!customNum"
+                prop="num"
+                min-width="120"
+                sortable
+                :label="$t('commons.id')">
+              </el-table-column>
+
+              <el-table-column
+                v-if="customNum"
+                prop="customNum"
+                min-width="120"
+                sortable
+                :label="$t('commons.id')">
+              </el-table-column>
+
+              <el-table-column
                 prop="name"
                 :label="$t('test_track.case.name')"
-                style="width: 100%">
+                min-width="120"
+                show-overflow-tooltip>
                 <template v-slot:default="scope">
                   {{ scope.row.name }}
                 </template>
@@ -82,6 +105,7 @@
                 :filters="priorityFilters"
                 column-key="priority"
                 :label="$t('test_track.case.priority')"
+                min-width="120"
                 show-overflow-tooltip>
                 <template v-slot:default="scope">
                   <priority-table-item :value="scope.row.priority" :priority-options="priorityFilters"/>
@@ -92,11 +116,15 @@
                 :filters="statusFilters"
                 column-key="reviewStatus"
                 :label="$t('test_track.case.status')"
+                min-width="120"
                 show-overflow-tooltip>
                 <template v-slot:default="scope">
                   <review-status :value="scope.row.reviewStatus"/>
                 </template>
               </el-table-column>
+
+              <ms-update-time-column/>
+              <ms-create-time-column/>
 
             </ms-table>
             <ms-table-pagination :change="getReviews" :current-page.sync="currentPage" :page-size.sync="pageSize"
@@ -116,6 +144,7 @@
 
 <script>
 
+import MsAsideContainer from "metersphere-frontend/src/components/MsAsideContainer";
 import NodeTree from "metersphere-frontend/src/components/module/MsNodeTree";
 import MsDialogFooter from "metersphere-frontend/src/components/MsDialogFooter";
 import PriorityTableItem from "@/business/common/tableItems/planview/PriorityTableItem";
@@ -142,10 +171,14 @@ import {getVersionFilters} from "@/business/utils/sdk-utils";
 import {projectRelated} from "@/api/project";
 import {getTestTemplate} from "@/api/custom-field-template";
 import {initTestCaseConditionComponents} from "@/business/case/test-case";
+import MsCreateTimeColumn from "metersphere-frontend/src/components/table/MsCreateTimeColumn";
+import MsUpdateTimeColumn from "metersphere-frontend/src/components/table/MsUpdateTimeColumn";
+import {getProjectApplicationConfig} from "@/api/project-application";
 
 export default {
   name: "TestReviewRelevance",
   components: {
+    MsAsideContainer,
     TableSelectCountBar,
     SelectMenu,
     NodeTree,
@@ -160,7 +193,9 @@ export default {
     'VersionSelect': VersionSelect,
     MsTablePagination,
     MsDialogHeader,
-    MsTable
+    MsTable,
+    MsUpdateTimeColumn,
+    MsCreateTimeColumn,
   },
   directives: {
     'el-table-infinite-scroll': elTableInfiniteScroll
@@ -186,6 +221,7 @@ export default {
       currentPage: 1,
       total: 0,
       lineStatus: true,
+      customNum: false,
       condition: {
         components: TEST_REVIEW_RELEVANCE_CASE_CONFIGS
       },
@@ -226,6 +262,7 @@ export default {
       this.condition.versionId = null;
       this.getVersionOptions();
       this.getProjectNode();
+      this.getCustomNum();
     }
   },
   mounted() {
@@ -412,7 +449,18 @@ export default {
     changeVersion(version) {
       this.condition.versionId = version || null;
       this.search();
-    }
+    },
+    getCustomNum() {
+      getProjectApplicationConfig('CASE_CUSTOM_NUM')
+        .then(result => {
+          let data = result.data;
+          if (data && data.typeValue === 'true') {
+            this.customNum = true;
+          } else {
+            this.customNum = false;
+          }
+        });
+    },
   }
 }
 </script>

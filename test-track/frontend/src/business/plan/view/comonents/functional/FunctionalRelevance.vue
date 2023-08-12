@@ -12,7 +12,7 @@
 
     <template v-slot:aside>
       <node-tree class="node-tree"
-                 :scroll="true"
+                 :scroll="false"
                  v-loading="nodeResult.loading"
                  local-suffix="test_case"
                  default-label="未规划用例"
@@ -224,7 +224,7 @@ export default {
       this.setConditionModuleIdParam();
       this.page.condition.projectId = this.projectId;
       this.page.condition.versionId = null;
-      this.getProjectNode();
+      this.getProjectNodeForce();
       this.getTestCases();
       this.getCustomNum();
       this.getVersionOptions();
@@ -310,6 +310,12 @@ export default {
       this.$refs.table.clear();
     },
     getProjectNode(projectId, condition) {
+      if (this.selectNodeIds && this.selectNodeIds.length > 0) {
+        return;
+      }
+      this.getProjectNodeForce(projectId, condition);
+    },
+    getProjectNodeForce(projectId = this.projectId, condition = this.page.condition) {
       const index = this.projects.findIndex(project => project.id === projectId);
       if (index !== -1) {
         this.projectName = this.projects[index].name;
@@ -364,5 +370,10 @@ export default {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.node-tree {
+  max-height: calc(75vh - 120px);
+  overflow-y: auto;
 }
 </style>

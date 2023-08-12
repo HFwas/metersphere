@@ -163,6 +163,9 @@ export default {
   created() {
     this.$EventBus.$on('scenarioConditionBus', (param) => {
       this.param = param;
+      if(this.$route.params && this.$route.params.versionId) {
+        this.list()
+      }
     });
   },
   beforeDestroy() {
@@ -172,23 +175,16 @@ export default {
   },
   methods: {
     handleImport() {
-      if (this.projectId) {
-        this.result = getModuleByProjectId(this.projectId).then((response) => {
-          if (response.data != undefined && response.data != null) {
-            this.data = response.data;
-            this.data.forEach((node) => {
-              buildTree(node, { path: '' });
-            });
-          }
-        });
-        this.$refs.apiImport.open(this.currentModule);
+      if (!this.projectId) {
+        this.$warning(this.$t('commons.check_project_tip'));
+        return;
       }
+      this.$refs.apiImport.open(this.currentModule);
     },
     filter() {
       this.$refs.nodeTree.filter(this.condition.filterText);
     },
     list(projectId) {
-
       if (this.isRelevanceModel) {
         this.result = getModuleByRelevanceProjectId(this.relevanceProjectId).then((response) => {
           this.setData(response);
@@ -234,21 +230,15 @@ export default {
     add(param) {
       param.projectId = this.projectId;
       param.protocol = this.condition.protocol;
-      if (param && param.level >= 9) {
-        this.list();
-        this.$error(this.$t('commons.warning_module_add'));
-        return;
-      } else {
-        addScenarioModule(param).then(
-          () => {
-            this.$success(this.$t('commons.save_success'));
-            this.list();
-          },
-          (error) => {
-            this.list();
-          }
-        );
-      }
+      addScenarioModule(param).then(
+        () => {
+          this.$success(this.$t('commons.save_success'));
+          this.list();
+        },
+        (error) => {
+          this.list();
+        }
+      );
     },
     remove(nodeIds) {
       delScenarioModule(nodeIds).then(
@@ -347,6 +337,7 @@ export default {
       this.param.trashEnable = true;
       this.param.name = '';
       this.param.combine = {};
+      this.param.filters = { status: ['Trash'] };
       this.result = postModuleByTrash(this.projectId, this.param).then((response) => {
         this.setData(response);
       });

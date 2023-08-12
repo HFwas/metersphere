@@ -1,4 +1,4 @@
-import el from 'element-ui/lib/locale/lang/zh-CN'; // 加载element的内容
+import el from 'metersphere-frontend/src/i18n/lang/ele-zh-CN'; // 加载element的内容
 import fu from 'fit2cloud-ui/src/locale/lang/zh-CN'; // 加载fit2cloud的内容
 import mf from 'metersphere-frontend/src/i18n/lang/zh-CN';
 
@@ -21,6 +21,7 @@ const message = {
     copy_data_from_other_version_tips: '名称相同的用例和Mock期望会进行强制覆盖!',
     body: {
       json_format_error: 'JSON格式错误',
+      json_format_error_tips: 'JSON-SCHEMA数据和类型不符合，请检查',
     },
     case_name: '用例名称',
     case_no_permission: '无编辑用例的权限',
@@ -36,6 +37,7 @@ const message = {
       auto_redirects: '自动重定向',
     },
     document_tooltip: '仅对已展示的参数生效',
+    raw_not_null: 'raw数据不能为空',
   },
   filters: {
     schedule: {
@@ -126,9 +128,17 @@ const message = {
   automation: {
     project_no_permission: '当前操作人无此步骤的操作权限',
     document_validity_msg: '文件已经被修改，请重新上传',
-    scenario_step_ref_message: '当前选择请求数 [{0}] 个可能导致页面加载异常，是否继续',
+    scenario_step_ref_message: '当前操作可能导致页面加载异常，是否继续',
     case_message: '请选择案例',
     scenario_message: '请选择场景',
+    scenario_plugin_debug_warning: '场景包含插件步骤，对应场景已经删除不能调试！',
+    scenario_plugin_save_warning: '场景包含插件步骤，对应场景已经删除不能编辑！',
+    scenario_plugin_run_warning: '场景包含插件步骤，对应场景已经删除不能执行！',
+    project_env_info: '更多项目环境',
+    project_env_info_tips:
+      '1.当前场景涉及到跨项目的步骤可以指定其所属项目的环境执行，不指定则默认使用当前项目环境执行。\n 2.如跨项目的步骤在场景设置中配置了使用原场景环境，则默认使用原场景环境执行。',
+    default_environment: '默认环境',
+    select_new_environment: '指定新环境',
   },
 };
 

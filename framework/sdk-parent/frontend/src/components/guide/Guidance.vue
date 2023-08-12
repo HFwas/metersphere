@@ -19,6 +19,7 @@
 import MsIntroduction from "../../components/guide/components/Introduction";
 import MsSideMenus from "../../components/sidemenu/SideMenus";
 import {getSideTask} from "../../api/novice";
+import {getCurrentProjectID} from "../../utils/token";
 
 
 export default {
@@ -31,7 +32,14 @@ export default {
   mounted() {
     this.$refs.introduction.resVisible = localStorage.getItem("introduction") && localStorage.getItem("introduction")
     !== 'false' && (localStorage.getItem("guide") === 'true' || localStorage.getItem("step") > 1);
-    this.checkStep()
+    if (this.projectId !== 'null') {
+      this.checkStep()
+    }
+  },
+  computed: {
+    projectId() {
+      return getCurrentProjectID();
+    }
   },
   methods: {
     handleCommand(command) {
@@ -62,15 +70,20 @@ export default {
         if (res.data.length > 0 && res.data[0].guideStep) {
           localStorage.setItem('step', res.data[0].guideStep)
           localStorage.setItem("noviceStatus", res.data[0].status)
+          if(localStorage.getItem("resetGuide") !== 'true'){
+            localStorage.setItem('guide',res.data[0].guideStep > 0 ? 'true' : 'false')
+          }
         } else {
+          if(localStorage.getItem("guide") !== 'click'){
+            localStorage.removeItem('step')
+          }
           localStorage.setItem('guide','false')
         }
         let microApps = JSON.parse(sessionStorage.getItem("micro_apps"));
         if(localStorage.getItem("guide") === 'false' && microApps && microApps['project']) {
           let step = localStorage.getItem("step") && localStorage.getItem("resetGuide") !== 'true' ?
-            localStorage.getItem("step") : "1"
+            localStorage.getItem("step") : '1'
           localStorage.setItem("step", step)
-
           if(step !== '3'){
             if(this.$route.path.includes('/project/home')){
               this.initStepAll()
@@ -287,6 +300,7 @@ export default {
               },
               {
                 action: function() {
+                  localStorage.setItem('guide','click')
                   return _this.gotoNext(this, '/project/home', 3)
                 },
                 classes: 'shep-btn',

@@ -6,6 +6,7 @@
         <ms-api-assertion-regex
           :is-read-only="isReadOnly"
           :list="assertions.regex"
+          :case-enable="caseEnable"
           :regex="regex"
           :edit="true"
           :index="index" />
@@ -18,6 +19,7 @@
         <ms-api-assertion-json-path
           :is-read-only="isReadOnly"
           :list="assertions.jsonPath"
+          :case-enable="caseEnable"
           :json-path="jsonPath"
           :edit="true"
           :index="index" />
@@ -25,11 +27,24 @@
     </div>
 
     <div class="assertion-item-editing x_path" v-if="assertions.xpath2.length > 0">
-      <div>{{ 'XPath' }}</div>
+      <div>
+        XPath
+        <el-select v-model="assertions.xpathType" size="mini" v-loading="loading" @change="reload"
+                   :disabled="caseEnable ">
+          <el-option v-for="item in options" :key="item.value" :label="item.label" :value="item.value"></el-option>
+        </el-select>
+        <el-tooltip placement="top">
+          <div slot="content">
+            {{ $t('api_test.request.assertions.assert_info') }}
+          </div>
+          <i class="el-icon-question" style="cursor: pointer" />
+        </el-tooltip>
+      </div>
       <div class="regex-item" v-for="(xPath, index) in assertions.xpath2" :key="index">
         <ms-api-assertion-x-path2
           :is-read-only="isReadOnly"
           :list="assertions.xpath2"
+          :case-enable="caseEnable"
           :x-path2="xPath"
           :edit="true"
           :index="index" />
@@ -42,6 +57,7 @@
         <ms-api-assertion-jsr223
           :is-read-only="isReadOnly"
           :list="assertions.jsr223"
+          :case-enable="caseEnable"
           :assertion="assertion"
           :edit="true"
           :index="index" />
@@ -53,6 +69,7 @@
       <div class="regex-item">
         <ms-api-assertion-duration
           :is-read-only="isReadOnly"
+          :case-enable="caseEnable"
           v-model="assertions.duration.value"
           :duration="assertions.duration"
           :edit="true" />
@@ -68,7 +85,7 @@
                 v-model="assertions.document.enable"
                 class="enable-switch"
                 size="mini"
-                :disabled="assertions.disabled"
+                :disabled="(isReadOnly && !assertions.document.label) || caseEnable"
                 style="width: 30px; margin-right: 10px" />
             </el-tooltip>
             <el-tooltip effect="dark" :content="$t('commons.remove')" placement="top-start">
@@ -78,12 +95,12 @@
                 size="mini"
                 circle
                 @click="remove()"
-                :disabled="assertions.disabled && !assertions.root" />
+                :disabled="(isReadOnly && !assertions.document.label && !assertions.root) || caseEnable" />
             </el-tooltip>
           </el-col>
         </el-row>
       </div>
-      <ms-document-body :document="assertions.document" :apiId="apiId" :isReadOnly="isReadOnly" @remove="remove" />
+      <ms-document-body :document="assertions.document" :apiId="apiId" :isReadOnly="isReadOnly && !assertions.document.label || caseEnable" @remove="remove" />
     </div>
   </div>
 </template>
@@ -115,10 +132,18 @@ export default {
       type: Boolean,
       default: false,
     },
+    caseEnable: {
+      type: Boolean,
+      default: false,
+    },
   },
   data() {
     return {
       loading: false,
+      options: [
+        { value: 'html', label: 'html' },
+        { value: 'xml', label: 'xml' },
+      ],
     };
   },
   computed: {

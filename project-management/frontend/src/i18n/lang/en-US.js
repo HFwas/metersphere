@@ -1,4 +1,4 @@
-import el from "element-ui/lib/locale/lang/en";
+import el from "metersphere-frontend/src/i18n/lang/ele-en-US";
 import fu from "fit2cloud-ui/src/locale/lang/en_US"; // 加载fit2cloud的内容
 import mf from "metersphere-frontend/src/i18n/lang/en-US";
 
@@ -7,7 +7,14 @@ const message = {
     environment_import_repeat_tip:
       "(Environment configuration with the same name filtered {0})",
     check_third_project_success: "inspection passed",
-    api_run_pool_title: "Interface execution resource pool",
+    api_run_pool_title: "Api execution resource pool",
+    api_script_review: "Interface script review",
+    api_script_review_tips: "User review must be specified when interface use cases include script steps",
+    reviewers: "Reviewers",
+    load_test_script_review: "Performance test script review",
+    load_test_script_review_detail:
+      "Performance test script file upload must specify user review",
+    script_warning:"The script has enabled the review mechanism and cannot test the script on the current page"
   },
   file_manage: {
     my_file: "My File",
@@ -21,11 +28,13 @@ const message = {
   pj_custom_field: {
     copy: "Copy",
     delete: "Delete",
+    delete_tips: "Delete it will cause the template with this field to be displayed abnormally. Be Careful!"
   },
   pj_app_manage: {
     timing_clean_ui_report: "Regularly clean up report",
   },
   custom_template: {
+    no_edit_permission: "no permissions to edit case/issue/api template, please contact the administrator",
     api_template: "Api Template",
     base_fields: "Base fields",
     template_name: "Template name",
@@ -55,6 +64,7 @@ const message = {
     cancel_ui_relevane: "Relevant",
     re_ui_relevane: "Relevane",
     relevance_ui: "Relevance login scene/command",
+    get_env_failed: "Jump environment deleted!",
   },
 };
 

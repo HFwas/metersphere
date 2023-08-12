@@ -359,7 +359,12 @@ export default {
         }
         this.sort(data.request.hashTree);
       }
+      if (data.response) {
+        this.parseResponseStructureDefaultKeyValue(data.response);
+      }
+      this.setProtocolBtn(true);
       updateDefinition(this.reqUrl, null, bodyFiles, data).then((response) => {
+        this.setProtocolBtn(false);
         this.$success(this.$t('commons.save_success'));
         this.reqUrl = '/api/definition/update';
         this.currentApi.isCopy = false;
@@ -375,10 +380,42 @@ export default {
       });
       this.responseCount = 0;
       this.count = 0;
-      store.apiStatus.set('fromChange', false);
-      store.apiStatus.set('requestChange', false);
-      store.apiStatus.set('responseChange', false);
-      store.apiMap.set(this.currentApi.id, store.apiStatus);
+    },
+    setProtocolBtn(disable) {
+      switch (this.currentProtocol) {
+        case Request.TYPES.SQL:
+          this.$refs.sqlApi.disableSaveBtn = disable;
+          break;
+        case Request.TYPES.DUBBO:
+          this.$refs.dubboApi.disableSaveBtn = disable;
+          break;
+        case Request.TYPES.TCP:
+          this.$refs.tcpApi.disableSaveBtn = disable;
+          break;
+        default:
+          this.$refs.httpApi.disableSaveBtn = disable;
+          break;
+      }
+    },
+    parseResponseStructureDefaultKeyValue(response) {
+      if (response.headers && response.headers.length === 1) {
+        let kv = response.headers[0];
+        if (!kv.name || !kv.value) {
+          response.headers = [];
+        }
+        if ((kv.name == null || kv.name === '') && (kv.value  == null || kv.value === '')) {
+          response.headers = [];
+        }
+      }
+      if (response.statusCode && response.statusCode.length === 1) {
+        let kv = response.statusCode[0];
+        if (!kv.name || !kv.value) {
+          response.statusCode = [];
+        }
+        if ((kv.name == null || kv.name === '') && (kv.value  == null || kv.value === '')) {
+          response.statusCode = [];
+        }
+      }
     },
     handleSave() {
       if (this.$refs.httpApi) {

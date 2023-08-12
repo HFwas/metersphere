@@ -6,7 +6,7 @@
         <api-json-path-suggest-button
           :open-tip="$t('api_test.request.assertions.json_path_suggest')"
           :clear-tip="$t('api_test.request.assertions.json_path_clear')"
-          :isReadOnly="isReadOnly"
+          :is-read-only="request.caseEnable"
           @open="suggestJsonOpen"
           @clear="clearJson" />
       </span>
@@ -15,9 +15,9 @@
       <el-row :gutter="10">
         <el-col :span="4">
           <el-select
-            :disabled="isReadOnly"
             class="assertion-item"
             v-model="type"
+            :disabled="request.caseEnable"
             :placeholder="$t('api_test.request.assertions.select_type')"
             size="small">
             <el-option :label="$t('api_test.request.assertions.text')" :value="options.TEXT" />
@@ -68,12 +68,7 @@
             :document="assertions.document"
             :callback="after"
             v-if="type === options.DOCUMENT" />
-          <el-button
-            v-if="!type"
-            :disabled="true"
-            type="primary"
-            size="mini"
-            style="background-color: var(--primary_color); border-color: var(--primary_color)">
+          <el-button v-if="!type" :disabled="true" type="primary" size="mini">
             {{ $t('api_test.request.assertions.add') }}
           </el-button>
         </el-col>
@@ -85,6 +80,7 @@
       :assertions="assertions"
       :apiId="apiId"
       :reloadData="reloadData"
+      :case-enable="request.caseEnable"
       style="margin-bottom: 20px" />
 
     <ms-api-jsonpath-suggest
@@ -158,7 +154,7 @@ export default {
   data() {
     return {
       options: ASSERTION_TYPE,
-      time: '',
+      time: 1,
       type: '',
       loading: false,
       reloadData: '',
@@ -171,6 +167,11 @@ export default {
       },
       deep: true,
     },
+  },
+  created() {
+    if (!this.assertions.xpathType) {
+      this.assertions.xpathType = 'xml';
+    }
   },
   methods: {
     computeStep() {
@@ -249,7 +250,14 @@ export default {
       this.assertions.jsonPath.push(jsonItem);
     },
     clearJson() {
-      this.assertions.jsonPath = [];
+      if (this.isReadOnly && this.assertions.jsonPath) {
+        const tmpArr = this.assertions.jsonPath.filter((item) =>
+          !item.label
+        );
+        this.assertions.jsonPath = tmpArr;
+      }else {
+        this.assertions.jsonPath = [];
+      }
     },
   },
 };

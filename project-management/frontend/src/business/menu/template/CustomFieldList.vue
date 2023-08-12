@@ -26,7 +26,7 @@
         <ms-table-column
           :field="item"
           :fields-width="fieldsWidth"
-          :label="$t('commons.name')"
+          :label="$t('custom_field.field_name')"
           prop="name">
           <template v-slot="scope">
             <span v-if="scope.row.system">
@@ -51,7 +51,7 @@
 
         <ms-table-column
           :field="item"
-          :label="$t('custom_field.attribute_type')"
+          :label="$t('custom_field.field_type')"
           :filters="fieldFilters"
           :fields-width="fieldsWidth"
           prop="type">
@@ -76,7 +76,7 @@
         </ms-table-column>
 
         <ms-table-column
-          :label="$t('commons.remark')"
+          :label="$t('custom_field.field_remark')"
           :field="item"
           :fields-width="fieldsWidth"
           prop="remark">
@@ -116,7 +116,9 @@
       ref="customFieldEdit">
     </custom-field-edit>
 
-    <ms-delete-confirm :title="$t('pj_custom_field.delete')" @delete="_handleDelete" ref="deleteConfirm"/>
+    <ms-delete-confirm :title="$t('pj_custom_field.delete')" @delete="_handleDelete" ref="deleteConfirm" :with-tip="true">
+      <i style="font-size: 13px">{{ $t('pj_custom_field.delete_tips') }}</i>
+    </ms-delete-confirm>
 
   </el-card>
 </template>

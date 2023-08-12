@@ -16,9 +16,6 @@ import directives from "metersphere-frontend/src/directive";
 import filters from "metersphere-frontend/src/filters";
 import "metersphere-frontend/src/router/permission";
 import chart from "metersphere-frontend/src/chart";
-import mavonEditor from 'mavon-editor';
-import 'mavon-editor/dist/css/index.css';
-import vueMinderEditor from 'vue-minder-editor-plus'
 import VueClipboard from 'vue-clipboard2'
 import VueFab from 'vue-float-action-button';
 import CKEditor from '@ckeditor/ckeditor5-vue';
@@ -41,9 +38,6 @@ pinia.use(PersistedState)//开启缓存，存储在localstorage
 Vue.use(ElementUI, {
   i18n: (key, value) => i18n.t(key, value)
 });
-Vue.use(vueMinderEditor, {
-  i18n: (key, value) => i18n.t(key, value)
-});
 
 Vue.use(svg);
 Vue.use(icons);
@@ -53,7 +47,6 @@ Vue.use(filters);
 Vue.use(chart);
 Vue.use(YanProgress);
 Vue.use(PiniaVuePlugin);
-Vue.use(mavonEditor);
 Vue.use(VueFab);
 Vue.use(VueClipboard);
 Vue.use(CKEditor);
@@ -75,6 +68,13 @@ function render(props = {}) {
     pinia,
     render: h => h(App),
   }).$mount(container ? container.querySelector('#app') : '#app');
+
+  // 解决qiankun下，vue-devtools不显示的问题
+  if (process.env.NODE_ENV === 'development') {
+    const instanceDiv = document.createElement('div')
+    instanceDiv.__vue__ = instance
+    document.body.appendChild(instanceDiv)
+  }
 }
 
 // 独立运行时
@@ -108,7 +108,16 @@ export async function unmount(props) {
 }
 
 /**
- * 可选生命周期钩子，仅使用 loadMicroApp 方式加载微应用时生效
+ * 更新钩子，目前只有routeParams更新，后续有其他属性更新再添加
  */
-export async function update(props) {
+export async function update (props) {
+  const { defaultPath, routeParams, routeName } = props;
+  // 微服务过来的路由
+  if (defaultPath || routeName) {
+    microRouter.push({
+      path: defaultPath,
+      params: routeParams,
+      name: routeName,
+    });
+  }
 }

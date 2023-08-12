@@ -248,8 +248,7 @@ export default {
           let param = {};
           Object.assign(param, this.form);
           param.name = param.name.trim();
-          if (param.name === '') {
-            this.$warning(this.$t('test_track.plan.input_plan_name'));
+          if (!this.validate(param)) {
             return;
           }
           param.workspaceId = getCurrentWorkspaceId();
@@ -270,6 +269,8 @@ export default {
                 }
                 this.dialogFormVisible = false;
                 this.$router.push('/track/plan/view/' + response.data.id);
+              }).catch(() => {
+                this.loading = false;
               });
         } else {
           return false;
@@ -361,19 +362,5 @@ export default {
 <style scoped>
 .instructions-icon {
   margin-left: 10px;
-}
-.el-select :deep(.el-tag) {
-  -webkit-box-sizing: border-box;
-  box-sizing: border-box;
-  border-color: transparent;
-  margin: 2px 0 2px 6px;
-  background-color: #f0f2f5;
-  display: -webkit-box;
-  display: -ms-flexbox;
-  display: flex;
-  max-width: 100%;
-  -webkit-box-align: center;
-  -ms-flex-align: center;
-  align-items: center;
 }
 </style>

@@ -33,6 +33,7 @@ import io.swagger.v3.parser.core.models.AuthorizationValue;
 import io.swagger.v3.parser.core.models.SwaggerParseResult;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -525,14 +526,21 @@ public class Swagger3Parser extends SwaggerAbstractParser {
             Schema items = ((ArraySchema) schema).getItems();
             item.setType(PropertyConstant.ARRAY);
             JsonSchemaItem arrayItem = parseSchema(items, refSet);
-            Map<String, String> mock = new LinkedHashMap<>();
+            Map<String, Object> mock = new LinkedHashMap<>();
             if (arrayItem != null && MapUtils.isNotEmpty(arrayItem.getProperties())) {
                 arrayItem.getProperties().forEach((k, v) -> {
                     mock.put(k, StringUtils.isBlank(v.getMock().get(PropertyConstant.MOCK).toString()) ? v.getType() :
                             v.getMock().get(PropertyConstant.MOCK).toString());
                 });
             }
-            item.getMock().put(PropertyConstant.MOCK, JSONUtil.toJSONString(mock));
+            if (item.getMock() != null) {
+                item.getMock().put(PropertyConstant.MOCK, JSONUtil.toJSONString(mock));
+            } else {
+                item.setMock(mock);
+            }
+            if (arrayItem != null) {
+                item.getItems().add(arrayItem);
+            }
         } else if (schema instanceof ObjectSchema) {
             item.setType(PropertyConstant.OBJECT);
             item.setProperties(parseSchemaProperties(schema, refSet));
@@ -616,16 +624,18 @@ public class Swagger3Parser extends SwaggerAbstractParser {
         Schema schema = getSchema(parameter.getSchema());
         Set<String> refSet = new HashSet<>();
         JsonSchemaItem jsonSchemaItem = parseSchema(schema, refSet);
-        if (MapUtils.isEmpty(jsonSchemaItem.getProperties())) {
-            arguments.add(new KeyValue(queryParameter.getName(), getDefaultValue(queryParameter, jsonSchemaItem), getDefaultStringValue(queryParameter.getDescription()), parameter.getRequired(), getMin(jsonSchemaItem), getMax(jsonSchemaItem)));
-        } else {
-            Map<String, JsonSchemaItem> properties = jsonSchemaItem.getProperties();
-            properties.forEach((key, value) -> {
-                arguments.add(new KeyValue(key, getDefaultValue(queryParameter, value),
-                        getDefaultStringValue(value.getDescription()),
-                        parameter.getRequired(),
-                        getMin(value), getMax(value)));
-            });
+        if (ObjectUtils.isNotEmpty(jsonSchemaItem)) {
+            if (MapUtils.isEmpty(jsonSchemaItem.getProperties())) {
+                arguments.add(new KeyValue(queryParameter.getName(), getDefaultValue(queryParameter, jsonSchemaItem), getDefaultStringValue(queryParameter.getDescription()), parameter.getRequired(), getMin(jsonSchemaItem), getMax(jsonSchemaItem)));
+            } else {
+                Map<String, JsonSchemaItem> properties = jsonSchemaItem.getProperties();
+                properties.forEach((key, value) -> {
+                    arguments.add(new KeyValue(key, getDefaultValue(queryParameter, value),
+                            getDefaultStringValue(value.getDescription()),
+                            parameter.getRequired(),
+                            getMin(value), getMax(value)));
+                });
+            }
         }
     }
 
@@ -865,6 +875,9 @@ public class Swagger3Parser extends SwaggerAbstractParser {
                 }
             } else if (StringUtils.equals(type, PropertyConstant.OBJECT)) {
                 parsedParam.put(PropertyConstant.TYPE, PropertyConstant.OBJECT);
+                if (requestBody.optJSONArray(PropertyConstant.REQUIRED) != null) {
+                    parsedParam.put(PropertyConstant.REQUIRED, requestBody.optJSONArray(PropertyConstant.REQUIRED));
+                }
                 JSONObject properties = requestBody.optJSONObject(PropertyConstant.PROPERTIES);
                 JSONObject jsonObject = buildFormDataSchema(properties);
                 if (StringUtils.isNotBlank(requestBody.optString("description"))) {
@@ -902,8 +915,10 @@ public class Swagger3Parser extends SwaggerAbstractParser {
     public Object getJsonSchemaValue(JSONObject item) {
         JSONObject mock = item.optJSONObject(PropertyConstant.MOCK);
         if (mock != null) {
-            Object value = mock.get(PropertyConstant.MOCK);
-            return value;
+            if (StringUtils.isNotBlank(mock.optString("mock"))) {
+                Object value = mock.get(PropertyConstant.MOCK);
+                return value;
+            }
         }
         return null;
     }
@@ -1040,7 +1055,7 @@ public class Swagger3Parser extends SwaggerAbstractParser {
             String value = obj.optString("value");
             if (StringUtils.isBlank(value)) {
                 JSONObject mock = obj.optJSONObject(PropertyConstant.MOCK);
-                if (mock != null) {
+                if (mock != null && StringUtils.isNotBlank(mock.optString("mock"))) {
                     Object mockValue = mock.get(PropertyConstant.MOCK);
                     property.put("example", mockValue);
                 } else {
@@ -1050,11 +1065,7 @@ public class Swagger3Parser extends SwaggerAbstractParser {
                 property.put("example", value);
             }
             property.put("description", obj.optString("description"));
-            property.put(PropertyConstant.REQUIRED, obj.optString(PropertyConstant.REQUIRED));
-            if (obj.optJSONObject(PropertyConstant.REQUIRED) != null) {
-                JSONObject childProperties = buildFormDataSchema(obj.optJSONObject(PropertyConstant.REQUIRED));
-                property.put(PropertyConstant.REQUIRED, childProperties.optJSONObject(PropertyConstant.REQUIRED));
-            }
+            property.put(PropertyConstant.REQUIRED, obj.optJSONArray(PropertyConstant.REQUIRED));
             if (obj.optJSONObject(PropertyConstant.PROPERTIES) != null) {
                 JSONObject childProperties = buildFormDataSchema(obj.optJSONObject(PropertyConstant.PROPERTIES));
                 property.put(PropertyConstant.PROPERTIES, childProperties.optJSONObject(PropertyConstant.PROPERTIES));
@@ -1215,7 +1226,10 @@ public class Swagger3Parser extends SwaggerAbstractParser {
                                     items.forEach(item -> {
                                         if (item instanceof JSONObject) {
                                             JSONObject itemRequired = ((JSONObject) item).optJSONObject(PropertyConstant.REQUIRED);
-                                            finalRequired.put(itemRequired);
+                                            if (itemRequired != null) {
+                                                finalRequired.put(itemRequired);
+                                            }
+                                            finalRequired.putAll(((JSONObject) item).optJSONArray(PropertyConstant.REQUIRED));
                                         }
                                     });
                                     required = finalRequired;
@@ -1251,9 +1265,11 @@ public class Swagger3Parser extends SwaggerAbstractParser {
                 String xml = XMLUtil.delXmlHeader(xmlText);
                 int startIndex = xml.indexOf("<", 0);
                 int endIndex = xml.indexOf(">", 0);
-                String substring = xml.substring(startIndex + 1, endIndex);
+                if (endIndex > startIndex+ 1 ) {
+                    String substring = xml.substring(startIndex + 1, endIndex);
+                    bodyInfo = buildRefSchema(substring);
+                }
                 JSONObject xmlToJson = XMLUtil.xmlConvertJson(xmlText);
-                bodyInfo = buildRefSchema(substring);
                 JSONObject jsonObject = buildRequestBodyXmlSchema(xmlToJson);
                 if (schemas == null) {
                     schemas = new LinkedList<>();

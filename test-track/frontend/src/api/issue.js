@@ -78,11 +78,12 @@ export function getIssuesByCaseId(refType, caseId, page) {
       .then((response) => {
         page.data = response.data;
         buildIssues(page);
+        parseFields(page);
       });
   }
 }
 
-function like(key, target) {
+export function like(key, target) {
   if (key === undefined || target === undefined) {
     return false;
   }
@@ -92,21 +93,7 @@ function like(key, target) {
 
 export function getIssuesByCaseIdWithSearch(refType, caseId, page, condition) {
   if (caseId) {
-    return get('issues/get/case/' + refType + '/' + caseId)
-      .then((response) => {
-        if(condition && condition.name && response.data){
-          //过滤
-          page.data = response.data.filter((v) => {
-            return (
-              like(condition.name, v.title) ||
-              like(condition.name, v.num)
-            );
-          });
-        } else{
-          page.data = response.data;
-        }
-        buildIssues(page);
-      });
+    return get('issues/get/case/' + refType + '/' + caseId);
   }
 }
 
@@ -230,9 +217,9 @@ export function getIssueThirdPartTemplate() {
 }
 
 export function isThirdPartEnable(callback) {
-  getCurrentProject().then((project) => {
+  getCurrentProject().then((r) => {
     if (callback)
-      callback(project.platform !== LOCAL);
+      callback(r.data.platform !== LOCAL);
   });
 }
 
@@ -259,6 +246,19 @@ export function buildIssues(page) {
       if (data[i].customFields) {
         data[i].customFields = JSON.parse(data[i].customFields);
       }
+    }
+  }
+}
+
+export function parseFields(page) {
+  let data = page.data;
+  for (let i = 0; i < data.length; i++) {
+    if (data[i] && data[i].fields && data[i].fields.length > 0) {
+      data[i].fields.forEach(item => {
+        if (item.value) {
+          item.value = JSON.parse(item.value);
+        }
+      });
     }
   }
 }

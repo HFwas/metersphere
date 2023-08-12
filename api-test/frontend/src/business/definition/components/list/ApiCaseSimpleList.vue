@@ -663,7 +663,7 @@ export default {
     },
     storeCurrentApiCaseRefresh() {
       if (store.currentApiCase && store.currentApiCase.refresh) {
-        this.setStatus(store.currentApiCase.id, store.currentApiCase.status, store.currentApiCase.passRate);
+        this.setStatus(store.currentApiCase.id, store.currentApiCase.status, store.currentApiCase.passRate, store.currentApiCase.reportId);
       }
       store.currentApiCase = {};
     },
@@ -743,12 +743,13 @@ export default {
     customHeader() {
       this.$refs.caseTable.openCustomHeader();
     },
-    setStatus(id, status, passRate) {
+    setStatus(id, status, passRate, reportId) {
       this.tableData.forEach((item) => {
         if (id && id === item.id) {
           item.status = status;
           item.execResult = status;
           item.passRate = passRate;
+          item.lastResultId = reportId;
         }
       });
     },
@@ -1518,5 +1519,9 @@ export default {
 
 .api-case-simple-list :deep(.el-table) {
   height: calc(100vh - 185px) !important;
+}
+
+.api-case-simple-list :deep(.el-loading-mask) {
+  z-index: 999;
 }
 </style>

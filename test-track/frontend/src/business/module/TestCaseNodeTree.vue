@@ -21,6 +21,9 @@
       @filter="filter"
       ref="nodeTree">
       <template v-slot:header>
+        <ms-search-bar
+            :show-operator="showOperator"
+            :condition="condition"/>
         <module-public-button
           v-if="showPublicBtn"
           :condition="condition"
@@ -124,12 +127,20 @@ export default {
     'condition.filterText'() {
       this.filter();
     },
+    caseCondition: {
+      handler() {
+        this.$nextTick(() => {
+          this.list();
+        });
+      },
+      deep: true,
+      immediate: true
+    }
   },
   mounted() {
     let store = useStore();
     store.testCaseSelectNode = {};
     store.testCaseSelectNodeIds = [];
-    this.list();
   },
   computed: {
     projectId() {

@@ -10,10 +10,10 @@
       </el-select>
       <el-button
         size="mini"
+        :disabled="request.caseEnable"
         @click="add"
         type="primary"
-        v-if="tabType !== 'assertionsRule'"
-        style="background-color: var(--primary_color); border-color: var(--primary_color)">
+        v-if="tabType !== 'assertionsRule'">
         {{ $t('api_test.request.assertions.add') }}
       </el-button>
     </p>
@@ -114,7 +114,7 @@
             :request="request"
             :apiId="apiId"
             :draggable="true"
-            :is-read-only="data.disabled"
+            :is-read-only="request.disabled"
             :assertions="data" />
         </div>
       </span>
@@ -567,6 +567,7 @@ export default {
       let index = 1;
       for (let i in this.request.hashTree) {
         let step = this.request.hashTree[i];
+        step.caseEnable = step.disabled;
         if (
           this.tabType === 'pre' &&
           (step.type === 'JSR223PreProcessor' || step.type === 'JDBCPreProcessor' || step.type === 'ConstantTimer')

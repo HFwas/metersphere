@@ -49,10 +49,15 @@
             v-if="!isXpack || !apiSyncRuleRelation.showUpdateRule"
             type="primary"
             size="small"
+            :disabled="disableSaveBtn"
             @click="saveApi"
             v-prevent-re-click
             title="ctrl + s"
-            v-permission="['PROJECT_API_DEFINITION:READ+EDIT_API']"
+            v-permission="[
+                       'PROJECT_API_DEFINITION:READ+EDIT_API',
+                       'PROJECT_API_DEFINITION:READ+CREATE_API',
+                       'PROJECT_API_DEFINITION:READ+COPY_API'
+                     ]"
             >{{ $t('commons.save') }}
           </el-button>
           <el-dropdown
@@ -309,6 +314,7 @@ export default {
       citedScenarioCount: 0,
       latestVersionId: '',
       hasLatest: false,
+      disableSaveBtn: false,
     };
   },
   props: {
@@ -1049,6 +1055,7 @@ export default {
               this.httpForm.newVersionCase ||
               this.httpForm.newVersionMock
             ) {
+              this.httpForm.caseTotal = 0;
               this.createNewVersionVisible = true;
             } else {
               this.saveApi();
@@ -1133,6 +1140,8 @@ export default {
       apiTestCaseCount({ id: this.httpForm.id }).then((response) => {
         if (response.data > 0) {
           this.httpForm.caseTotal = response.data;
+        } else {
+          this.httpForm.caseTotal = 0;
         }
       });
     },

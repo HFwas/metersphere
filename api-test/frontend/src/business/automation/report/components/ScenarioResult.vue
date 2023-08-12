@@ -1,5 +1,5 @@
 <template>
-  <div class="scenario-result">
+  <div class="scenario-result" @click.stop="handleClick">
     <div
       v-if="
         (node.children && node.children.length > 0) ||
@@ -7,17 +7,32 @@
         (node.type && this.stepFilter.get('AllSamplerProxy').indexOf(node.type) === -1)
       ">
       <el-card class="ms-card">
-        <div class="el-step__icon is-text ms-api-col">
-          <div class="el-step__icon-inner">
-            {{ node.index }}
-          </div>
-        </div>
-        <el-tooltip effect="dark" :content="node.label" placement="top">
-          <el-link v-if="node.redirect" class="report-label-head" @click="isLink">
-            {{ getLabel(node.label) }}
-          </el-link>
-          <span v-else>{{ getLabel(node.label) }}</span>
-        </el-tooltip>
+        <el-row>
+          <el-col :span="22">
+            <div class="el-step__icon is-text ms-api-col">
+              <div class="el-step__icon-inner">
+                {{ node.index }}
+              </div>
+            </div>
+            <el-tooltip effect="dark" :content="node.label" placement="top">
+              <el-link v-if="node.redirect" class="report-label-head" @click="isLink">
+                {{ getLabel(node.label) }}
+              </el-link>
+              <span v-else>{{ getLabel(node.label) }}</span>
+            </el-tooltip>
+          </el-col>
+          <el-col :span="2">
+            <div style="float: right">
+              <ms-api-report-status
+                :status="node.totalStatus"
+                v-if="
+                  node.type !== 'ConstantTimer' &&
+                  node.type !== 'Assertions' &&
+                  node.children
+                " />
+            </div>
+          </el-col>
+        </el-row>
       </el-card>
     </div>
     <div v-else>
@@ -30,8 +45,8 @@
         :scenarioName="node.label"
         :resourceId="node.resourceId"
         :total-status="node.totalStatus"
+        :expanded.sync="innerExpanded"
         :console="console"
-        :isActive="isActive"
         :is-share="isShare"
         :share-id="shareId"
         v-on:requestResult="requestResult" />
@@ -43,34 +58,49 @@
 import MsRequestResult from './RequestResult';
 import { STEP } from '../../../../business/automation/scenario/Setting';
 import { getCurrentByResourceId } from '../../../../api/user';
+import MsApiReportStatus from '../ApiReportStatus';
 
 export default {
   name: 'MsScenarioResult',
   components: {
     MsRequestResult,
+    MsApiReportStatus,
   },
   props: {
     scenario: Object,
     node: Object,
     console: String,
-    isActive: Boolean,
     isShare: Boolean,
+    expanded: Boolean,
     shareId: String,
   },
   data() {
     return {
       stepFilter: new STEP(),
+      innerExpanded: false,
     };
+  },
+  watch: {
+    expanded(val) {
+      this.innerExpanded = val;
+    },
+    innerExpanded(val) {
+      this.$emit('update:expanded', val);
+    },
   },
   methods: {
     getLabel(label) {
       switch (label) {
         case 'ConstantTimer':
-          return '等待控制器';
+          return this.$t('api_test.automation.wait_controller');
         case 'LoopController':
-          return '循环控制器';
-        case 'Assertion':
-          return '场景断言';
+          return this.$t('api_test.automation.loop_controller');
+        case 'Assertions':
+          return this.$t('api_test.definition.request.scenario_assertions');
+        case 'IfController':
+          return this.$t('api_test.automation.if_controller');
+        case 'TransactionController':
+          return this.$t('api_test.automation.transaction_controller');
         default:
           return label;
       }
@@ -96,11 +126,11 @@ export default {
       let element = document.getElementById(id);
       element.parentNode.removeChild(element);
     },
-    active() {
-      this.isActive = !this.isActive;
-    },
     requestResult(requestResult) {
       this.$emit('requestResult', requestResult);
+    },
+    handleClick() {
+      this.innerExpanded = !this.innerExpanded;
     },
   },
 
@@ -172,5 +202,9 @@ export default {
   width: 20px;
   height: 20px;
   font-size: 12px;
+}
+
+:deep(.ms-card .el-card__body) {
+  padding-right: 1px;
 }
 </style>

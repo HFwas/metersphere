@@ -54,6 +54,12 @@ function render(props = {}) {
     pinia,
     render: h => h(App),
   }).$mount(container ? container.querySelector('#app') : '#app');
+  // 解决qiankun下，vue-devtools不显示的问题
+  if (process.env.NODE_ENV === 'development') {
+    const instanceDiv = document.createElement('div')
+    instanceDiv.__vue__ = instance
+    document.body.appendChild(instanceDiv)
+  }
   // 微服务过来的路由
   if (defaultPath || routeName) {
     microRouter.push({path: defaultPath, params: routeParams, name: routeName});
@@ -91,7 +97,16 @@ export async function unmount(props) {
 }
 
 /**
- * 可选生命周期钩子，仅使用 loadMicroApp 方式加载微应用时生效
+ * 更新钩子，目前只有routeParams更新，后续有其他属性更新再添加
  */
-export async function update(props) {
+export async function update (props) {
+  const { defaultPath, routeParams, routeName } = props;
+  // 微服务过来的路由
+  if (defaultPath || routeName) {
+    microRouter.push({
+      path: defaultPath,
+      params: routeParams,
+      name: routeName,
+    });
+  }
 }

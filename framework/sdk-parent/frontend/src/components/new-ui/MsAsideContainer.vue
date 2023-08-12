@@ -107,7 +107,12 @@ export default {
       let MutationObserver = window.MutationObserver || window.WebKitMutationObserver || window.MozMutationObserver
       this.observer = new MutationObserver(() => {
         // 监听元素的宽度变化，保存在 localStorage 中
-        localStorage.setItem(rememberKey, getComputedStyle(element).getPropertyValue('width'));
+        let width = getComputedStyle(element).getPropertyValue('width');
+        if (!this.asideHidden) {
+          localStorage.setItem(rememberKey, width);
+          // 这里宽度变化设置下默认宽度，否则页面有更新，会导致宽度变回到原来的默认宽度
+          this.defaultWidth = width;
+        }
       })
       this.observer.observe(element, { attributes: true, attributeFilter: ['style'], attributeOldValue: true })
     }

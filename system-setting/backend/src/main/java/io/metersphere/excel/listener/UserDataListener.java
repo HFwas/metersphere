@@ -10,6 +10,8 @@ import io.metersphere.service.UserService;
 import org.apache.commons.lang3.StringUtils;
 
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class UserDataListener extends EasyExcelListener<UserExcelData> {
@@ -81,7 +83,29 @@ public class UserDataListener extends EasyExcelListener<UserExcelData> {
         if (viewerProjectCheck != null) {
             stringBuilder.append(viewerProjectCheck);
         }
+
+        if (data.getId().length() > 50) {
+            stringBuilder.append(Translator.get("user_import_id_too_long") + ";");
+        }
+
+        if (savedUserId.contains(data.getId())) {
+            stringBuilder.append(Translator.get("user_import_id_exist") + ";");
+        }
+
+        if (data.getName().length() > 50 || data.getName().length() < 2) {
+            stringBuilder.append(Translator.get("user_import_name_length_limit") + ";");
+        }
+
+        if (containsChineseCharacter(data.getId())) {
+            stringBuilder.append(Translator.get("user_import_id_not_chinese") + ";");
+        }
         return stringBuilder.toString();
+    }
+
+    public static boolean containsChineseCharacter(String str) {
+        Pattern pattern = Pattern.compile("[\u4e00-\u9fa5]");
+        Matcher matcher = pattern.matcher(str);
+        return matcher.find();
     }
 
     @Override

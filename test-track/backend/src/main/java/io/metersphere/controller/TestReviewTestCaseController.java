@@ -11,6 +11,7 @@ import io.metersphere.commons.utils.PageUtils;
 import io.metersphere.commons.utils.Pager;
 import io.metersphere.log.annotation.MsAuditLog;
 import io.metersphere.dto.TestReviewCaseDTO;
+import io.metersphere.log.annotation.MsRequestLog;
 import io.metersphere.request.ResetOrderRequest;
 import io.metersphere.request.testplancase.TestReviewCaseBatchRequest;
 import io.metersphere.request.testreview.DeleteRelevanceRequest;
@@ -31,7 +32,8 @@ public class TestReviewTestCaseController {
     TestReviewTestCaseService testReviewTestCaseService;
 
     @PostMapping("/list/{goPage}/{pageSize}")
-    public Pager<List<TestReviewCaseDTO>> getTestPlanCases(@PathVariable int goPage, @PathVariable int pageSize, @RequestBody QueryCaseReviewRequest request) {
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_REVIEW_READ)
+    public Pager<List<TestReviewCaseDTO>> getTestReviewCases(@PathVariable int goPage, @PathVariable int pageSize, @RequestBody QueryCaseReviewRequest request) {
         Page<Object> page = PageHelper.startPage(goPage, pageSize, true);
         return PageUtils.setPageInfo(page, testReviewTestCaseService.list(request));
     }
@@ -51,14 +53,14 @@ public class TestReviewTestCaseController {
     }
 
     @PostMapping("/batch/edit/status")
-    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_REVIEW_READ_EDIT)
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_REVIEW_READ_REVIEW)
     @MsAuditLog(module = OperLogModule.TRACK_TEST_CASE_REVIEW, type = OperLogConstants.BATCH_UPDATE, beforeEvent = "#msClass.batchLogDetails(#request)", content = "#msClass.getLogDetails(#request)", msClass = TestReviewTestCaseService.class)
     public void editTestCaseBatch(@RequestBody TestReviewCaseBatchRequest request) {
         testReviewTestCaseService.editTestCaseBatchStatus(request);
     }
 
     @PostMapping("/batch/edit/reviewer")
-    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_REVIEW_READ_EDIT)
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_REVIEW_READ_REVIEW)
     @MsAuditLog(module = OperLogModule.TRACK_TEST_CASE_REVIEW, type = OperLogConstants.BATCH_UPDATE, beforeEvent = "#msClass.batchLogDetails(#request)", content = "#msClass.getLogDetails(#request)", msClass = TestReviewTestCaseService.class)
     public void editTestCaseReviewerBatch(@RequestBody TestReviewCaseBatchRequest request) {
         testReviewTestCaseService.editTestCaseBatchReviewer(request);
@@ -72,34 +74,40 @@ public class TestReviewTestCaseController {
     }
 
     @PostMapping("/list/minder")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_REVIEW_READ)
     public List<TestReviewCaseDTO> listForMinder(@RequestBody QueryCaseReviewRequest request) {
         return testReviewTestCaseService.listForMinder(request);
     }
 
     @PostMapping("/list/minder/{goPage}/{pageSize}")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_REVIEW_READ)
     public Pager<List<TestReviewCaseDTO>> listForMinder(@PathVariable int goPage, @PathVariable int pageSize, @RequestBody QueryCaseReviewRequest request) {
         Page<Object> page = PageHelper.startPage(goPage, pageSize, true);
         return PageUtils.setPageInfo(page, testReviewTestCaseService.listForMinder(request));
     }
 
     @PostMapping("/edit")
-    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_REVIEW_READ_EDIT)
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_REVIEW_READ_REVIEW)
     @MsAuditLog(module = OperLogModule.TRACK_TEST_CASE_REVIEW, type = OperLogConstants.REVIEW, content = "#msClass.getLogDetails(#testCaseReviewTestCase)", msClass = TestReviewTestCaseService.class)
     public String editTestCase(@RequestBody TestCaseReviewTestCaseEditRequest testCaseReviewTestCase) {
         return testReviewTestCaseService.editTestCase(testCaseReviewTestCase);
     }
 
     @GetMapping("/get/{reviewId}")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_REVIEW_READ)
     public TestReviewCaseDTO get(@PathVariable String reviewId) {
         return testReviewTestCaseService.get(reviewId);
     }
 
     @GetMapping("/reviewer/status/{id}")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_REVIEW_READ)
     public List<TestCaseComment> getReviewerStatusComment(@PathVariable String id) {
         return testReviewTestCaseService.getReviewerStatusComment(id);
     }
 
     @PostMapping("/edit/order")
+    @RequiresPermissions(PermissionConstants.PROJECT_TRACK_REVIEW_READ)
+    @MsRequestLog(module = OperLogModule.TRACK_TEST_CASE_REVIEW)
     public void orderCase(@RequestBody ResetOrderRequest request) {
         testReviewTestCaseService.updateOrder(request);
     }

@@ -56,6 +56,14 @@
   margin: 10px 0 5px 0;
 }
 
+.el-message--error {
+  height: auto !important;
+}
+
+.el-message__content {
+  width: 90%;
+}
+
 /* --> */
 
 body {
@@ -327,7 +335,7 @@ textarea {
 
 
 .el-message.is-closable .el-message__content {
-  max-width: 800px;
+  max-width: 90%;
   word-wrap: break-word;
 }
 
@@ -336,6 +344,9 @@ textarea {
   margin-bottom: 20%;
 }
 
+.el-message-box__message p {
+  word-wrap: break-word;
+}
 
 /* 超出文本显示... */
 .text-ellipsis {

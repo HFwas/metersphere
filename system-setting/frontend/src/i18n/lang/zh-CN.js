@@ -1,4 +1,4 @@
-import el from "element-ui/lib/locale/lang/zh-CN"; // 加载element的内容
+import el from "metersphere-frontend/src/i18n/lang/ele-zh-CN"; // 加载element的内容
 import fu from "fit2cloud-ui/src/locale/lang/zh-CN"; // 加载fit2cloud的内容
 import mf from "metersphere-frontend/src/i18n/lang/zh-CN"
 
@@ -32,7 +32,8 @@ const message = {
     theme_style: '主题风格设置',
     theme_default: '默认',
     theme_light: '白色',
-    theme_follow: '跟随主题色'
+    theme_follow: '跟随主题色',
+    css_file: '自定义CSS',
   },
   system_custom_template: {
     api_template: "接口模版"

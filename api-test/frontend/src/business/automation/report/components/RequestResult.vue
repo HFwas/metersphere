@@ -1,7 +1,7 @@
 <template>
   <el-card class="ms-cards" v-if="request && request.responseResult">
     <div class="request-result">
-      <div @click="active">
+      <div @click.stop="active">
         <el-row :gutter="18" type="flex" align="middle" class="info">
           <el-col class="ms-req-name-col" :span="18" v-if="indexNumber != undefined">
             <el-tooltip :content="getName(request.name)" placement="top" style="z-index: 999">
@@ -9,7 +9,7 @@
                 <div class="el-step__icon is-text ms-api-col-create">
                   <div class="el-step__icon-inner">{{ indexNumber }}</div>
                 </div>
-                <i class="icon el-icon-arrow-right" :class="{ 'is-active': showActive }" @click="active" @click.stop />
+                <i class="icon el-icon-arrow-right" :class="{ 'is-active': showActive }" @click.stop="active" />
                 <span class="report-label-req" @click="isLink" v-if="redirect && resourceId">
                   {{ request.name }}
                 </span>
@@ -70,14 +70,13 @@
       </div>
 
       <el-collapse-transition>
-        <div v-show="showActive && !request.unexecute" style="width: 99%">
+        <div v-show="showActive && !request.unexecute" style="width: 99%" @click.stop>
           <ms-request-result-tail
             v-loading="requestInfo.loading"
             :scenario-name="scenarioName"
             :request-type="requestType"
             :request="requestInfo"
-            :console="console"
-            v-if="showActive" />
+            :console="console" />
         </div>
       </el-collapse-transition>
     </div>
@@ -119,16 +118,12 @@ export default {
       type: String,
       default: '',
     },
-    isActive: {
+    expanded: {
       type: Boolean,
       default: false,
     },
     isShare: Boolean,
     shareId: String,
-  },
-  created() {
-    this.showActive = this.isActive;
-    this.baseErrorCode = this.errorCode;
   },
   data() {
     return {
@@ -156,9 +151,12 @@ export default {
     };
   },
   watch: {
-    isActive() {
+    expanded(val) {
       this.loadRequestInfoExpand();
-      this.showActive = this.isActive;
+      this.showActive = val;
+    },
+    showActive(val) {
+      this.$emit('update:expanded', val);
     },
     errorCode() {
       this.baseErrorCode = this.errorCode;
@@ -166,15 +164,22 @@ export default {
     request: {
       deep: true,
       handler(n) {
-        if (this.request.errorCode) {
+        if (this.request && this.request.errorCode) {
           this.baseErrorCode = this.request.errorCode;
-        } else if (this.request.attachInfoMap && this.request.attachInfoMap.FAKE_ERROR) {
+        } else if (this.request && this.request.attachInfoMap && this.request.attachInfoMap.FAKE_ERROR) {
           if (this.request.attachInfoMap.FAKE_ERROR !== '') {
             this.baseErrorCode = this.request.attachInfoMap.FAKE_ERROR;
           }
         }
       },
     },
+  },
+  created() {
+    this.showActive = this.expanded;
+    this.baseErrorCode = this.errorCode;
+    if (this.expanded === true) {
+      this.loadRequestInfoExpand();
+    }
   },
   methods: {
     statusColor(status) {
@@ -202,7 +207,7 @@ export default {
       element.parentNode.removeChild(element);
     },
     loadRequestInfoExpand() {
-      if (
+      if ( this.request &&
         !this.request.responseResult ||
         this.request.responseResult.body === null ||
         this.request.responseResult.body === undefined
@@ -224,6 +229,7 @@ export default {
         }
       } else {
         this.requestInfo = this.request;
+        this.requestInfo.loading = false;
       }
     },
     active() {

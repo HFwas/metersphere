@@ -14,6 +14,7 @@ import io.metersphere.commons.utils.JSON;
 import io.metersphere.commons.utils.LogUtil;
 import io.metersphere.dto.CustomFieldDao;
 import io.metersphere.dto.CustomFieldResourceDTO;
+import io.metersphere.dto.TestCaseNodeDTO;
 import io.metersphere.excel.annotation.NotRequired;
 import io.metersphere.excel.constants.TestCaseImportFiled;
 import io.metersphere.excel.domain.ExcelErrData;
@@ -25,6 +26,7 @@ import io.metersphere.excel.utils.ExcelValidateHelper;
 import io.metersphere.exception.CustomFieldValidateException;
 import io.metersphere.i18n.Translator;
 import io.metersphere.request.testcase.TestCaseImportRequest;
+import io.metersphere.service.TestCaseNodeService;
 import io.metersphere.service.TestCaseService;
 import io.metersphere.validate.AbstractCustomFieldValidator;
 import io.metersphere.validate.CustomFieldValidatorFactory;
@@ -61,6 +63,8 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
     protected static final int BATCH_COUNT = 5000;
 
     private TestCaseService testCaseService;
+
+    private TestCaseNodeService testCaseNodeService;
 
     protected List<TestCaseExcelData> updateList = new ArrayList<>();  //存储待更新用例的集合
 
@@ -104,6 +108,8 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
     private HashMap<String, AbstractCustomFieldValidator> customFieldValidatorMap;
 
     private Map<String, List<CustomFieldResourceDTO>> testCaseCustomFieldMap = new HashMap<>();
+    private Map<String, String> pathMap = new HashMap<>();
+    private List<TestCaseNodeDTO> nodeTrees;
 
     public boolean isUpdated() {
         return isUpdated;
@@ -113,6 +119,7 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
         this.mergeInfoSet = mergeInfoSet;
         this.excelDataClass = c;
         this.testCaseService = CommonBeanFactory.getBean(TestCaseService.class);
+        this.testCaseNodeService = CommonBeanFactory.getBean(TestCaseNodeService.class);
         customIds = new HashSet<>();
 
         this.request = request;
@@ -123,6 +130,8 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
         if (CollectionUtils.isNotEmpty(customFields)) {
             customFieldsMap = customFields.stream().collect(Collectors.toMap(CustomFieldDao::getName, i -> i));
         }
+
+        nodeTrees = testCaseNodeService.getNodeTreeByProjectId(request.getProjectId());
     }
 
     @Override
@@ -294,6 +303,8 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
     }
 
     private void validateDbExist(TestCaseExcelData data, StringBuilder stringBuilder) {
+        //  校验模块是否存在，没有存在则新建一个模块
+        testCaseNodeService.createNodeByNodePath(data.getNodePath(), request.getProjectId(), nodeTrees, pathMap);
         if (this.isUpdateModel()) {
             return;
         }
@@ -304,6 +315,7 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
             String steps = getSteps(data);
             testCase.setSteps(steps);
 
+            testCase.setNodeId(pathMap.get(testCase.getNodePath()));
             boolean dbExist = testCaseService.exist(testCase);
             boolean excelExist = false;
 
@@ -448,13 +460,6 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
         //校验”所属模块"
         if (nodePath != null) {
             String[] nodes = nodePath.split("/");
-            //校验模块深度
-            if (nodes.length > TestCaseConstants.MAX_NODE_DEPTH + 1) {
-                stringBuilder.append(Translator.get("test_case_node_level_tip"))
-                        .append(TestCaseConstants.MAX_NODE_DEPTH)
-                        .append(Translator.get("test_case_node_level"))
-                        .append("; ");
-            }
             //模块名不能为空
             for (int i = 0; i < nodes.length; i++) {
                 if (i != 0 && StringUtils.equals(nodes[i].trim(), StringUtils.EMPTY)) {
@@ -535,7 +540,7 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
             List<TestCaseWithBLOBs> result = list.stream()
                     .map(item -> this.convert2TestCase(item))
                     .collect(Collectors.toList());
-            testCaseService.saveImportData(result, request, testCaseCustomFieldMap);
+            testCaseService.saveImportData(result, request, testCaseCustomFieldMap, pathMap);
             this.names = result.stream().map(TestCase::getName).collect(Collectors.toList());
             this.ids = result.stream().map(TestCase::getId).collect(Collectors.toList());
             this.isUpdated = true;
@@ -680,41 +685,61 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
         }
     }
 
+    /**
+     * 解析合并步骤描述, 预期结果单元格数据
+     * @param data Excel数据
+     * @return 步骤JSON-String
+     */
     public String getSteps(TestCaseExcelData data) {
-        List jsonArray = new ArrayList<>();
+        List<Map<String, Object>> steps = new ArrayList<>();
 
-        // 如果是合并单元格，则组合多条单元格的数据
-        if (CollectionUtils.isNotEmpty(data.getMergeStepDesc())
-                || CollectionUtils.isNotEmpty(data.getMergeStepResult())) {
+        if (CollectionUtils.isNotEmpty(data.getMergeStepDesc()) || CollectionUtils.isNotEmpty(data.getMergeStepResult())) {
+            // 如果是合并单元格，则组合多条单元格的数据
             for (int i = 0; i < data.getMergeStepDesc().size(); i++) {
-                Map<String, Object> step = new LinkedHashMap<>();
-                step.put("num", i + 1);
-                step.put("desc", Optional.ofNullable(data.getMergeStepDesc().get(i)).orElse(StringUtils.EMPTY));
-                step.put("result", Optional.ofNullable(data.getMergeStepResult().get(i)).orElse(StringUtils.EMPTY));
-                jsonArray.add(step);
+                List<Map<String, Object>> rowSteps = getSingleRowSteps(data.getMergeStepDesc().get(i), data.getMergeStepResult().get(i), steps.size());
+                steps.addAll(rowSteps);
             }
-            return JSON.toJSONString(jsonArray);
+        } else {
+            // 如果不是合并单元格，则直接解析单元格数据
+            steps.addAll(getSingleRowSteps(data.getStepDesc(), data.getStepResult(), steps.size()));
         }
+        return JSON.toJSONString(steps);
+    }
+
+    /**
+     * 解析单行步骤描述, 预期结果数据
+     * @param cellDesc 步骤描述
+     * @param cellResult 预期结果
+     * @param startStepIndex 步骤开始序号
+     * @return 步骤JSON-String
+     */
+    private List<Map<String, Object>> getSingleRowSteps(String cellDesc, String cellResult, Integer startStepIndex) {
+        List<Map<String, Object>> steps = new ArrayList<>();
 
         List<String> stepDescList = new ArrayList<>();
         List<String> stepResList = new ArrayList<>();
-
-        Set<Integer> rowNums = new HashSet<>();
-        if (data.getStepDesc() != null) {
-            String[] stepDesc = data.getStepDesc().split("\r|\n|\r\n");
+        if (StringUtils.isNotEmpty(cellDesc)) {
+            // 根据[1], [2]...分割步骤描述, 开头空字符去掉, 末尾保留
+            String[] stepDesc = cellDesc.split("\\[\\d+]", -1);
+            if (StringUtils.isEmpty(stepDesc[0])) {
+                stepDesc = Arrays.copyOfRange(stepDesc, 1, stepDesc.length);
+            }
 
             int rowIndex = 1;
             for (String row : stepDesc) {
                 RowInfo rowInfo = this.parseIndexInRow(row, rowIndex);
                 stepDescList.add(rowInfo.rowInfo);
-                rowNums.add(rowIndex++);
             }
         } else {
             stepDescList.add(StringUtils.EMPTY);
         }
 
-        if (data.getStepResult() != null) {
-            String[] stepRes = data.getStepResult().split("\r|\n|\r\n");
+        if (StringUtils.isNotEmpty(cellResult)) {
+            // 根据[1], [2]...分割步骤描述, 开头空字符去掉, 末尾保留
+            String[] stepRes = cellResult.split("\\[\\d+]", -1);
+            if (StringUtils.isEmpty(stepRes[0])) {
+                stepRes = Arrays.copyOfRange(stepRes, 1, stepRes.length);
+            }
             int lastStepIndex = 1;
             for (String row : stepRes) {
                 RowInfo rowInfo = this.parseIndexInRow(row, lastStepIndex);
@@ -726,13 +751,11 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
             stepResList.add(StringUtils.EMPTY);
         }
 
-        int index = stepDescList.size() > stepResList.size() ? stepDescList.size() : stepResList.size();
-
+        int index = Math.max(stepDescList.size(), stepResList.size());
         for (int i = 0; i < index; i++) {
-
             // 保持插入顺序，判断用例是否有相同的steps
             Map<String, Object> step = new LinkedHashMap<>();
-            step.put("num", i + 1);
+            step.put("num", startStepIndex + i + 1);
             if (i < stepDescList.size()) {
                 step.put("desc", stepDescList.get(i));
             } else {
@@ -745,9 +768,9 @@ public class TestCaseNoModelDataListener extends AnalysisEventListener<Map<Integ
                 step.put("result", StringUtils.EMPTY);
             }
 
-            jsonArray.add(step);
+            steps.add(step);
         }
-        return JSON.toJSONString(jsonArray);
+        return steps;
     }
 
     private RowInfo parseIndexInRow(String row, int rowIndex) {

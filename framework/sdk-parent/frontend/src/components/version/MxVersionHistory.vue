@@ -47,8 +47,13 @@
           </el-link>
 
           <el-link v-if="!scope.row.isCheckout && scope.row.status === 'open'" @click="create(scope.row)"
-                   :disabled="isRead">
+                   :disabled="isRead" v-permission="['PROJECT_VERSION:READ+CREATE']">
             {{ $t('commons.create') }}&nbsp;
+          </el-link>
+
+          <el-link @click="del(scope.row)" v-if="scope.row.isCheckout" :disabled="scope.row.isCurrent || isRead"
+                   v-permission="['PROJECT_VERSION:READ+DELETE']">
+            {{ $t('commons.delete') }}&nbsp;
           </el-link>
 
           <el-popover
@@ -62,10 +67,7 @@
                        :disabled="isRead || scope.row.id === dataLatestId">
                 {{ $t('project.version.set_new') }}&nbsp;
               </el-link>
-              <br/>
-              <el-link @click="del(scope.row)" v-if="scope.row.isCheckout" :disabled="scope.row.isCurrent || isRead">
-                {{ $t('commons.delete') }}&nbsp;
-              </el-link>
+
             </div>
             <span slot="reference">...</span>
           </el-popover>
@@ -158,6 +160,7 @@ export default {
     checkout(row) {
       this.loading = true;
       this.$emit('checkout', row);
+      this.loading = false;
     },
     create(row) {
       this.loading = true;
@@ -166,10 +169,12 @@ export default {
     del(row) {
       this.loading = true;
       this.$emit('del', row);
+      this.loading = false;
     },
     setLatest(row) {
       this.loading = true;
       this.$emit('setLatest', row);
+      this.loading = false;
     },
     handleVersionOptions() {
       let versionData = this.versionData;

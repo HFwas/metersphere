@@ -12,7 +12,7 @@
       <ms-new-ui-search :condition.sync="condition" @search="search" style="float: left" />
 
       <!-- 版本切换组件 -->
-      <version-select v-xpack :project-id="projectId" @changeVersion="changeVersion" />
+      <version-select v-xpack :project-id="projectId" :default-version="defaultVersion" @changeVersion="changeVersion" />
 
       <!-- 高级搜索框  -->
       <ms-table-adv-search :condition.sync="condition" @search="search" ref="advanceSearch"/>
@@ -284,7 +284,7 @@ import PlanStatusTableItem from "@/business/common/tableItems/plan/PlanStatusTab
 import {getCurrentProjectID, getCurrentWorkspaceId, setCurrentProjectID} from "metersphere-frontend/src/utils/token";
 import {parseTag} from "metersphere-frontend/src/utils"
 import {hasLicense} from "metersphere-frontend/src/utils/permission"
-import {getTestTemplate} from "@/api/custom-field-template";
+import {getTestTemplateForList} from "@/api/custom-field-template";
 import {getProjectMember, getProjectMemberUserFilter} from "@/api/user";
 import MsTable from "metersphere-frontend/src/components/new-ui/MsTable";
 import MsTableColumn from "metersphere-frontend/src/components/table/MsTableColumn";
@@ -365,7 +365,7 @@ export default {
       tableHeaderKey: "TRACK_TEST_CASE",
       tableHeaderDragKey: "TRACK_TEST_CASE_DRAG",
       screenHeight: 'calc(100vh - 185px)',
-      maxHeight: 'calc(100vh - 287px)',
+      maxHeight: 'calc(100vh - 285px)',
       enableOrderDrag: true,
       isMoveBatch: true,
       loading: false,
@@ -512,7 +512,8 @@ export default {
     versionEnable: {
       type: Boolean,
       default: false
-    }
+    },
+    defaultVersion: String
   },
   computed: {
     routeProjectId() {
@@ -541,6 +542,7 @@ export default {
     }
   },
   created: function () {
+    this.currentVersion = this.defaultVersion || null;
     this.checkCurrentProject();
 
     getProjectMemberUserFilter((data) => {
@@ -580,6 +582,7 @@ export default {
           // 点击模块导致路由变更不刷新，避免刷新两次
           return;
         }
+        this.getProject();
         this.getTemplateField();
         let ids = this.$route.params.ids;
         if (ids) {
@@ -636,7 +639,7 @@ export default {
             this.memberMap.set(item.id, item.name);
           });
         });
-      let p2 = getTestTemplate();
+      let p2 = getTestTemplateForList();
       Promise.all([p1, p2]).then((data) => {
         this.loading = false;
         let template = data[1];
@@ -650,6 +653,15 @@ export default {
           name: this.$t('commons.tag')
         })
         getCustomFieldBatchEditOption(template.customFields, this.typeArr, this.valueArr, this.members);
+        this.$nextTick(() => {
+          if (this.$refs.table) {
+            this.$refs.table.resetHeader(() => {
+              this.loading = false;
+            });
+          } else {
+            this.loading = false;
+          }
+        });
       });
     },
     checkCurrentProject() {
@@ -785,7 +797,6 @@ export default {
       this.condition.selectThisWeedData = false;
       this.condition.selectThisWeedRelevanceData = false;
       this.condition.caseCoverage = null;
-      this.condition.filters.reviewStatus = ["Prepare", "Pass", "UnPass"];
       if (this.selectDataRange && this.selectDataRange.indexOf("single") > -1) {
         this.condition.ids = [this.selectDataRange.substring(7)];
       }
@@ -803,7 +814,7 @@ export default {
           this.condition.caseCoverage = 'coverage';
           break;
         case 'notReviewed':
-          this.condition.filters.review_status = ['Prepare', 'Underway'];
+          this.condition.filters.review_status = ['Prepare', 'Underway', 'Again'];
           break
         case 'reviewed':
           this.condition.filters.review_status = ['UnPass', 'Pass'];
@@ -975,7 +986,7 @@ export default {
       );
     },
     generateGraph() {
-      if (getSelectDataCounts(this.condition, this.total, this.$refs.table.selectRows) > 100) {
+      if (getSelectDataCounts(this.condition, this.$refs.table.selectDataCounts, this.$refs.table.selectRows) > 500) {
         this.$warning(this.$t('test_track.case.generate_dependencies_warning'));
         return;
       }
@@ -1217,7 +1228,18 @@ export default {
           });
       }
     },
-    generateColumnKey
+    generateColumnKey,
+    getProject() {
+      getProjectApplicationConfig('CASE_CUSTOM_NUM')
+        .then(result => {
+          let data = result.data;
+          if (data && data.typeValue === 'true') {
+            store.currentProjectIsCustomNum = true;
+          } else {
+            store.currentProjectIsCustomNum = false;
+          }
+        });
+    },
   }
 };
 </script>

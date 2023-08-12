@@ -49,19 +49,20 @@ import {
   delModule,
   dragModule,
   editModule,
-  getApiModuleByTrash,
   getApiModules,
   getUserDefaultApiType,
-  posModule, postApiModuleByTrash, postApiModules,
+  posModule,
+  postApiModuleByTrash,
+  postApiModules,
 } from '@/api/definition-module';
 import MsAddBasisApi from '../basis/AddBasisApi';
 import SelectMenu from '@/business/commons/SelectMenu';
-import { OPTIONS } from '../../model/JsonData';
+import {OPTIONS} from '../../model/JsonData';
 import ApiImport from '../import/ApiImport';
 import MsNodeTree from '@/business/commons/NodeTree';
 import ApiModuleHeader from './ApiModuleHeader';
-import { buildTree } from 'metersphere-frontend/src/model/NodeTree';
-import { getCurrentProjectID } from 'metersphere-frontend/src/utils/token';
+import {buildTree} from 'metersphere-frontend/src/model/NodeTree';
+import {getCurrentProjectID} from 'metersphere-frontend/src/utils/token';
 
 export default {
   name: 'MsApiModule',
@@ -77,7 +78,7 @@ export default {
       result: false,
       refreshDataOver: true,
       condition: {
-        protocol: OPTIONS[0].value,
+        protocol: '',
         filterText: '',
         trashEnable: false,
       },
@@ -180,6 +181,9 @@ export default {
     this.$EventBus.$on("apiConditionBus", (param)=>{
       this.param = param;
     })
+    if (this.isRelevance) {
+      this.condition.protocol = "HTTP";
+    }
   },
   beforeDestroy() {
     this.$EventBus.$off("apiConditionBus", (param)=>{
@@ -202,6 +206,9 @@ export default {
           this.list();
         });
       } else {
+        if (!this.condition.protocol) {
+          this.condition.protocol = 'HTTP';
+        }
         this.$emit('protocolChange', this.condition.protocol);
         this.list();
       }
@@ -213,6 +220,13 @@ export default {
         if (item) {
           let type = item.taskGroup.toString();
           if (type === 'SWAGGER_IMPORT') {
+            isRedirectPage = true;
+          }
+        }
+        if (!isRedirectPage) {
+          //跳转来源不是swagger时，判断是否是首页统计跳转的。
+          if ((this.$route.params.dataType === 'api' || this.$route.params.dataType === 'apiTestCase')
+            && this.$route.params.dataSelectRange !== '') {
             isRedirectPage = true;
           }
         }
@@ -237,9 +251,14 @@ export default {
           this.setData(response);
         });
       } else {
-        this.result = postApiModules(projectId, this.condition.protocol, this.currentVersion, this.param).then((response) => {
-          this.setData(response);
-        });
+        if (this.condition.protocol) {
+          if (this.currentVersion && !this.param.versionId) {
+            this.param.versionId = this.currentVersion;
+          }
+          this.result = postApiModules(projectId, this.condition.protocol, this.currentVersion, this.param).then((response) => {
+            this.setData(response);
+          });
+        }
       }
     },
     setNohupData(response, selectNodeId) {

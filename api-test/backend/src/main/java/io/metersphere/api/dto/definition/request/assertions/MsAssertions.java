@@ -24,6 +24,7 @@ import java.util.List;
 @EqualsAndHashCode(callSuper = true)
 public class MsAssertions extends MsTestElement {
     private String clazzName = MsAssertions.class.getCanonicalName();
+    private String xpathType;
 
     private boolean scenarioAss;
     private List<MsAssertionRegex> regex;
@@ -87,9 +88,15 @@ public class MsAssertions extends MsTestElement {
         }
 
         if (CollectionUtils.isNotEmpty(this.getXpath2())) {
-            this.getXpath2().stream().filter(MsAssertionXPath2::isValid).forEach(assertion ->
-                    hashTree.add(xPath2Assertion(assertion))
-            );
+            if (StringUtils.equals("html", this.getXpathType())) {
+                this.getXpath2().stream().filter(MsAssertionXPath2::isValid).forEach(assertion ->
+                        hashTree.add(xPathAssertion(assertion))
+                );
+            } else {
+                this.getXpath2().stream().filter(MsAssertionXPath2::isValid).forEach(assertion ->
+                        hashTree.add(xPath2Assertion(assertion))
+                );
+            }
         }
 
         if (CollectionUtils.isNotEmpty(this.getJsr223())) {
@@ -178,6 +185,23 @@ public class MsAssertions extends MsTestElement {
         return assertion;
     }
 
+    private XPathAssertion xPathAssertion(MsAssertionXPath2 assertionXPath) {
+        XPathAssertion assertion = new XPathAssertion();
+        assertion.setEnabled(this.isEnable());
+        assertion.setTolerant(true);
+        assertion.setValidating(false);
+        if (StringUtils.isNotEmpty(assertionXPath.getExpression())) {
+            assertion.setName(this.getName() + delimiter + assertionXPath.getExpression());
+        } else {
+            assertion.setName(this.getName() + delimiter + "XPath2Assertion");
+        }
+        assertion.setProperty(TestElement.TEST_CLASS, XPathAssertion.class.getName());
+        assertion.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("XPathAssertionGui"));
+        assertion.setXPathString(assertionXPath.getExpression());
+        assertion.setNegated(false);
+        return assertion;
+    }
+
     private DurationAssertion durationAssertion(MsAssertionDuration assertionDuration) {
         DurationAssertion assertion = new DurationAssertion();
         assertion.setEnabled(this.isEnable());
@@ -192,19 +216,9 @@ public class MsAssertions extends MsTestElement {
     }
 
     private TestElement jsr223Assertion(MsAssertionJSR223 assertionJSR223) {
-        TestElement assertion = new BeanShellAssertion();
-        if (assertionJSR223.getJsrEnable() == null || BooleanUtils.isTrue(assertionJSR223.getJsrEnable())) {
-            assertion = new JSR223Assertion();
-        }
-        assertion.setEnabled(this.isEnable());
-        if (StringUtils.isNotEmpty(assertionJSR223.getDesc())) {
-            assertion.setName("JSR223" + delimiter + this.getName() + delimiter + assertionJSR223.getDesc() + delimiterScript + assertionJSR223.getScript());
-        } else {
-            assertion.setName("JSR223" + delimiter + this.getName() + delimiter + "JSR223Assertion" + delimiterScript + assertionJSR223.getScript());
-        }
-        assertion.setProperty(TestElement.TEST_CLASS, JSR223Assertion.class.getName());
+        TestElement assertion = new JSR223Assertion();
         assertion.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("TestBeanGUI"));
-        assertion.setProperty("cacheKey", "false");
+        assertion.setProperty(TestElement.TEST_CLASS, JSR223Assertion.class.getName());
         String scriptLanguage = assertionJSR223.getScriptLanguage();
         if (StringUtils.equals(scriptLanguage, "nashornScript")) {
             scriptLanguage = "nashorn";
@@ -215,6 +229,20 @@ public class MsAssertions extends MsTestElement {
         if (StringUtils.equals(scriptLanguage, "javascript")) {
             scriptLanguage = "rhino";
         }
+        if (StringUtils.equals(scriptLanguage, "beanshell") && BooleanUtils.isFalse(assertionJSR223.getJsrEnable())) {
+            assertion = new BeanShellAssertion();
+            scriptLanguage = "beanshell";
+            assertion.setProperty(TestElement.TEST_CLASS, BeanShellAssertion.class.getName());
+            assertion.setProperty(TestElement.GUI_CLASS, SaveService.aliasToClass("BeanShellAssertionGui"));
+            assertion.setProperty(BeanShellAssertion.SCRIPT, assertionJSR223.getScript());
+        }
+        if (StringUtils.isNotEmpty(assertionJSR223.getDesc())) {
+            assertion.setName("JSR223" + delimiter + this.getName() + delimiter + assertionJSR223.getDesc() + delimiterScript + assertionJSR223.getScript());
+        } else {
+            assertion.setName("JSR223" + delimiter + this.getName() + delimiter + "JSR223Assertion" + delimiterScript + assertionJSR223.getScript());
+        }
+        assertion.setEnabled(this.isEnable());
+        assertion.setProperty("cacheKey", "false");
         assertion.setProperty("scriptLanguage", scriptLanguage);
         assertion.setProperty(ElementConstants.SCRIPT, assertionJSR223.getScript());
         return assertion;

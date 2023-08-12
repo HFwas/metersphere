@@ -26,23 +26,18 @@
       </ms-table-column>
       <ms-table-column
         :label="$t('test_track.issue.id')"
+        sortable
         prop="num">
       </ms-table-column>
 
       <ms-table-column
         :label="$t('test_track.issue.title')"
         prop="title"
+        sortable
         min-width="200px">
       </ms-table-column>
 
-      <ms-table-column
-        :label="$t('test_track.issue.platform_status')"
-        v-if="isThirdPart"
-        prop="platformStatus">
-        <template v-slot="scope">
-          {{ scope.row.platformStatus ? scope.row.platformStatus : '--' }}
-        </template>
-      </ms-table-column>
+      <issue-platform-status-column  v-if="isThirdPart" ref="issuePlatformStatus"/>
 
       <ms-table-column
         v-else
@@ -77,7 +72,12 @@
 import MsEditDialog from "metersphere-frontend/src/components/MsEditDialog";
 import MsTable from "metersphere-frontend/src/components/table/MsTable";
 import MsTableColumn from "metersphere-frontend/src/components/table/MsTableColumn";
-import {getPlatformOption, getRelateIssues, isThirdPartEnable, testCaseIssueRelate} from "@/api/issue";
+import {
+  getPlatformOption,
+  getRelateIssues,
+  isThirdPartEnable,
+  testCaseIssueRelate
+} from "@/api/issue";
 import IssueDescriptionTableItem from "@/business/issue/IssueDescriptionTableItem";
 import {ISSUE_STATUS_MAP} from "metersphere-frontend/src/utils/table-constants";
 import MsTablePagination from "metersphere-frontend/src/components/pagination/TablePagination";
@@ -86,17 +86,19 @@ import {getCurrentProjectID} from "metersphere-frontend/src/utils/token";
 import {TEST_CASE_RELEVANCE_ISSUE_LIST} from "@/business/utils/sdk-utils";
 import MsSearch from "metersphere-frontend/src/components/search/MsSearch";
 import {setIssuePlatformComponent} from "@/business/issue/issue";
-
+import IssuePlatformStatusColumn from "@/business/issue/IssuePlatformStatusColumn.vue";
 export default {
   name: "IssueRelateList",
-  components: {MsTablePagination, IssueDescriptionTableItem, MsTableColumn, MsTable, MsEditDialog, MsSearch},
+  components: {
+    IssuePlatformStatusColumn,
+    MsTablePagination, IssueDescriptionTableItem, MsTableColumn, MsTable, MsEditDialog, MsSearch},
   data() {
     return {
       page: getPageInfo({
         components: TEST_CASE_RELEVANCE_ISSUE_LIST
       }),
       visible: false,
-      isThirdPart: false
+      isThirdPart: false,
     }
   },
   computed: {
@@ -105,7 +107,7 @@ export default {
     },
     projectId() {
       return getCurrentProjectID();
-    }
+    },
   },
   props: {
     caseId: String,
@@ -126,6 +128,12 @@ export default {
         .then((r) => {
           setIssuePlatformComponent(r.data, this.page.condition.components);
         });
+
+      this.$nextTick(() => {
+        if (this.$refs.issuePlatformStatus) {
+          this.$refs.issuePlatformStatus.getPlatformStatus();
+        }
+      });
     },
     getIssues() {
       this.page.condition.projectId = this.projectId;

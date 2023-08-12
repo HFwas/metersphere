@@ -38,8 +38,8 @@
           @refresh="initTable"
           ref="table"
         >
-          <ms-table-column prop="num" label="ID" width="100px" sortable="true">
-          </ms-table-column>
+
+          <ms-table-column :prop="scenarioCustomNumEnable ? 'customNum' : 'num'" label="ID" width="100px" sortable="true" />
 
           <ms-table-column
             prop="name"
@@ -130,6 +130,8 @@ import { getVersionFilters } from "@/business/utils/sdk-utils";
 import MxVersionSelect from "metersphere-frontend/src/components/version/MxVersionSelect";
 import { getTestCaseRelevanceScenarioList } from "@/api/testCase";
 import {getTagToolTips, parseColumnTag} from "@/business/case/test-case";
+import {getCurrentProjectID} from "metersphere-frontend/src/utils/token";
+import {getProjectConfig} from "@/api/project";
 
 export default {
   name: "CaseRelateScenarioList",
@@ -165,7 +167,8 @@ export default {
       pageSize: 10,
       total: 0,
       versionFilters: [],
-      refreshBySearch: false
+      refreshBySearch: false,
+      scenarioCustomNumEnable: false,
     };
   },
   props: {
@@ -182,6 +185,7 @@ export default {
     this.$emit('setCondition', this.condition);
     this.getVersionOptions();
     this.initTable();
+    this.getCustomNumEnable();
   },
   watch: {
     selectNodeIds() {
@@ -190,7 +194,8 @@ export default {
     projectId() {
       this.condition.versionId = null;
       this.getVersionOptions();
-      this.initTable();
+      this.initTable(this.projectId);
+      this.getCustomNumEnable();
     },
   },
   computed: {
@@ -203,6 +208,13 @@ export default {
     },
   },
   methods: {
+    getCustomNumEnable() {
+      getProjectConfig(this.projectId, '/SCENARIO_CUSTOM_NUM').then((result) => {
+        if (result.data) {
+          this.scenarioCustomNumEnable = result.data['scenarioCustomNum'];
+        }
+      });
+    },
     selectCountChange(data) {
       this.$emit("selectCountChange", data);
     },
@@ -214,6 +226,9 @@ export default {
         this.condition.projectId = projectId;
       } else if (this.projectId != null) {
         this.condition.projectId = this.projectId;
+      }
+      if (this.condition.projectId === "") {
+        this.condition.projectId = getCurrentProjectID();
       }
       this.condition.notInIds = this.notInIds;
       this.condition.testCaseId = this.testCaseId;

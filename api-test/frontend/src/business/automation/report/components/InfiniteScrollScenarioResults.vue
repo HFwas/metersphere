@@ -8,33 +8,41 @@
         <i class="el-icon-remove-outline ms-open-btn" size="mini" @click="closeExpansion" />
       </el-tooltip>
     </div>
-    <infinite-scroll-tree
-      :data="treeData"
-      :expand-on-click-node="false"
-      :default-expand-all="defaultExpand"
-      :filter-node-method="filterNode"
-      highlight-current
-      class="ms-tree ms-report-tree"
-      ref="resultsTree">
-      <span slot-scope="{ node, data }" style="width: 99%" @click="nodeClick(node)">
-        <ms-scenario-result
-          :node="data"
-          :console="console"
-          v-on:requestResult="requestResult"
-          :isActive="isActive"
-          :is-share="isShare"
-          :share-id="shareId" />
-      </span>
-    </infinite-scroll-tree>
+    <div style="height: calc(100vh - 400px)">
+      <vue-easy-tree
+        :data="treeData"
+        node-key="resourceId"
+        :sizeDependencies="['expanded']"
+        height="calc(100vh - 400px)"
+        :minItemSize="47"
+        :buffer="500"
+        :expand-on-click-node="false"
+        :default-expand-all="defaultExpand"
+        :filter-node-method="filterNode"
+        highlight-current
+        class="ms-tree ms-report-tree"
+        isDynamic
+        ref="resultsTree">
+        <template slot-scope="{ node, data }">
+          <ms-scenario-result
+            :key="data.resourceId"
+            :node="data"
+            :expanded.sync="node.expanded"
+            :console="console"
+            v-on:requestResult="requestResult"
+            :is-share="isShare"
+            :share-id="shareId" />
+        </template>
+      </vue-easy-tree>
+    </div>
   </el-card>
 </template>
 <script>
 import MsScenarioResult from './ScenarioResult';
-import InfiniteScrollTree from '@/business/automation/report/components/tree/InfiniteScrollTree.vue';
 
 export default {
   name: 'MsInfiniteScrollScenarioResults',
-  components: { MsScenarioResult, InfiniteScrollTree },
+  components: { MsScenarioResult },
   props: {
     scenarios: Array,
     treeData: Array,
@@ -49,9 +57,7 @@ export default {
     shareId: String,
   },
   data() {
-    return {
-      isActive: false,
-    };
+    return {};
   },
   created() {
     if (this.$refs.resultsTree && this.$refs.resultsTree.root) {
@@ -92,7 +98,8 @@ export default {
     requestResult(requestResult) {
       this.$emit('requestResult', requestResult);
     },
-    nodeClick(node) {
+    nodeClick(data, node) {
+      console.log('nodeClick', e);
       node.expanded = !node.expanded;
     },
     // 改变节点的状态
@@ -108,7 +115,6 @@ export default {
       }
     },
     closeExpansion() {
-      this.isActive = false;
       this.expandAll = false;
       this.changeTreeNodeStatus(this.$refs.resultsTree.store.root, 0);
     },

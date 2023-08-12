@@ -8,13 +8,14 @@
     <template v-slot:aside>
       <ms-api-scenario-module
         style="margin-top: 5px"
+        class="node-tree"
         @nodeSelectEvent="nodeChange"
         @refreshTable="refresh"
         @setModuleOptions="setModuleOptions"
         @enableTrash="false"
         :is-read-only="true"
         :select-project-id="projectId"
-        ref="nodeTree" />
+        ref="nodeTree"/>
     </template>
 
     <relevance-scenario-list
@@ -28,9 +29,9 @@
     </relevance-scenario-list>
 
     <template v-slot:headerBtn>
-      <table-select-count-bar :count="selectCounts" style="float: left; margin: 5px" />
+      <table-select-count-bar :count="selectCounts" style="float: left; margin: 5px"/>
 
-      <el-button size="mini" icon="el-icon-refresh" @click="refresh" />
+      <el-button size="mini" icon="el-icon-refresh" @click="refresh"/>
       <el-button type="primary" @click="copy" :loading="buttonIsWorking" @keydown.enter.native.prevent size="mini">
         {{ $t('commons.copy') }}
       </el-button>
@@ -42,19 +43,20 @@
 </template>
 
 <script>
-import { getProjectVersions, versionEnableByProjectId } from '@/api/xpack';
-import { apiScenarioAll, getApiScenarios, getApiScenarioStep } from '@/api/scenario';
+import {getProjectVersions, versionEnableByProjectId} from '@/api/xpack';
+import {apiScenarioAll, getApiScenarios, getApiScenarioStep} from '@/api/scenario';
 import MsContainer from 'metersphere-frontend/src/components/MsContainer';
 import MsAsideContainer from 'metersphere-frontend/src/components/MsAsideContainer';
 import MsMainContainer from 'metersphere-frontend/src/components/MsMainContainer';
 import MsApiScenarioModule from '../ApiScenarioModule';
-import { getUUID, operationConfirm } from 'metersphere-frontend/src/utils';
-import { hasLicense } from 'metersphere-frontend/src/utils/permission';
+import {getUUID, operationConfirm} from 'metersphere-frontend/src/utils';
+import {hasLicense} from 'metersphere-frontend/src/utils/permission';
 import RelevanceDialog from '@/business/commons/RelevanceDialog';
 import RelevanceScenarioList from './RelevanceScenarioList';
 import TestCaseRelevanceBase from '../../../commons/TestCaseRelevanceBase';
 import TableSelectCountBar from '@/business/automation/scenario/api/TableSelectCountBar';
-import { getProjectConfig } from '@/api/project';
+import {getProjectConfig} from '@/api/project';
+
 export default {
   name: 'ScenarioRelevance',
   props: {
@@ -129,6 +131,7 @@ export default {
               variables: scenarioDefinition.variables,
               environmentMap: scenarioDefinition.environmentMap,
               referenced: referenced,
+              refType: 'scenario',
               resourceId: getUUID(),
               hashTree: scenarioDefinition.hashTree,
               projectId: item.projectId,
@@ -167,34 +170,10 @@ export default {
             this.buttonIsWorking = false;
             return;
           }
-          getApiScenarioStep(this.currentScenarioIds).then((response) => {
-            if (response.data > 500) {
-              operationConfirm(
-                this,
-                this.$t('automation.scenario_step_ref_message', [response.data]) + '？',
-                () => {
-                  this.pushApiScenario(scenarios, referenced);
-                },
-                () => {
-                  this.buttonIsWorking = false;
-                }
-              );
-            } else {
-              this.pushApiScenario(scenarios, referenced);
-            }
-          });
-        });
-      } else {
-        if (!this.currentScenarioIds || this.currentScenarioIds.length < 1) {
-          this.$warning(this.$t('automation.scenario_message'));
-          this.buttonIsWorking = false;
-          return;
-        }
-        getApiScenarioStep(this.currentScenarioIds).then((response) => {
-          if (response.data > 500) {
+          if (conditions.selectAll) {
             operationConfirm(
               this,
-              this.$t('automation.scenario_step_ref_message', [response.data]) + '？',
+              this.$t('automation.scenario_step_ref_message') + '？',
               () => {
                 this.pushApiScenario(scenarios, referenced);
               },
@@ -206,6 +185,13 @@ export default {
             this.pushApiScenario(scenarios, referenced);
           }
         });
+      } else {
+        if (!this.currentScenarioIds || this.currentScenarioIds.length < 1) {
+          this.$warning(this.$t('automation.scenario_message'));
+          this.buttonIsWorking = false;
+          return;
+        }
+        this.pushApiScenario(scenarios, referenced);
       }
     },
     pushApiScenario(scenarios, referenced) {
@@ -253,6 +239,7 @@ export default {
       this.moduleOptions = data;
     },
     refresh() {
+      this.$refs.nodeTree.refresh(this.projectId);
       this.$refs.apiScenarioList.search(this.projectId);
     },
     setData(data) {
@@ -299,4 +286,12 @@ export default {
 };
 </script>
 
-<style scoped></style>
+<style scoped>
+.node-tree {
+  margin-top: 15px;
+  margin-bottom: 15px;
+  max-height: calc(75vh - 120px);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+</style>

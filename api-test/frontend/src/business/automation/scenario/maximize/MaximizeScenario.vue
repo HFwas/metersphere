@@ -1,7 +1,7 @@
 <template>
   <div style="width: 100%; overflow: hidden">
     <div class="ms-header">
-      <el-row>
+      <el-row @click.native="handleHeaderClick">
         <el-col :span="1" v-show="scenarioDefinition.length > 1">
           <div class="ms-div" style="margin-left: 10px">
             <el-tooltip
@@ -46,13 +46,13 @@
           </div>
         </el-col>
         <el-col :span="12">
-          <el-checkbox v-model="cookieShare" @change="setCookieShare">共享cookie</el-checkbox>
+          <el-checkbox v-model="cookieShare" @change="setCookieShare">{{
+            $t('api_test.scenario.share_cookie')
+          }}</el-checkbox>
           <el-checkbox v-model="sampleError" @change="setOnSampleError" style="margin-right: 10px">
             {{ $t('commons.failure_continues') }}
           </el-checkbox>
           <env-popover
-            :disabled="scenarioDefinition.length < 1"
-            :isReadOnly="scenarioDefinition.length < 1"
             :env-map="projectEnvMap"
             :project-ids="projectIds"
             @setProjectEnvMap="setProjectEnvMap"
@@ -72,6 +72,7 @@
             @click="debugScenario"
             style="margin: 0px 10px 0px"
             size="mini"
+            :disabled="scenarioDefinition.length < 1"
             @command="handleCommand"
             v-show="!debugLoading">
             {{ $t('api_test.request.debug') }}
@@ -90,7 +91,12 @@
 
     <!-- 场景步骤-->
     <ms-container :class="{ 'maximize-container': !asideHidden }">
-      <ms-aside-container @setAsideHidden="setAsideHidden" style="padding: 0px; overflow: hidden">
+      <ms-aside-container
+        :draggable="false"
+        @setAsideHidden="setAsideHidden"
+        style="padding: 0px; overflow: hidden"
+        width="35%"
+        @click.native="handleMainClick">
         <div class="ms-debug-result" v-if="reqTotal > 0">
           <span style="float: right">
             <span class="ms-message-right"> {{ reqTotalTime }} ms </span>
@@ -201,8 +207,8 @@
         </div>
       </ms-aside-container>
 
-      <ms-main-container v-loading="loading">
-        <div v-if="!loading">
+      <ms-main-container class="card-content" v-loading="loading" @click.native="handleMainClick">
+        <div v-if="!loading" @click="handleComponentClick">
           <!-- 第一层当前节点内容-->
           <ms-component-config
             :isMax="false"
@@ -222,6 +228,8 @@
             @suggestClick="suggestClick"
             @refReload="refReload"
             @openScenario="openScenario"
+            @runScenario="runScenario"
+            @stopScenario="stopScenario"
             v-if="selectedTreeNode && selectedNode" />
           <!-- 请求下还有的子步骤-->
           <div v-if="selectedTreeNode && selectedTreeNode.hashTree && showNode(selectedTreeNode)">
@@ -241,6 +249,8 @@
                 @suggestClick="suggestClick"
                 @refReload="refReload"
                 @openScenario="openScenario"
+                @runScenario="runScenario"
+                @stopScenario="stopScenario"
                 v-show="
                   selectedTreeNode && selectedNode && stepFilter.get('ALlSamplerStep').indexOf(item.type) === -1
                 " />
@@ -268,9 +278,6 @@
     </el-drawer>
     <!--场景导入 -->
     <scenario-relevance v-if="type !== 'detail'" @save="addScenario" ref="scenarioRelevance" />
-
-    <!-- 环境 -->
-    <api-environment-config v-if="type !== 'detail'" ref="environmentConfig" @close="environmentConfigClose" />
 
     <!--执行组件-->
     <ms-run
@@ -313,21 +320,16 @@
 <script>
 import { getApiScenarioEnv } from '@/api/scenario';
 import { API_STATUS, PRIORITY } from '../../../definition/model/JsonData';
-import { parseEnvironment } from '@/business/environment/model/EnvironmentModel';
-import { ELEMENT_TYPE, STEP } from '../Setting';
-import { exportPdf, getUUID, strMapToObj } from 'metersphere-frontend/src/utils';
+import { STEP } from '../Setting';
+import { getUUID, strMapToObj } from 'metersphere-frontend/src/utils';
 import { getCurrentProjectID } from 'metersphere-frontend/src/utils/token';
-import { hasLicense } from 'metersphere-frontend/src/utils/permission';
 import OutsideClick from '../common/outside-click';
 import { copyScenarioRow, saveScenario, scenarioSort, handleCtrlSEvent } from '@/business/automation/api-automation';
 import { buttons, setComponent } from '../menu/Menu';
 import MsContainer from 'metersphere-frontend/src/components/MsContainer';
 import MsMainContainer from 'metersphere-frontend/src/components/MsMainContainer';
 import MsAsideContainer from 'metersphere-frontend/src/components/MsAsideContainer';
-import html2canvas from 'html2canvas';
-import { getEnvironmentByProjectId } from 'metersphere-frontend/src/api/environment';
 import { useApiStore } from '@/store';
-import { getPluginList } from '@/api/plugin';
 
 const store = useApiStore();
 let jsonPath = require('jsonpath');
@@ -353,6 +355,7 @@ export default {
     projectList: Array,
     enableCookie: Boolean,
     onSampleError: Boolean,
+    pluginList: Array,
   },
   components: {
     MsAsideContainer,
@@ -512,9 +515,6 @@ export default {
     this.cookieShare = this.enableCookie;
     this.sampleError = this.onSampleError;
   },
-  mounted() {
-    this.$refs.refFab.openMenu();
-  },
 
   watch: {
     reloadDebug() {
@@ -532,35 +532,40 @@ export default {
     },
   },
   methods: {
+    handleHeaderClick(e) {
+      if (e.target.tagName === 'DIV') {
+        this.outsideClick(e);
+      }
+    },
+    handleMainClick(e) {
+      this.outsideClick(e);
+    },
+    handleComponentClick(e) {
+      e.stopPropagation();
+    },
     initPlugins() {
-      getPluginList().then((response) => {
-        let data = response.data;
-        if (data) {
-          data.forEach((item) => {
-            let plugin = {
-              title: item.name,
-              show: this.showButton(item.jmeterClazz),
-              titleColor: '#555855',
-              titleBgColor: '#F4F4FF',
-              icon: 'colorize',
-              click: () => {
-                this.addComponent(item.name, item);
-              },
-            };
-            if (item.license) {
-              if (hasLicense()) {
-                if (this.operatingElements && this.operatingElements.includes(item.jmeterClazz)) {
-                  this.buttonData.push(plugin);
-                }
-              }
-            } else {
-              if (this.operatingElements && this.operatingElements.includes(item.jmeterClazz)) {
-                this.buttonData.push(plugin);
-              }
+      if (this.pluginList && this.pluginList.length > 0) {
+        this.pluginList.forEach((item) => {
+          let plugin = {
+            title: item.name,
+            show: this.showButton(item.jmeterClazz),
+            titleColor: '#555855',
+            titleBgColor: '#F4F4FF',
+            icon: 'colorize',
+            click: () => {
+              this.addComponent(item.name, item);
+            },
+          };
+          if (this.operatingElements && this.operatingElements.includes(item.jmeterClazz)) {
+            this.buttonData.push(plugin);
+          }
+          this.$nextTick(() => {
+            if (!this.currentScenario.name && this.$refs.refFab) {
+              this.$refs.refFab.openMenu();
             }
           });
-        }
-      });
+        });
+      }
     },
     // 打开引用的场景
     openScenario(data) {
@@ -608,8 +613,17 @@ export default {
       }
       return false;
     },
-    addComponent(type) {
-      setComponent(type, this);
+    addComponent(type, plugin) {
+      if (
+        this.selectedNode &&
+        this.selectedNode.parent &&
+        this.selectedNode.parent.data &&
+        this.selectedNode.parent.data.disabled
+      ) {
+        this.$warning(this.$t('api_test.scenario.scenario_warning'));
+        return;
+      }
+      setComponent(type, this, plugin);
     },
     setAsideHidden(data) {
       this.asideHidden = data;
@@ -796,52 +810,11 @@ export default {
       });
     },
     debugScenario() {
-      this.debugLoading = true;
-      this.$emit('runDebug');
-    },
-    runDebug() {
-      /*触发执行操作*/
-      let sign = this.$refs.envPopover.checkEnv();
-      if (!sign) {
-        this.errorRefresh();
+      if (this.scenarioDefinition.length < 1) {
         return;
       }
-      if (this.$refs['currentScenario']) {
-        this.$refs['currentScenario'].validate((valid) => {
-          if (valid) {
-            Promise.all([this.editScenario()]).then((val) => {
-              if (val) {
-                this.debugData = {
-                  id: this.currentScenario.id,
-                  name: this.currentScenario.name,
-                  type: 'scenario',
-                  variables: this.currentScenario.variables,
-                  referenced: 'Created',
-                  enableCookieShare: this.enableCookieShare,
-                  headers: this.currentScenario.headers,
-                  environmentMap: this.projectEnvMap,
-                  hashTree: this.scenarioDefinition,
-                };
-                this.reportId = getUUID().substring(0, 8);
-              }
-            });
-          } else {
-            this.errorRefresh();
-          }
-        });
-      }
-    },
-    getEnvironments() {
-      if (this.projectId) {
-        getEnvironmentByProjectId(this.projectId).then((response) => {
-          this.environments = response.data;
-          this.environments.forEach((environment) => {
-            parseEnvironment(environment);
-          });
-          //检查场景是否需要先进行保存
-          this.checkDataIsCopy();
-        });
-      }
+      this.debugLoading = true;
+      this.$emit('runDebug');
     },
 
     checkDataIsCopy() {
@@ -851,16 +824,6 @@ export default {
       }
     },
 
-    openEnvironmentConfig() {
-      if (!this.projectId) {
-        this.$error(this.$t('api_test.select_project'));
-        return;
-      }
-      this.$refs.environmentConfig.open(this.projectId);
-    },
-    environmentConfigClose() {
-      this.getEnvironments();
-    },
     allowDrop(draggingNode, dropNode, dropType) {
       if (draggingNode.data.type === 'Assertions' || dropNode.data.type === 'Assertions') {
         return false;
@@ -1259,18 +1222,18 @@ export default {
         item.checkBox = this.isBatchProcess;
       });
     },
-    handleExport() {
-      let name = this.$t('commons.report_statistics.test_case_analysis');
-      this.$nextTick(function () {
-        setTimeout(() => {
-          html2canvas(document.getElementById('reportAnalysis'), {
-            scale: 2,
-          }).then(function (canvas) {
-            exportPdf(name, [canvas]);
-          });
-        }, 1000);
-      });
-    },
+    // handleExport() {
+    //   let name = this.$t('commons.report_statistics.test_case_analysis');
+    //   this.$nextTick(function () {
+    //     setTimeout(() => {
+    //       html2canvas(document.getElementById('reportAnalysis'), {
+    //         scale: 2,
+    //       }).then(function (canvas) {
+    //         exportPdf(name, [canvas]);
+    //       });
+    //     }, 1000);
+    //   });
+    // },
     stop() {
       this.debugLoading = false;
       this.$emit('stop');
@@ -1304,14 +1267,21 @@ export default {
     },
     getEnv(definition) {
       return new Promise((resolve) => {
-        getApiScenarioEnv({ definition: definition }).then((res) => {
-          if (res.data) {
-            res.data.projectIds.push(this.projectId);
+        this.projectIds = new Set();
+        const regex = /"projectId"\s*:\s*"([^"]+)"/g;
+        let match;
+        while ((match = regex.exec(definition)) !== null) {
+          this.projectIds.add(match[1]);
+        }
+        this.projectIds.add(this.projectId);
+        if (this.projectIds.size > 1) {
+          getApiScenarioEnv(Array.from(this.projectIds)).then((res) => {
             this.$emit('update:projectIds', new Set(res.data.projectIds));
-            this.$emit('update:isFullUrl', res.data.fullUrl);
-          }
+            resolve();
+          });
+        } else {
           resolve();
-        });
+        }
       });
     },
   },
@@ -1319,6 +1289,10 @@ export default {
 </script>
 
 <style scoped>
+.card-content {
+  height: calc(100vh - 37px);
+  overflow-y: auto;
+}
 .ms-col-one {
   margin-top: 10px;
 }
@@ -1451,6 +1425,7 @@ export default {
   height: 36px;
   background-color: #fff;
   font-size: 12px;
+  padding-left: 5px;
 }
 
 .ms-div {

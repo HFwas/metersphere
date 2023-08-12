@@ -14,6 +14,7 @@ import io.metersphere.plugin.core.MsTestElement;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.control.*;
 import org.apache.jmeter.modifiers.CounterConfig;
@@ -49,6 +50,7 @@ public class MsLoopController extends MsTestElement {
         if (!config.isOperating() && !this.isEnable()) {
             return;
         }
+        
         final HashTree groupTree = controller(tree);
         // 自身场景
         if (CollectionUtils.isNotEmpty(config.getVariables())) {

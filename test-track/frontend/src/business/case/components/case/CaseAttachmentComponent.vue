@@ -57,6 +57,7 @@
         </div>
         <!-- 关联文件 -->
         <div class="ref-row opt-row"
+          v-if="hasProjectFilePermission"
           @click="associationFile"
           style="
             display: flex;
@@ -104,7 +105,7 @@
       ></case-attachment-viewer>
     </div>
 
-    <ms-file-metadata-list ref="metadataList" @checkRows="checkRows" />
+    <ms-file-metadata-list v-if="hasProjectFilePermission" ref="metadataList" @checkRows="checkRows" />
     <ms-file-batch-move ref="module" @setModuleId="setModuleId" />
   </div>
 </template>
@@ -115,7 +116,7 @@ import { TokenKey } from "metersphere-frontend/src/utils/constants";
 import {
   byteToSize,
   getCurrentUser,
-  getTypeByFileName,
+  getTypeByFileName, hasPermission,
 } from "@/business/utils/sdk-utils";
 import axios from "axios";
 import { getUUID } from "metersphere-frontend/src/utils";
@@ -125,9 +126,9 @@ import {
   attachmentList,
   deleteTestCaseAttachment,
   dumpAttachment,
-  relatedAttachment,
-  unrelatedAttachment,
-  uploadIssueAttachment,
+  relatedTestCaseAttachment,
+  unrelatedTestCaseAttachment,
+  uploadTestCaseAttachment,
 } from "@/api/attachment";
 import MsFileBatchMove from "metersphere-frontend/src/components/environment/commons/variable/FileBatchMove";
 
@@ -172,6 +173,9 @@ export default {
     targetId() {
       return this.belongType === "issue" ? this.issueId : this.caseId;
     },
+    hasProjectFilePermission() {
+      return hasPermission("PROJECT_FILE:READ");
+    }
   },
   watch: {
     caseId() {
@@ -244,7 +248,7 @@ export default {
       let CancelToken = axios.CancelToken;
       let self = this;
 
-      uploadIssueAttachment(
+      uploadTestCaseAttachment(
         file,
         data,
         CancelToken,
@@ -381,7 +385,7 @@ export default {
                     belongId: this.targetId,
                     metadataRefIds: this.unRelateFiles,
                   };
-                  unrelatedAttachment(data).then(() => {
+                  unrelatedTestCaseAttachment(data).then(() => {
                     this.$success(this.$t("commons.unrelated_success"), false);
                     this.result.loading = false;
                     this.getFileMetaData(this.issueId);
@@ -480,7 +484,7 @@ export default {
             metadataRefIds: metadataRefIds,
           };
           this.result.loading = true;
-          relatedAttachment(data).then(() => {
+          relatedTestCaseAttachment(data).then(() => {
             this.$success(this.$t("commons.relate_success"), false);
             this.result.loading = false;
             this.getFileMetaData();

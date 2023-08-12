@@ -53,6 +53,9 @@ public class ApiDefinitionImportUtilService {
 
     public static final String BODY = "body";
 
+    private static final String TIMING_SYNCHRONIZATION = "TIMING_SYNCHRONIZATION";
+    private static final String IMPORT_FILE = "IMPORT_FILE";
+
     private final ThreadLocal<Long> currentApiOrder = new ThreadLocal<>();
     private final ThreadLocal<Long> currentApiCaseOrder = new ThreadLocal<>();
 
@@ -226,7 +229,7 @@ public class ApiDefinitionImportUtilService {
         } else {
             repeatList = dealRepeat(apiImportParamDto);
         }
-
+        optionData = apiImportParamDto.getOptionData();
         Map<String, List<ApiTestCaseWithBLOBs>> apiIdCaseMap = optionDataCases.stream().collect(Collectors.groupingBy(ApiTestCase::getApiDefinitionId));
         if (MapUtils.isNotEmpty(moduleMap)) {
 
@@ -845,6 +848,11 @@ public class ApiDefinitionImportUtilService {
                 apiTestCaseWithBLOBs.setCreateUserId(Objects.requireNonNull(SessionUtils.getUser()).getId());
                 apiTestCaseWithBLOBs.setUpdateUserId(Objects.requireNonNull(SessionUtils.getUser()).getId());
                 apiTestCaseWithBLOBs.setCreateTime(System.currentTimeMillis());
+                JSONObject o = JSONUtil.parseObject(apiTestCaseWithBLOBs.getRequest());
+                if (o != null) {
+                    o.put("projectId", apiTestCaseWithBLOBs.getProjectId());
+                    apiTestCaseWithBLOBs.setRequest(o.toString());
+                }
                 BeanUtils.copyBean(apiTestCaseDTO, apiTestCaseWithBLOBs);
                 apiTestCaseDTO.setUpdated(false);
                 apiTestCaseMapper.insert(apiTestCaseWithBLOBs);
@@ -864,7 +872,6 @@ public class ApiDefinitionImportUtilService {
         List<ApiTestCaseWithBLOBs> optionDataCases = apiImportParamDto.getOptionDataCases();
         Map<String, ApiModule> moduleMap = apiImportParamDto.getModuleMap();
 
-        String chooseModuleId = request.getModuleId();
         List<ApiDefinitionWithBLOBs> repeatApiDefinitionWithBLOBs = getApiDefinitionWithBLOBsList(request, optionData);
         //如果系统内，没有重复数据，要把文件重复的数据改成接口的case
         if (CollectionUtils.isEmpty(repeatApiDefinitionWithBLOBs)) {
@@ -885,15 +892,12 @@ public class ApiDefinitionImportUtilService {
                 List<ApiDefinitionWithBLOBs> singleOptionData = new ArrayList<>();
                 removeOtherChooseModuleRepeat(optionData, singleOptionData, chooseModulePath);
                 optionData = singleOptionData;
-                optionMap = optionData.stream().collect(Collectors.toMap(t -> t.getName().concat(chooseModulePath), api -> api));
-            } else {
-                getNoHChooseModuleUrlRepeatOptionMap(optionData, optionMap, chooseModulePath);
             }
-            repeatDataMap = repeatApiDefinitionWithBLOBs.stream().filter(t -> t.getModuleId().equals(chooseModuleId)).collect(Collectors.groupingBy(t -> t.getName().concat(t.getModulePath())));
+            getNoHChooseModuleUrlRepeatOptionMap(optionData, optionMap, chooseModulePath);
         } else {
             buildOptionMap(optionData, optionMap);
-            repeatDataMap = repeatApiDefinitionWithBLOBs.stream().collect(Collectors.groupingBy(t -> t.getName().concat(t.getModulePath())));
         }
+        repeatDataMap = repeatApiDefinitionWithBLOBs.stream().collect(Collectors.groupingBy(t -> t.getName().concat(t.getModulePath())));
         Boolean fullCoverageApi = getFullCoverageApi(request);
         String updateVersionId = getUpdateVersionId(request);
         //处理数据
@@ -929,10 +933,10 @@ public class ApiDefinitionImportUtilService {
         if (optionData.isEmpty()) {
             moduleMap = new HashMap<>();
         }
+        apiImportParamDto.setOptionData(optionData);
         //将原来的case和更改的case组合在一起，为了同步的设置
         List<String> caseIds = optionDataCases.stream().map(ApiTestCase::getId).filter(StringUtils::isNotBlank).collect(Collectors.toList());
         buildCases(optionDataCases, oldCaseMap, caseIds);
-
         return repeatApiDefinitionWithBLOBs;
     }
 
@@ -958,7 +962,7 @@ public class ApiDefinitionImportUtilService {
             if (optionDatum.getModulePath() == null) {
                 optionMap.put(optionDatum.getName().concat(chooseModulePath), optionDatum);
             } else {
-                optionMap.put(optionDatum.getName().concat(chooseModulePath).concat(optionDatum.getModulePath()), optionDatum);
+                optionMap.put(optionDatum.getName().concat(optionDatum.getModulePath()), optionDatum);
             }
         }
     }
@@ -1320,14 +1324,14 @@ public class ApiDefinitionImportUtilService {
             List<Schedule> list = scheduleMapper.selectByExample(schedule);
             if (list.size() > 0) {
                 User user = baseUserService.getUserDTO(list.get(0).getUserId());
-                msOperLog.setOperUser(user.getName() + Translator.get("timing_synchronization"));
+                msOperLog.setOperUser(user.getName() + TIMING_SYNCHRONIZATION);
                 msOperLog.setCreateUser(user.getId());
             } else {
-                msOperLog.setOperUser(Translator.get("timing_synchronization"));
+                msOperLog.setOperUser(TIMING_SYNCHRONIZATION);
             }
         } else {
             SessionUser user = SessionUtils.getUser();
-            msOperLog.setOperUser(user.getName() + Translator.get("import_file"));
+            msOperLog.setOperUser(user.getName() + IMPORT_FILE);
             msOperLog.setCreateUser(user.getId());
         }
     }

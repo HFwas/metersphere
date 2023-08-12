@@ -4,7 +4,11 @@
       <el-row :gutter="20">
         <el-col :span="4" v-for="item in data" :key="item.id">
           <el-card :body-style="{ padding: '0px' }" class="ms-card-item" @click.native="handleView(item)">
-            <img :src="'/project/file/metadata/info/'+item.id" class="ms-image" v-if="isImage(item.type)"/>
+            <div v-loading="imageContents[item.id]==='' || imageContents[item.id] === 'loading'" class="ms-image"
+                 v-if="isImage(item)">
+              <img style="height: 100%;width: 100%;object-fit:cover;background-color: #FFFFFF"
+                   :src="imageContents[item.id]"/>
+            </div>
             <div class="ms-image" v-else>
               <div class="ms-file">
                 <div class="icon-title">{{ getType(item.type) }}</div>
@@ -35,6 +39,7 @@
 <script>
 import MsTablePagination from "metersphere-frontend/src/components/pagination/TablePagination";
 import MsEditFileMetadata from "../edit/EditFileMetadata";
+import {getFileBytes} from "@/api/file";
 
 export default {
   name: "MsFileThumbnail",
@@ -44,6 +49,7 @@ export default {
       currentPage: 1,
       pageSize: 10,
       total: 0,
+      imageContents: {},
       images: ["bmp", "jpg", "png", "tif", "gif", "pcx", "tga", "exif", "fpx", "svg", "psd", "cdr", "pcd", "dxf", "ufo", "eps", "ai", "raw", "WMF", "webp", "avif", "apng", "jpeg"]
     };
   },
@@ -56,6 +62,7 @@ export default {
     nodeTree: []
   },
   created() {
+    this.imageContents = {};
     this.currentPage = this.page;
     this.pageSize = this.size;
     this.total = this.pageTotal;
@@ -88,8 +95,19 @@ export default {
     change() {
       this.$emit("change", this.pageSize, this.currentPage);
     },
-    isImage(type) {
-      return (type && this.images.indexOf(type.toLowerCase()) !== -1);
+    isImage(item) {
+      let type = item.type;
+      let isImage = (type && this.images.indexOf(type.toLowerCase()) !== -1);
+      if (isImage) {
+        if (isImage && (!this.imageContents[item.id] || this.imageContents[item.id] === '')) {
+          this.$set(this.imageContents, item.id, "loading");
+          getFileBytes(item.id).then(res => {
+            let fileRsp = res.data;
+            this.$set(this.imageContents, item.id, "data:image/png;base64," + fileRsp.bytes);
+          })
+        }
+      }
+      return isImage;
     }
   },
 }

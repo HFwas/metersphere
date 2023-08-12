@@ -3,6 +3,7 @@ package io.metersphere.service;
 import io.metersphere.base.domain.*;
 import io.metersphere.base.mapper.TestCaseTemplateMapper;
 import io.metersphere.base.mapper.ext.ExtTestCaseTemplateMapper;
+import io.metersphere.commons.constants.CustomFieldType;
 import io.metersphere.commons.constants.TemplateConstants;
 import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.utils.BeanUtils;
@@ -251,6 +252,17 @@ public class TestCaseTemplateService extends TemplateBaseService {
         return caseTemplateDao;
     }
 
+    public TestCaseTemplateDao getTemplateForList(String projectId) {
+        TestCaseTemplateDao template = getTemplate(projectId);
+        // 列表展示过滤掉文本框和富文本框等大字段，否则加载效率低
+        List<CustomFieldDao> fields = template.getCustomFields().stream()
+                .filter(field -> !StringUtils.equalsAnyIgnoreCase(field.getType(),
+                        CustomFieldType.TEXTAREA.getValue(), CustomFieldType.RICH_TEXT.getValue()))
+                .collect(Collectors.toList());
+        template.setCustomFields(fields);
+        return template;
+    }
+
     public String getLogDetails(String id) {
         TestCaseTemplateWithBLOBs templateWithBLOBs = testCaseTemplateMapper.selectByPrimaryKey(id);
         if (templateWithBLOBs != null) {
@@ -260,7 +272,7 @@ public class TestCaseTemplateService extends TemplateBaseService {
                     item.setOriginalValue(StringUtils.EMPTY);
                 }
             });
-            OperatingLogDetails details = new OperatingLogDetails(JSON.toJSONString(templateWithBLOBs.getId()), null, templateWithBLOBs.getName(), templateWithBLOBs.getCreateUser(), columns);
+            OperatingLogDetails details = new OperatingLogDetails(JSON.toJSONString(templateWithBLOBs.getId()), templateWithBLOBs.getProjectId(), templateWithBLOBs.getName(), templateWithBLOBs.getCreateUser(), columns);
             return JSON.toJSONString(details);
         }
         return null;

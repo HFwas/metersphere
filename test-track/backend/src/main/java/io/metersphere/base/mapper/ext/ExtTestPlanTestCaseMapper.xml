@@ -279,6 +279,22 @@
                                 #{value}
                             </foreach>
                         </when>
+                        <when test="key.startsWith('custom_single')">
+                            and test_case.id in (
+                            select resource_id from custom_field_test_case where concat('custom_single-',field_id) = #{key}
+                            and trim(both '"' from value) in
+                            <include refid="io.metersphere.base.mapper.ext.ExtBaseMapper.filterInWrapper"/>
+                            )
+                        </when>
+                        <when test="key.startsWith('custom_multiple')">
+                            and test_case.id in (
+                            select resource_id from custom_field_test_case where concat('custom_multiple-',field_id) = #{key}
+                            and
+                            <foreach collection="values" item="value" separator="or" open="(" close=")">
+                                JSON_CONTAINS(value, #{value})
+                            </foreach>
+                            )
+                        </when>
                         <otherwise>
                             and test_plan_test_case.status in
                             <foreach collection="values" item="value" separator="," open="(" close=")">
@@ -298,7 +314,9 @@
         test_case.node_path, test_case.method,
         test_case.num, test_case.custom_num,
         test_case.project_id,
-        test_plan_test_case.executor, test_plan_test_case.status,
+        test_plan_test_case.executor,
+        test_plan_test_case.status as status,
+        test_case.status as caseStatus,
         test_plan_test_case.actual_result,
         test_plan_test_case.update_time, test_plan_test_case.create_time,
         test_plan_test_case.issues_count as issuesCount,
@@ -423,7 +441,8 @@
                test_plan_test_case.*,
                test_case.*,
                test_case_node.name                                                            as model,
-               project.name                                                                   as projectName
+               project.name                                                                   as projectName,
+               test_case.status as caseStatus
         from test_plan_test_case
                  inner join test_case on test_plan_test_case.case_id = test_case.id
                  left join test_case_node on test_case_node.id = test_case.node_id
@@ -663,9 +682,22 @@
         AND status != #{execResult}
     </update>
 
+    <update id="updateTestCaseLastResultByIds">
+        UPDATE test_case SET last_execute_result = #{execResult}
+        WHERE id IN
+        <foreach collection="caseIds" item="value" separator="," open="(" close=")">
+            #{value}
+        </foreach>
+        AND (last_execute_result != #{execResult} or last_execute_result is null)
+    </update>
+
     <update id="updateDiffExecResultByTestCaseIdAndTestPlanId">
         UPDATE test_plan_test_case SET status = #{execResult}
         WHERE case_id = #{testCaseId} AND plan_id = #{testPlanId} AND status != #{execResult}
+    </update>
+    <update id="updateTestCaseLastResult">
+        UPDATE test_case SET last_execute_result = #{execResult}
+        WHERE id = #{testCaseId} AND (last_execute_result != #{execResult} or last_execute_result is null)
     </update>
     <select id="findFailureCaseInTestPlanByProjectIDAndExecuteTimeAndLimitNumber"
             resultType="io.metersphere.dto.ExecutedCaseInfoResult">

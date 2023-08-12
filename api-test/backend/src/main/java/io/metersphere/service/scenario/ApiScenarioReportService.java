@@ -7,8 +7,7 @@ import io.metersphere.api.dto.automation.ExecuteType;
 import io.metersphere.api.dto.automation.RunScenarioRequest;
 import io.metersphere.api.dto.datacount.ApiDataCountResult;
 import io.metersphere.api.dto.definition.RunDefinitionRequest;
-import io.metersphere.service.*;
-import io.metersphere.utils.ReportStatusUtil;
+import io.metersphere.api.dto.definition.request.ElementUtil;
 import io.metersphere.base.domain.*;
 import io.metersphere.base.mapper.*;
 import io.metersphere.base.mapper.ext.ExtApiDefinitionExecResultMapper;
@@ -21,7 +20,6 @@ import io.metersphere.commons.enums.ApiReportStatus;
 import io.metersphere.commons.enums.ExecutionExecuteTypeEnum;
 import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.utils.*;
-import io.metersphere.vo.ResultVO;
 import io.metersphere.constants.RunModeConstants;
 import io.metersphere.dto.*;
 import io.metersphere.i18n.Translator;
@@ -31,10 +29,15 @@ import io.metersphere.log.vo.OperatingLogDetails;
 import io.metersphere.log.vo.api.ModuleReference;
 import io.metersphere.notice.sender.NoticeModel;
 import io.metersphere.notice.service.NoticeSendService;
+import io.metersphere.service.*;
+import io.metersphere.utils.JsonUtils;
+import io.metersphere.utils.ReportStatusUtil;
+import io.metersphere.vo.ResultVO;
 import jakarta.annotation.Resource;
 import org.apache.commons.beanutils.BeanMap;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONObject;
 import org.springframework.stereotype.Service;
@@ -88,11 +91,6 @@ public class ApiScenarioReportService {
     BaseShareInfoService baseShareInfoService;
     @Resource
     private RedisTemplateService redisTemplateService;
-
-    public void saveResult(ResultDTO dto) {
-        // 报告详情内容
-        apiScenarioReportResultService.save(dto.getReportId(), dto.getRequestResults());
-    }
 
     public void batchSaveResult(List<ResultDTO> dtos) {
         apiScenarioReportResultService.batchSave(dtos);
@@ -305,7 +303,7 @@ public class ApiScenarioReportService {
         ResultVO resultVO = ReportStatusUtil.computedProcess(dto);
         ApiScenarioReport report = editReport(dto.getReportType(), dto.getReportId(), resultVO.getStatus(), dto.getRunMode());
         // 当前资源正在执行中
-        if (redisTemplateService.has(dto.getTestId())) {
+        if (!redisTemplateService.has(dto.getTestId(), dto.getReportId())) {
             return report;
         }
         TestPlanApiScenario testPlanApiScenario = testPlanApiScenarioMapper.selectByPrimaryKey(dto.getTestId());
@@ -335,6 +333,7 @@ public class ApiScenarioReportService {
                 scenario.setExecuteTimes(executeTimes + 1);
                 apiScenarioMapper.updateByPrimaryKey(scenario);
             }
+            redisTemplateService.unlock(dto.getTestId(), dto.getReportId());
         }
         return report;
     }
@@ -345,7 +344,7 @@ public class ApiScenarioReportService {
         ResultVO resultVO = ReportStatusUtil.computedProcess(dto);
         ApiScenarioReport report = editReport(dto.getReportType(), dto.getReportId(), resultVO.getStatus(), dto.getRunMode());
         // 当前资源正在执行中
-        if (redisTemplateService.has(dto.getTestId())) {
+        if (!redisTemplateService.has(dto.getTestId(), dto.getReportId())) {
             return report;
         }
         if (report != null) {
@@ -375,6 +374,7 @@ public class ApiScenarioReportService {
                     scenario.setExecuteTimes(executeTimes + 1);
                     apiScenarioMapper.updateByPrimaryKey(scenario);
                 }
+                redisTemplateService.unlock(dto.getTestId(), dto.getReportId());
             }
         }
         return report;
@@ -860,12 +860,35 @@ public class ApiScenarioReportService {
         }
     }
 
+    private static Map<String, List<String>> getProjectMap(List<String> projectIdLists, Map<String, List<String>> projectEnvMap) {
+        if (org.apache.commons.collections.CollectionUtils.isNotEmpty(projectIdLists)) {
+            projectEnvMap = projectEnvMap.entrySet().stream()
+                    .filter(entry -> projectIdLists.contains(entry.getKey()))
+                    .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+        }
+        return projectEnvMap;
+    }
+
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void batchSave(Map<String, RunModeDataDTO> executeQueue, String serialReportId, String runMode, List<MsExecResponseDTO> responseDTOS) {
         List<ApiScenarioReportResult> list = new LinkedList<>();
         if (StringUtils.isEmpty(serialReportId)) {
             for (String reportId : executeQueue.keySet()) {
                 ApiScenarioReportResult report = executeQueue.get(reportId).getReport();
+                ApiScenarioWithBLOBs scenario = executeQueue.get(reportId).getScenario();
+                if (ObjectUtils.isNotEmpty(scenario)) {
+                    List<String> projectIdLists = ElementUtil.getProjectIds(scenario.getScenarioDefinition());
+                    String envConfig = report.getEnvConfig();
+                    RunModeConfigWithEnvironmentDTO config = JsonUtils.parseObject(envConfig, RunModeConfigWithEnvironmentDTO.class);
+                    if (MapUtils.isNotEmpty(config.getEnvMap())) {
+                        Map<String, String> envMap = ElementUtil.getProjectEnvMap(projectIdLists, config.getEnvMap());
+                        config.setEnvMap(envMap);
+                    } else if (MapUtils.isNotEmpty(config.getExecutionEnvironmentMap())) {
+                        Map<String, List<String>> envMap = getProjectMap(projectIdLists, config.getExecutionEnvironmentMap());
+                        config.setExecutionEnvironmentMap(envMap);
+                    }
+                    report.setEnvConfig(JSON.toJSONString(config));
+                }
                 list.add(report);
                 responseDTOS.add(new MsExecResponseDTO(executeQueue.get(reportId).getTestId(), reportId, runMode));
             }

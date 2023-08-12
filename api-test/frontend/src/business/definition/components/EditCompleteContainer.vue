@@ -1,6 +1,6 @@
 <template>
   <ms-container v-if="isShow && !loading">
-    <ms-aside-container>
+    <ms-aside-container >
       <api-base-info
         ref="apiBaseInfo"
         :api-template="apiTemplate"
@@ -11,7 +11,7 @@
         :is-form-alive="isFormAlive"
         :maintainer-options="maintainerOptions"
         :module-options="moduleOptions"
-        style="overflow: auto" />
+      />
     </ms-aside-container>
     <ms-main-container class="ms-api-main-container">
       <el-button-group v-if="currentApi.id" style="z-index: 10; position: fixed">
@@ -30,6 +30,7 @@
           :class="{ active: showMock }"
           @click="changeTab('mock')"
           size="small"
+          v-permission="['PROJECT_API_DEFINITION:READ+MOCK']"
           v-if="currentProtocol === 'HTTP' || currentProtocol === 'TCP'">
           MOCK
         </el-button>
@@ -141,7 +142,8 @@ import ApiBaseInfo from '@/business/definition/components/complete/ApiBaseInfo';
 import { getProjectMemberOption } from '@/api/project';
 import { buildCustomFields, parseCustomField } from 'metersphere-frontend/src/utils/custom_field';
 import { getApiTemplate } from '@/api/api-template';
-
+import { parseCustomFilesForItem } from 'metersphere-frontend/src/utils/tableUtils';
+import { hasPermissions } from 'metersphere-frontend/src/utils/permission';
 const store = useApiStore();
 export default {
   name: 'EditCompleteContainer',
@@ -156,7 +158,7 @@ export default {
     MsApiCaseList,
     ApiBaseInfo,
     MsMainContainer: () => import('metersphere-frontend/src/components/MsMainContainer'),
-    MsAsideContainer: () => import('metersphere-frontend/src/components/MsAsideContainer'),
+    MsAsideContainer: () => import('./CustomAsideContainer.vue'),
     MsContainer: () => import('metersphere-frontend/src/components/MsContainer'),
   },
   data() {
@@ -201,9 +203,14 @@ export default {
     getApiTemplate(this.projectId).then((template) => {
       this.apiTemplate = template;
       store.apiTemplate = this.apiTemplate;
+      if (this.currentApi.fields) {
+        this.currentApi.fields.forEach(i => {
+          parseCustomFilesForItem(i);
+        });
+      }
       this.customFieldForm = parseCustomField(this.currentApi, this.apiTemplate, this.customFieldRules);
     });
-    if (this.currentApi.id && (this.currentProtocol === 'HTTP' || this.currentProtocol === 'TCP')) {
+    if (this.currentApi.id && (this.currentProtocol === 'HTTP' || this.currentProtocol === 'TCP') && hasPermissions('PROJECT_API_DEFINITION:READ+MOCK')) {
       this.mockSetting();
     }
     this.formatApi();
@@ -253,6 +260,7 @@ export default {
           if (stepArray[i] && stepArray[i].authManager && !stepArray[i].authManager.clazzName) {
             stepArray[i].authManager.clazzName = TYPE_TO_C.get(stepArray[i].authManager.type);
           }
+          stepArray[i].projectId = this.currentApi.projectId;
           if (stepArray[i].type === 'Assertions' && !stepArray[i].document) {
             stepArray[i].document = {
               type: 'JSON',
@@ -369,6 +377,12 @@ export default {
         this.$warning(this.currentValidateName + this.$t('commons.cannot_be_null'));
         this.currentValidateName = '';
         return false;
+      }
+      if(this.currentApi.isCopy && this.apiTemplate && Array.isArray(this.apiTemplate.customFields)){
+        this.apiTemplate.customFields.forEach(item => {
+          delete item.isEdit;
+          delete item.hasParse;
+        })
       }
       buildCustomFields(this.currentApi, data, this.apiTemplate);
       this.$refs.apiConfig.saveApi(data);

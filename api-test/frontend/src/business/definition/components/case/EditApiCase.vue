@@ -268,6 +268,9 @@ export default {
       if (api && api.request && api.request.url) {
         api.request.url = undefined;
       }
+      if (api && api.name) {
+        api.name = undefined;
+      }
       this.visible = true;
       this.api = api;
       if (this.currentApi && api) {
@@ -303,7 +306,7 @@ export default {
     apiCaseClose() {
       if (this.apiCaseList && this.apiCaseList.length > 0) {
         let message = '';
-        if (store.apiCaseMap.has(this.apiCaseList[0].id) && store.apiCaseMap.get(this.apiCaseList[0].id) > 1) {
+        if (store.apiCaseMap.has(this.apiCaseList[0].id) && store.apiCaseMap.get(this.apiCaseList[0].id) > 0) {
           message += this.apiCaseList[0].name + '，';
         }
         if (this.apiCaseList[0].type === 'AddCase') {
@@ -442,11 +445,12 @@ export default {
           this.apiCaseList[0].execResult = status;
           this.apiCaseList[0].responseData = data;
           this.apiCaseList[0].passRate = passRate;
+          this.apiCaseList[0].reportId = data.threadName;
           this.$refs.apiCaseItem.runLoading = false;
           if (this.$refs.apiCaseItem && this.$refs.apiCaseItem[0]) {
             this.$refs.apiCaseItem[0].reload();
           }
-          store.currentApiCase = { refresh: true, id: data.id, status: status, passRate: passRate };
+          store.currentApiCase = { refresh: true, id: data.id, status: status, passRate: passRate, reportId: data.threadName };
         });
       }
     },

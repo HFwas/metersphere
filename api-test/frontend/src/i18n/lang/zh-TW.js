@@ -1,4 +1,4 @@
-import el from 'element-ui/lib/locale/lang/zh-TW';
+import el from 'metersphere-frontend/src/i18n/lang/ele-zh-TW';
 import fu from 'fit2cloud-ui/src/locale/lang/zh-TW'; // 加载fit2cloud的内容
 import mf from 'metersphere-frontend/src/i18n/lang/zh-TW';
 
@@ -21,6 +21,7 @@ const message = {
     copy_data_from_other_version_tips: '名稱相同的用例和Mock期望會進行強制覆蓋!',
     body: {
       json_format_error: 'JSON格式錯誤',
+      json_format_error_tips: 'JSON-SCHEMA數據和類型不符合，請檢查',
     },
     case_name: '用例名稱',
     case_no_permission: '無編輯用例的權限',
@@ -36,6 +37,7 @@ const message = {
       auto_redirects: '自動重定向',
     },
     document_tooltip: '僅對已顯示的參與數據生成效率',
+    raw_not_null: 'raw數據不能為空',
   },
   filters: {
     schedule: {
@@ -126,9 +128,15 @@ const message = {
   automation: {
     project_no_permission: '當前人操作無此步驟的操作權限',
     document_validity_msg: '文件已經被修改，請重新上傳',
-    scenario_step_ref_message: '當前選擇請求數 [{0}] 个可能導致頁面加載異常，是否繼續',
+    scenario_step_ref_message: '當前操作可能導致頁面加載異常，是否繼續',
     case_message: '請選擇案例',
     scenario_message: '請選擇場景',
+    scenario_plugin_debug_warning: '場景包含挿件步驟，對應場景已經刪除不能調試! ',
+    scenario_plugin_save_warning: '場景包含挿件步驟，對應場景已經刪除不能編輯! ',
+    scenario_plugin_run_warning: '場景包含挿件步驟，對應場景已經刪除不能運行! ',
+    project_env_info: '更多項目環境',
+    project_env_info_tips:
+      '1.當前場景涉及到跨項目的步驟可以指定其所屬項目的環境執行，不指定則默認使用當前項目環境執行。 \n 2.如跨項目的步驟在場景設置中配置了使用原場景環境，則默認使用原場景環境執行。 ',
   },
 };
 

@@ -6,6 +6,8 @@ import io.metersphere.base.mapper.ext.BaseApiTestEnvironmentMapper;
 import io.metersphere.base.mapper.ext.BaseEnvironmentGroupMapper;
 import io.metersphere.base.mapper.ext.ExtApiTestEnvironmentMapper;
 import io.metersphere.commons.constants.FileAssociationType;
+import io.metersphere.commons.constants.NoticeConstants;
+import io.metersphere.commons.constants.NotificationConstants;
 import io.metersphere.commons.constants.ProjectApplicationType;
 import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.utils.*;
@@ -19,6 +21,7 @@ import io.metersphere.log.vo.DetailColumn;
 import io.metersphere.log.vo.OperatingLogDetails;
 import io.metersphere.log.vo.system.SystemReference;
 import io.metersphere.metadata.service.FileAssociationService;
+import io.metersphere.notice.service.NotificationService;
 import io.metersphere.request.BodyFile;
 import io.metersphere.request.variable.ScenarioVariable;
 import io.metersphere.service.BaseProjectApplicationService;
@@ -29,6 +32,7 @@ import jakarta.annotation.Resource;
 import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.BooleanUtils;
+import org.apache.commons.lang3.ObjectUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.ibatis.session.ExecutorType;
 import org.apache.ibatis.session.SqlSession;
@@ -37,6 +41,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.mybatis.spring.SqlSessionUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -78,7 +83,20 @@ public class BaseEnvironmentService extends NodeTreeService<ApiModuleDTO> {
     private BaseProjectService baseProjectService;
     @Resource
     private BaseProjectApplicationService baseProjectApplicationService;
+    @Resource
+    private NotificationService notificationService;
+    @Resource
+    private UserGroupMapper userGroupMapper;
+
     public static final String MOCK_EVN_NAME = "Mock环境";
+
+    public static final String POST_STEP = "postStepProcessor";
+    public static final String PRE_STEP = "preStepProcessor";
+    public static final String POST = "postProcessor";
+    public static final String PRE = "preProcessor";
+    public static final String SCRIPT = "script";
+    public static final String JSR = "jsr223";
+    public static final String ASSERTIONS = "assertions";
 
     public BaseEnvironmentService() {
         super(ApiModuleDTO.class);
@@ -352,6 +370,16 @@ public class BaseEnvironmentService extends NodeTreeService<ApiModuleDTO> {
         return apiTestEnvironmentMapper.selectByExampleWithBLOBs(example);
     }
 
+    public List<ApiTestEnvironment> selectList(List<String> projectIds) {
+        if(CollectionUtils.isEmpty(projectIds)){
+            return new ArrayList<>();
+        }
+        ApiTestEnvironmentExample example = new ApiTestEnvironmentExample();
+        example.createCriteria().andProjectIdIn(projectIds);
+        return apiTestEnvironmentMapper.selectByExample(example);
+    }
+
+
     public ApiTestEnvironmentWithBLOBs get(String id) {
         return apiTestEnvironmentMapper.selectByPrimaryKey(id);
     }
@@ -399,6 +427,14 @@ public class BaseEnvironmentService extends NodeTreeService<ApiModuleDTO> {
         apiTestEnvironmentMapper.insert(request);
         // 存储附件关系
         saveEnvironment(request.getId(), request.getConfig(), FileAssociationType.ENVIRONMENT.name());
+        checkAndSendReviewMessage(request.getId(),
+                request.getName(),
+                request.getProjectId(),
+                NoticeConstants.TaskType.ENV_TASK,
+                null,
+                request.getConfig(),
+                request.getCreateUser()
+                );
         return request.getId();
     }
 
@@ -478,7 +514,49 @@ public class BaseEnvironmentService extends NodeTreeService<ApiModuleDTO> {
         apiTestEnvironment.setUpdateTime(System.currentTimeMillis());
         // 存储附件关系
         saveEnvironment(apiTestEnvironment.getId(), apiTestEnvironment.getConfig(), FileAssociationType.ENVIRONMENT.name());
+        ApiTestEnvironmentWithBLOBs envOrg = apiTestEnvironmentMapper.selectByPrimaryKey(apiTestEnvironment.getId());
+
         apiTestEnvironmentMapper.updateByPrimaryKeyWithBLOBs(apiTestEnvironment);
+        if (StringUtils.isBlank(apiTestEnvironment.getCreateUser())) {
+            ProjectApplication reviewer = baseProjectApplicationService
+                    .getProjectApplication(apiTestEnvironment.getProjectId(), ProjectApplicationType.API_SCRIPT_REVIEWER.name());
+            if (StringUtils.isNotBlank(reviewer.getTypeValue())) {
+                checkAndSendReviewMessage(apiTestEnvironment.getId(),
+                        apiTestEnvironment.getName(),
+                        apiTestEnvironment.getProjectId(),
+                        NoticeConstants.TaskType.ENV_TASK,
+                        envOrg.getConfig(),
+                        apiTestEnvironment.getConfig(),
+                        reviewer.getTypeValue()
+                );
+            } else {
+                UserGroupExample example = new UserGroupExample();
+                example.createCriteria().andSourceIdEqualTo(apiTestEnvironment.getProjectId()).andGroupIdEqualTo("project_admin");
+                List<UserGroup> userGroups = userGroupMapper.selectByExample(example);
+                if ( CollectionUtils.isNotEmpty(userGroups)) {
+                    userGroups.forEach(userGroup -> {
+                        checkAndSendReviewMessage(apiTestEnvironment.getId(),
+                                apiTestEnvironment.getName(),
+                                apiTestEnvironment.getProjectId(),
+                                NoticeConstants.TaskType.ENV_TASK,
+                                envOrg.getConfig(),
+                                apiTestEnvironment.getConfig(),
+                                userGroup.getUserId()
+                        );
+                    });
+                }
+            }
+        } else {
+            checkAndSendReviewMessage(apiTestEnvironment.getId(),
+                    apiTestEnvironment.getName(),
+                    apiTestEnvironment.getProjectId(),
+                    NoticeConstants.TaskType.ENV_TASK,
+                    envOrg.getConfig(),
+                    apiTestEnvironment.getConfig(),
+                    apiTestEnvironment.getCreateUser()
+            );
+        }
+
     }
 
     public List<ApiModuleDTO> getNodeTreeByProjectId(String projectId, String protocol) {
@@ -973,5 +1051,104 @@ public class BaseEnvironmentService extends NodeTreeService<ApiModuleDTO> {
         } else {
             return new ArrayList<>();
         }
+    }
+
+    @Async
+    public void checkAndSendReviewMessage(
+            String id,
+            String name,
+            String projectId,
+            String resourceType,
+            String requestOrg,
+            String requestTarget,
+            String sendUser) {
+        try {
+            ProjectApplication scriptEnable = baseProjectApplicationService
+                    .getProjectApplication(projectId, ProjectApplicationType.API_REVIEW_TEST_SCRIPT.name());
+
+            if (BooleanUtils.toBoolean(scriptEnable.getTypeValue())) {
+
+                List<String> org = scriptList(requestOrg);
+                List<String> target = scriptList(requestTarget);
+                boolean isSend = isSend(org, target);
+                if (isSend) {
+
+                    ProjectApplication reviewer = baseProjectApplicationService
+                            .getProjectApplication(projectId, ProjectApplicationType.API_SCRIPT_REVIEWER.name());
+                    if (StringUtils.isNotBlank(reviewer.getTypeValue())) {
+                        sendUser = reviewer.getTypeValue();
+                    }
+                    if (baseProjectService.isProjectMember(projectId, sendUser)) {
+                        Notification notification = new Notification();
+                        notification.setTitle("环境设置");
+                        notification.setOperator(reviewer.getTypeValue());
+                        notification.setOperation(NoticeConstants.Event.REVIEW);
+                        notification.setResourceId(id);
+                        notification.setResourceName(name);
+                        notification.setResourceType(resourceType);
+                        notification.setType(NotificationConstants.Type.SYSTEM_NOTICE.name());
+                        notification.setStatus(NotificationConstants.Status.UNREAD.name());
+                        notification.setCreateTime(System.currentTimeMillis());
+                        notification.setReceiver(sendUser);
+                        notificationService.sendAnnouncement(notification);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LogUtil.error("发送通知失败", e);
+        }
+    }
+
+    public static List<String> scriptList(String request) {
+        List<String> list = new ArrayList<>();
+        if (StringUtils.isNotBlank(request)){
+            Map<Object, Object> configMap = JSON.parseObject(request, Map.class);
+            JSONObject configObj = new JSONObject(configMap);
+            toList(list, configObj, POST_STEP, PRE_STEP);
+            toList(list, configObj, PRE, POST);
+            JSONObject object = configObj.optJSONObject(ASSERTIONS);
+            if (ObjectUtils.isNotEmpty(object)) {
+                JSONArray jsrArray = object.optJSONArray(JSR);
+                if (jsrArray != null) {
+                    for (int j = 0; j < jsrArray.length(); j++) {
+                        JSONObject jsr223 = jsrArray.optJSONObject(j);
+                        if (jsr223 != null) {
+                            list.add(jsr223.optString(SCRIPT));
+                        }
+                    }
+                }
+            }
+        }
+        return list;
+    }
+
+    private static void toList(List<String> list, JSONObject configObj, String pre, String post) {
+        JSONObject preProcessor = configObj.optJSONObject(pre);
+        if (ObjectUtils.isNotEmpty(preProcessor) && StringUtils.isNotBlank(preProcessor.optString(SCRIPT))) {
+            list.add(StringUtils.join(pre,preProcessor.optString(SCRIPT)));
+        }
+        JSONObject postProcessor = configObj.optJSONObject(post);
+        if (ObjectUtils.isNotEmpty(postProcessor) && StringUtils.isNotBlank(postProcessor.optString(SCRIPT))) {
+            list.add(StringUtils.join(post,postProcessor.optString(SCRIPT)));
+        }
+    }
+
+    public static boolean isSend(List<String> orgList, List<String> targetList) {
+        if (orgList.size() != targetList.size() && CollectionUtils.isEmpty(orgList)) {
+            if (CollectionUtils.isEmpty(orgList)) {
+                return true;
+            }
+            if (CollectionUtils.isEmpty(targetList)) {
+                return false;
+            }
+            return true;
+        }
+        List<String> diff = targetList.stream()
+                .filter(s -> !orgList.contains(s))
+                .collect(Collectors.toList());
+        if (CollectionUtils.isNotEmpty(diff)) {
+            return true;
+        }
+        return false;
     }
 }

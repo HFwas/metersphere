@@ -402,7 +402,6 @@ import {
   batchEditScenario,
   batchGenPerformanceTestJmx,
   checkBeforeDelete,
-  checkScenarioEnv,
   delByScenarioId,
   delByScenarioIdAndRefId,
   deleteBatchByCondition,
@@ -678,9 +677,6 @@ export default {
           name: this.$t('api_test.create_performance_test_batch'),
           handleClick: this.batchCreatePerformance,
           permissions: ['PROJECT_API_SCENARIO:READ+CREATE_PERFORMANCE_BATCH'],
-          isDisable() {
-            return !hasPermission('PROJECT_PERFORMANCE_TEST:READ+CREATE');
-          },
         },
       ],
       typeArr: [
@@ -862,7 +858,6 @@ export default {
       }
     },
     search(projectId) {
-      this.$EventBus.$emit('scenarioConditionBus', this.condition);
       this.nodeChange(projectId);
     },
     nodeChange(projectId) {
@@ -882,7 +877,7 @@ export default {
         };
       }
 
-      if (!this.condition.filters.status) {
+      if (!this.condition.filters || !this.condition.filters.status) {
         this.condition.filters = {
           status: ['Prepare', 'Underway', 'Completed'],
         };
@@ -894,7 +889,7 @@ export default {
         this.condition.projectId = this.projectId;
       }
 
-      this.enableOrderDrag = this.condition.orders.length <= 0;
+      this.enableOrderDrag = this.condition.orders && this.condition.orders.length <= 0;
 
       //检查是否只查询本周数据
       this.condition.selectThisWeedData = false;
@@ -937,6 +932,7 @@ export default {
           }
         }
       }
+      this.$EventBus.$emit('scenarioConditionBus', this.condition);
       if (this.condition.projectId) {
         this.result = getScenarioList(this.currentPage, this.pageSize, this.condition).then((response) => {
           let data = response.data;
@@ -1140,11 +1136,6 @@ export default {
         planIds: params[0],
         scenarioIds: this.$refs.scenarioTable.selectIds,
       };
-
-      // todo 选取全部数据
-      if (this.condition.selectAll) {
-        this.$warning(this.$t('api_test.scenario.warning_context'));
-      }
 
       this.planVisible = false;
 
@@ -1378,16 +1369,9 @@ export default {
           }
           this.environmentType = this.currentScenario.environmentType;
           this.envGroupId = this.currentScenario.environmentGroupId;
-          checkScenarioEnv(this.currentScenario.id).then((res) => {
-            let data = res.data;
-            if (!data) {
-              this.$warning(this.$t('workspace.env_group.please_select_env_for_current_scenario'));
-              return false;
-            }
-            this.reportId = getUUID().substring(0, 8);
-            this.runVisible = true;
-            this.$set(row, 'isStop', true);
-          });
+          this.reportId = getUUID().substring(0, 8);
+          this.runVisible = true;
+          this.$set(row, 'isStop', true);
         }
       });
     },
@@ -1597,6 +1581,10 @@ export default {
       this.$emit('selection', selection);
     },
     batchCreatePerformance() {
+      if (!hasPermission('PROJECT_PERFORMANCE_TEST:READ+CREATE')) {
+        this.$warning(this.$t('api_test.create_performance_test_tips'));
+        return;
+      }
       this.$alert(this.$t('api_test.definition.request.batch_to_performance_confirm') + ' ？', '', {
         confirmButtonText: this.$t('commons.confirm'),
         callback: (action) => {

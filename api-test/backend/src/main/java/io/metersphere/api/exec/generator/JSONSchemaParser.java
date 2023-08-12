@@ -3,6 +3,7 @@ package io.metersphere.api.exec.generator;
 import com.google.gson.*;
 import io.metersphere.commons.constants.PropertyConstant;
 import io.metersphere.commons.utils.EnumPropertyUtil;
+import io.metersphere.commons.utils.JSON;
 import io.metersphere.commons.utils.JSONUtil;
 import org.apache.commons.collections4.CollectionUtils;
 import org.apache.commons.collections4.MapUtils;
@@ -11,7 +12,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -44,7 +47,7 @@ public class JSONSchemaParser {
                 }
                 formatObject(allOfElementObj, rootObj, processMap);
             }
-        } else if (object.has(PropertyConstant.PROPERTIES)) {
+        } else if (object.has(PropertyConstant.PROPERTIES) && !object.get(PropertyConstant.PROPERTIES).getAsJsonObject().isEmpty()) {
             formatObject(object, rootObj, processMap);
         } else if (object.has(PropertyConstant.ADDITIONAL_PROPERTIES)) {
             analyzeProperty(rootObj, PropertyConstant.ADDITIONAL_PROPERTIES,
@@ -108,7 +111,7 @@ public class JSONSchemaParser {
             // 设置mock值
             if (FormatterUtil.isMockValue(object)) {
                 if (FormatterUtil.isNumber(FormatterUtil.getStrValue(object))) {
-                    int value = FormatterUtil.getElementValue(object).getAsInt();
+                    long value = FormatterUtil.getElementValue(object).getAsLong();
                     concept.put(propertyName, value);
                 } else {
                     String value = FormatterUtil.getStrValue(object);
@@ -125,7 +128,7 @@ public class JSONSchemaParser {
                 if (FormatterUtil.isNumber(FormatterUtil.getStrValue(object))) {
                     String value = FormatterUtil.getElementValue(object).getAsString();
                     if (value.indexOf(".") == -1) {
-                        concept.put(propertyName, Integer.valueOf(value));
+                        concept.put(propertyName, new BigInteger(value));
                     } else {
                         concept.put(propertyName, new BigDecimal(value));
                     }
@@ -180,13 +183,7 @@ public class JSONSchemaParser {
             JsonObject jsonObject = element.getAsJsonObject();
             if (object.has(PropertyConstant.ITEMS)) {
                 if (FormatterUtil.isMockValue(jsonObject)) {
-                    if (jsonObject.has(PropertyConstant.TYPE)
-                            && jsonObject.get(PropertyConstant.TYPE).getAsString().equals(PropertyConstant.INTEGER)
-                            && FormatterUtil.isNumber(FormatterUtil.getStrValue(jsonObject))) {
-                        array.put(FormatterUtil.getElementValue(jsonObject).getAsInt());
-                    } else {
-                        array.put(FormatterUtil.getStrValue(jsonObject));
-                    }
+                    JSONSchemaBuilder.formatItems(jsonObject, array, processMap);
                 } else if (jsonObject.has(PropertyConstant.ENUM)) {
                     array.put(EnumPropertyUtil.analyzeEnumProperty(jsonObject));
                 } else if (jsonObject.has(PropertyConstant.TYPE) && jsonObject.get(PropertyConstant.TYPE).getAsString().equals(PropertyConstant.STRING)) {
@@ -205,7 +202,7 @@ public class JSONSchemaParser {
                     } else {
                         array.put(0);
                     }
-                } else if (jsonObject.has(PropertyConstant.PROPERTIES)) {
+                } else if (jsonObject.has(PropertyConstant.PROPERTIES) && !jsonObject.get(PropertyConstant.PROPERTIES).getAsJsonObject().isEmpty()) {
                     JSONObject propertyConcept = JSONUtil.createJsonObject(true);
                     formatObject(jsonObject, propertyConcept, processMap);
                     array.put(propertyConcept);
@@ -239,9 +236,12 @@ public class JSONSchemaParser {
         analyzeSchema(jsonSchema, root, processMap);
         // 格式化返回
         if (root.opt(PropertyConstant.MS_OBJECT) != null) {
-            json = root.get(PropertyConstant.MS_OBJECT).toString();
+            JSONArray jsonArray = (JSONArray) root.get(PropertyConstant.MS_OBJECT);
+            List<String> list = new LinkedList<>();
+            toJsonString(jsonArray, list);
+            json = list.toString();
         } else {
-            json = root.toString();
+            json = JSON.toJSONString(root.toMap());
         }
         if (MapUtils.isNotEmpty(processMap)) {
             for (String str : processMap.keySet()) {
@@ -249,6 +249,22 @@ public class JSONSchemaParser {
             }
         }
         return json;
+    }
+
+    public static void toJsonString(JSONArray jsonArray, List<String> list) {
+        jsonArray.forEach(element -> {
+            if (element instanceof JSONObject o) {
+                list.add(JSON.toJSONString(o.toMap()));
+            } else if (element instanceof JSONArray o) {
+                List<String> aa = new LinkedList<>();
+                toJsonString(o, aa);
+                list.add(aa.toString());
+            } else if (element instanceof BigDecimal) {
+                list.add(element.toString());
+            } else {
+                list.add(element.toString());
+            }
+        });
     }
 
     public static String schemaToJson(String jsonSchema) {
@@ -263,7 +279,7 @@ public class JSONSchemaParser {
                 return JSONUtil.parserObject(value);
             }
         } catch (Exception ex) {
-            return jsonSchema;
+            return "Error";
         }
     }
 

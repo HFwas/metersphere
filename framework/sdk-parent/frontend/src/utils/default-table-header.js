@@ -128,7 +128,6 @@ export let CUSTOM_TABLE_HEADER = {
       key: "6",
       label: "api_test.definition.api_principal",
     },
-    { id: "environmentMap", key: "8", label: "commons.environment" },
     { id: "updateTime", key: "7", label: "api_test.definition.api_last_time" },
     { id: "lastResult", key: "a", label: "ui.debug_result_label" },
     { id: "createTime", key: "c", label: "commons.create_time" },
@@ -160,14 +159,15 @@ export let CUSTOM_TABLE_HEADER = {
 
   //缺陷列表
   ELEMENT_LIST: [
-    { id: "num", key: "1", label: "ID" },
-    { id: "name", key: "2", label: "元素名称" },
-    { id: "locationType", key: "3", label: "定位类型" },
-    { id: "location", key: "4", label: "元素定位" },
-    { id: "createUser", key: "5", label: "创建人" },
-    { id: "createTime", key: "6", label: "commons.create_time" },
-    { id: "updateUser", key: "7", label: "更新人" },
-    { id: "updateTime", key: "8", label: "commons.update_time" },
+    {id: "num", key: "1", label: "ID"},
+    {id: "name", key: "2", label: "元素名称"},
+    {id: "locationType", key: "3", label: "定位类型"},
+    {id: "location", key: "4", label: "元素定位"},
+    {id: 'modulePath', key: 'a', label: 'test_track.case.module'},
+    {id: "createUser", key: "5", label: "创建人"},
+    {id: "createTime", key: "6", label: "commons.create_time"},
+    {id: "updateUser", key: "7", label: "更新人"},
+    {id: "updateTime", key: "8", label: "commons.update_time"},
   ],
 
   //空间配额
@@ -201,7 +201,6 @@ export let CUSTOM_TABLE_HEADER = {
 
   // 测试报告列表
   PERFORMANCE_REPORT_TABLE: [
-    { id: "testName", key: "a", label: "report.test_name" },
     { id: "name", key: "b", label: "commons.name" },
     { id: "versionId", key: "c", label: "project.version.name" },
     { id: "userName", key: "d", label: "report.user_name" },

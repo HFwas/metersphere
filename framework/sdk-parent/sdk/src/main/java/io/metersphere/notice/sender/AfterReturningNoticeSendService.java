@@ -3,6 +3,7 @@ package io.metersphere.notice.sender;
 import io.metersphere.commons.constants.NoticeConstants;
 import io.metersphere.commons.user.SessionUser;
 import io.metersphere.dto.BaseSystemConfigDTO;
+import io.metersphere.log.vo.StatusReference;
 import io.metersphere.notice.annotation.SendNotice;
 import io.metersphere.notice.service.NoticeSendService;
 import io.metersphere.service.SystemParameterService;

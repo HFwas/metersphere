@@ -1,4 +1,4 @@
-import el from "element-ui/lib/locale/lang/zh-TW";
+import el from "metersphere-frontend/src/i18n/lang/ele-zh-TW";
 import fu from "fit2cloud-ui/src/locale/lang/zh-TW"; // 加载fit2cloud的内容
 import mf from "metersphere-frontend/src/i18n/lang/zh-TW"
 
@@ -64,6 +64,7 @@ const message = {
   },
   plan: {
     batch_delete_tip: "批量刪除測試計劃，是否繼續？",
+    relevance_case_success: "已添加至測試計劃"
   },
   review: {
     result_distribution: "結果分布",
@@ -152,6 +153,8 @@ const message = {
     back_tips: "你填寫的信息未保存, 確定退出嗎?",
     dependency_remove_confirm: "確定解除依賴嗎?",
     minder_paste_tip: "粘貼的節點中有未加載用例的模塊，目前不支持復製未加載的用例！",
+    minder_move_confirm_tip: "當前存在字段排序，無法設置用例順序，請切換至用例列表，取消字段排序!",
+    minder_module_move_confirm_tip: "模塊不支持設置順序!",
     public: {
       remove: '是否移除用例',
       batch_remove_confirm: "確定移除{0}項用例?",

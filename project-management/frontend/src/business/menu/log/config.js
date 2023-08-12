@@ -23,7 +23,8 @@ export function LOG_TYPE(_this) {
     {id: 'BATCH_UPDATE', label: _this.$t('api_test.definition.request.batch_edit')},
     {id: 'BATCH_ADD', label: _this.$t('commons.batch_add')},
     {id: 'BATCH_RESTORE', label: _this.$t('commons.batch_restore')},
-    {id: 'BATCH_GC', label: _this.$t('commons.batch_gc')}
+    {id: 'BATCH_GC', label: _this.$t('commons.batch_gc')},
+    {id: 'REQUEST', label: _this.$t('operating_log.request_record')},
   ];
   return LOG_TYPE;
 }
@@ -52,6 +53,7 @@ export function LOG_TYPE_MAP(_this) {
     ['BATCH_ADD', _this.$t('commons.batch_add')],
     ['BATCH_RESTORE', _this.$t('commons.batch_restore')],
     ['BATCH_GC', _this.$t('commons.batch_gc')],
+    ['REQUEST', _this.$t('operating_log.request_record')],
   ]);
   return LOG_TYPE_MAP;
 }
@@ -368,16 +370,6 @@ export function getPermissionUrl(d, _this) {
     case "项目-模版设置-自定义字段" :
     case "項目-模版設置-自定義字段" :
     case "Project template settings field" :
-      res = [url + "/project/template", ["PROJECT_TEMPLATE:READ"]];
-      break;
-    case "项目-模版设置-用例模版" :
-    case "項目-模版設置-用例模板" :
-    case "Project template settings case" :
-      res = [url + "/project/template", ["PROJECT_TEMPLATE:READ"]];
-      break;
-    case "项目-模版设置-缺陷模版" :
-    case "項目-模版設置-缺陷模板" :
-    case "Project template settings issue" :
       res = [url + "/project/template", ["PROJECT_TEMPLATE:READ"]];
       break;
     case "项目-成员":

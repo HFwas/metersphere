@@ -5,7 +5,7 @@
     </div>
 
     <div class="case-main-layout-right" style="float: right; display: flex">
-      <version-select v-xpack :project-id="projectId" @changeVersion="changeVersion" />
+      <version-select v-xpack :default-version="defaultVersion" :project-id="projectId" @changeVersion="changeVersion" />
     </div>
 
     <ms-module-minder
@@ -17,7 +17,7 @@
       :distinct-tags="tags"
       :module-disable="false"
       :show-module-tag="true"
-      :move-enable="moveEnable"
+      :move-confirm="moveConfirm"
       :tag-edit-check="tagEditCheck()"
       :priority-disable-check="priorityDisableCheck()"
       :disabled="disabled"
@@ -122,7 +122,8 @@ export default {
     },
     condition: Object,
     projectId: String,
-    activeName: String
+    activeName: String,
+    defaultVersion: String
   },
   computed: {
     ...mapState(useStore, {
@@ -167,6 +168,7 @@ export default {
     }
   },
   mounted() {
+    this.currentVersion = this.defaultVersion || null;
     this.setIsChange(false);
     let moduleNum = 0;
     this.treeNodes.forEach(node => {
@@ -183,6 +185,7 @@ export default {
   methods: {
     changeVersion(currentVersion) {
       this.currentVersion = currentVersion || null;
+      this.$emit('versionChange', currentVersion);
     },
     handleNodeUpdateForMinder() {
       if (this.noRefreshMinder) {
@@ -291,6 +294,22 @@ export default {
         isDisable: false
       }
     },
+    moveConfirm() {
+      let selectNodes = minder.getSelectedNodes();
+      for (let node of selectNodes) {
+        // 模块暂不支持调整顺序
+        if (isModuleNode(node)) {
+          this.$warning(this.$t('case.minder_module_move_confirm_tip'));
+          return false;
+        }
+        // 列表排序后用例不能排序
+        if (!this.moveEnable && isCaseNodeData(node.data)) {
+          this.$warning(this.$t('case.minder_move_confirm_tip'));
+          return false;
+        }
+      }
+      return true;
+    },
     handleDeleteConfirm() {
       let selectNodes = minder.getSelectedNodes();
       let moduleName = '';
@@ -338,6 +357,8 @@ export default {
         module.nodeIds = nodeIds;
       });
 
+      // 去掉为 null 的数据
+      this.deleteNodes = this.deleteNodes.filter(i => i);
       let param = {
         projectId: this.projectId,
         data: this.saveCases,
@@ -437,6 +458,12 @@ export default {
       }
       let pId = parent ? (parent.newId ? parent.newId : parent.id) : null;
 
+      if (!parent && this.selectNode && this.selectNode.data
+        && this.selectNode.data.id === data.id) {
+        // 当前头节点没有 parent, 参数中没有 parentId，校验重名会不准确
+        pId = this.selectNode.data.parentId;
+      }
+
       if (parent && !isModuleNodeData(parent)) {
         this.throwError(this.$t('test_track.case.minder_not_module_tip', [data.text]));
       }
@@ -482,8 +509,8 @@ export default {
 
       this.saveModuleNodeMap.set(module.id, node);
 
-      if (module.level > 8) {
-        this.throwError(this.$t('commons.module_deep_limit'));
+      if (module.name.trim().length > 100) {
+        this.throwError( this.$t('test_track.module.name') + this.$t('test_track.length_less_than') + 100);
       }
       this.saveModules.push(module);
     },
@@ -647,6 +674,10 @@ export default {
           testCase.isEdit = false; // 新增
           testCase.id = getUUID();
           data.newId = testCase.id;
+        }
+
+        if (testCase.name.length > 255) {
+          this.throwError( this.$t('api_test.home_page.failed_case_list.table_coloum.case_name') + this.$t('test_track.length_less_than') + 255);
         }
         this.saveCases.push(testCase);
       }

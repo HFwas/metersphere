@@ -34,8 +34,8 @@
             <el-col :span="codeSpan">
               <el-form-item>
                 <template v-slot>
-                  <div style="position: relative;">
-                    <el-tabs v-model="activeName">
+                  <div style="position: relative;" :class="{'button-color': apiReviewTestScript}">
+                    <el-tabs v-model="activeName" >
                       <el-tab-pane :label="$t('project.code_segment.segment')" name="code">
                         <ms-code-edit
                           v-if="isCodeEditAlive"
@@ -96,6 +96,7 @@ import MsCodeEdit from "metersphere-frontend/src/components/MsCodeEdit";
 import MsDropdown from "metersphere-frontend/src/components/MsDropdown";
 import {FUNC_TEMPLATE} from "metersphere-frontend/src/components/environment/snippet/custom-function";
 import {getCurrentProjectID} from "metersphere-frontend/src/utils/token";
+import {hasPermission} from "metersphere-frontend/src/utils/permission";
 import {getUUID} from "metersphere-frontend/src/utils";
 import {JSR223Processor} from "metersphere-frontend/src/model/ApiTestModel";
 import CustomFunctionRelate from "metersphere-frontend/src/components/environment/snippet/CustomFunctionRelate";
@@ -104,6 +105,7 @@ import ScriptNavMenu from "metersphere-frontend/src/components/environment/snipp
 import {getCodeSnippetById, modifyCodeSnippet, saveCodeSnippet} from "../../../api/custom-func";
 import FunctionRun from "./FunctionRun";
 import {TYPE_TO_C} from "metersphere-frontend/src/model/Setting";
+import {getProjectApplicationConfig} from "../../../api/app-setting";
 
 export default {
   name: "EditFunction",
@@ -167,8 +169,16 @@ export default {
       response: {},
       request: {},
       debug: true,
-      console: this.$t('project.code_segment.no_result')
+      console: this.$t('project.code_segment.no_result'),
+      apiReviewTestScript: false
     }
+  },
+  activated() {
+    getProjectApplicationConfig(getCurrentProjectID(), '/API_REVIEW_TEST_SCRIPT').then((res) => {
+      if (res.data && res.data.typeValue) {
+        this.apiReviewTestScript = res.data.typeValue === 'true';
+      }
+    });
   },
   methods: {
     open(data) {
@@ -254,15 +264,25 @@ export default {
       });
     },
     update(obj) {
-      if (!obj.projectId) {
-        obj.projectId = getCurrentProjectID();
+      let hasEditPermission = hasPermission('PROJECT_CUSTOM_CODE:READ+EDIT');
+      if (!hasEditPermission) {
+        this.$warning(this.$t('commons.no_permission'));
+        return;
+      } else {
+        if (!obj.projectId) {
+          obj.projectId = getCurrentProjectID();
+        }
+        this.loading = modifyCodeSnippet(obj).then(() => {
+          this.$emit("refresh");
+          this.$success(this.$t('commons.modify_success'));
+        });
       }
-      this.loading = modifyCodeSnippet(obj).then(() => {
-        this.$emit("refresh");
-        this.$success(this.$t('commons.modify_success'));
-      });
     },
     handleTest() {
+      if (this.apiReviewTestScript) {
+        this.$warning(this.$t('pj.script_warning'));
+        return;
+      }
       this.activeName = "result";
       this.console = this.$t('project.code_segment.no_result');
       this.reloadResult();
@@ -300,7 +320,7 @@ export default {
 }
 </script>
 
-<style scoped>
+<style lang="scss" scoped>
 .template-title {
   margin-bottom: 5px;
   font-weight: bold;
@@ -342,6 +362,14 @@ export default {
 
 .show-menu:hover {
   color: #935aa1;
+}
+
+.button-color{
+  .el-button--primary{
+    color: #FFF !important;
+    background-color: rgb(188, 156, 195) !important;
+    border-color: rgb(188, 156, 195) !important;
+  }
 }
 
 </style>

@@ -45,7 +45,9 @@
         <el-tag size="small" class="ms-tag" v-if="request.referenced === 'REF'">
           {{ $t('api_test.scenario.reference') }}
         </el-tag>
-        <span class="ms-tag ms-step-name-api">{{ getProjectName(request.projectId) }}</span>
+        <span class="ms-tag ms-step-name-api" v-show="getProjectName(request.projectId)">
+          {{ getProjectName(request.projectId) }}
+        </span>
       </template>
       <template v-slot:debugStepCode>
         <span v-if="request.testing" class="ms-test-running">
@@ -60,6 +62,7 @@
             !loading &&
             !request.testing &&
             request.debug &&
+            request.requestResult &&
             request.requestResult[0] &&
             request.requestResult[0].responseResult &&
             request.requestResult[0].status === 'FAKE_ERROR'
@@ -69,26 +72,30 @@
         <span
           class="ms-step-debug-code"
           @click="active"
-          :class="request.requestResult[0].success && reqSuccess ? 'ms-req-success' : 'ms-req-error'"
+          :class="
+            request.requestResult && request.requestResult[0].success && reqSuccess ? 'ms-req-success' : 'ms-req-error'
+          "
           v-else-if="
             !loading &&
             !request.testing &&
             request.debug &&
+            request.requestResult &&
             request.requestResult[0] &&
             request.requestResult[0].responseResult
           ">
-          {{ request.requestResult[0].success && reqSuccess ? 'Success' : 'Error' }}
+          {{ request.requestResult && request.requestResult[0].success && reqSuccess ? 'Success' : 'Error' }}
         </span>
       </template>
       <template v-slot:button v-if="!ifFromVariableAdvance">
-        <el-tooltip :content="$t('api_test.run')" placement="top" v-if="!loading">
+        <el-tooltip :content="$t('api_test.run')" placement="top" v-if="!request.testing">
           <el-button
             :disabled="!request.enable"
             @click="run"
             icon="el-icon-video-play"
             class="ms-btn"
             size="mini"
-            circle />
+            circle
+            v-permission="['PROJECT_API_SCENARIO:READ+DEBUG', 'PROJECT_API_SCENARIO:READ+RUN']" />
         </el-tooltip>
         <el-tooltip :content="$t('report.stop_btn')" placement="top" :enterable="false" v-else>
           <el-button
@@ -96,7 +103,8 @@
             size="mini"
             style="color: white; padding: 0 0.1px; width: 24px; height: 24px"
             class="stop-btn"
-            circle>
+            circle
+            v-permission="['PROJECT_API_SCENARIO:READ+DEBUG', 'PROJECT_API_SCENARIO:READ+RUN']">
             <div style="transform: scale(0.66)">
               <span style="margin-left: -4.5px; font-weight: bold">STOP</span>
             </div>
@@ -159,7 +167,7 @@
             <el-tab-pane
               v-for="(item, i) in request.requestResult"
               :label="'循环' + (i + 1)"
-              :key="i"
+              :key="`api-response${i}`"
               style="margin-bottom: 5px">
               <api-response-component :currentProtocol="request.protocol" :apiActive="true" :result="item" />
             </el-tab-pane>
@@ -167,7 +175,7 @@
           <api-response-component
             :currentProtocol="request.protocol"
             :apiActive="true"
-            :result="request.requestResult[0]"
+            :result="request.requestResult && request.requestResult[0]"
             v-else />
         </div>
       </template>
@@ -264,10 +272,10 @@ export default {
       this.request.projectId = getCurrentProjectID();
     }
     this.request.customizeReq = this.isCustomizeReq;
-   if (this.request.customizeReq) {
+    if (this.request.customizeReq) {
       if (this.node.parent && this.node.parent.data && this.node.parent.data.length > 1) {
         this.request.projectId = getCurrentProjectID();
-      }else {
+      } else {
         this.request.projectId =
           this.node.parent.data instanceof Array ? this.node.parent.data[0].projectId : this.node.parent.data.projectId;
       }
@@ -391,9 +399,6 @@ export default {
         this.request.requestResult.forEach((item) => {
           if (!item.success) {
             this.reqSuccess = item.success;
-            if (this.node && this.node.parent && this.node.parent.data) {
-              this.node.parent.data.code = 'ERROR';
-            }
           }
         });
       }
@@ -448,10 +453,6 @@ export default {
               ) {
                 selectEnvId = store.scenarioEnvMap.get(this.currentScenario.id + '_' + this.request.projectId);
                 this.environmentMap = this.envMap;
-              }
-              if (!selectEnvId && !this.environmentGroupId) {
-                this.$warning(this.$t('api_test.automation.env_message'));
-                return false;
               }
             }
           }
@@ -511,6 +512,8 @@ export default {
           this.reportId = getUUID();
           debugData.hashTree = [this.request];
           debugData.stepScenario = true;
+          debugData.hasRequest = true;
+          this.request.testing = true;
           this.$emit('runScenario', debugData);
         }
       });
@@ -527,10 +530,7 @@ export default {
       }
     },
     stop() {
-      execStop(this.reportId).then(() => {
-        this.loading = false;
-        this.$success(this.$t('report.test_stop_success'));
-      });
+      this.$emit('stopScenario');
     },
     errorRefresh() {
       this.loading = false;
@@ -692,6 +692,12 @@ export default {
 
 .ms-step-name-api {
   padding-left: 5px;
+  display: inline-block;
+  overflow-x: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+  white-space: nowrap;
+  max-width: 100px;
 }
 
 .ms-tag {

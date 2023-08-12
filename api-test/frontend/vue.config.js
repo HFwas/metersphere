@@ -1,17 +1,21 @@
 const path = require('path');
 const { name } = require('./package');
+const { defineConfig } = require('@vue/cli-service');
+const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
 
 function resolve(dir) {
   return path.join(__dirname, dir);
 }
 
-module.exports = {
+module.exports = defineConfig({
+  publicPath: '/',
   productionSourceMap: false,
   devServer: {
     port: 4004,
     client: {
       webSocketTransport: 'sockjs',
-    },
+      overlay: false,
+  },
     allowedHosts: 'all',
     webSocketServer: 'sockjs',
     proxy: {
@@ -51,6 +55,9 @@ module.exports = {
     resolve: {
       alias: {
         '@': resolve('src'),
+        mockjs: resolve('node_modules/mockjs'),
+        'vue-i18n': resolve('node_modules/vue-i18n'),
+        jsondiffpatch: resolve('node_modules/jsondiffpatch'),
       },
     },
     output: {
@@ -61,6 +68,86 @@ module.exports = {
       // 打包后js的名称
       filename: `js/${name}-[name].[contenthash:8].js`,
       chunkFilename: `js/${name}-[name].[contenthash:8].js`,
+    },
+    optimization: {
+      splitChunks: {
+        cacheGroups: {
+          'chunk-vendors': {
+            test: /[\\/]node_modules[\\/]/,
+            name: 'chunk-vendors',
+            priority: 1,
+            minChunks: 3,
+            chunks: 'all',
+          },
+          'chunk-common': {
+            test: /[\\/]src[\\/]/,
+            name: 'chunk-common',
+            priority: 1,
+            minChunks: 5,
+            chunks: 'all',
+          },
+          html2canvas: {
+            test: /[\\/]html2canvas[\\/]/,
+            name: 'html2canvas',
+            priority: 3,
+            chunks: 'all',
+          },
+          fortawesome: {
+            test: /[\\/]@fortawesome[\\/]/,
+            name: 'fortawesome',
+            priority: 3,
+            chunks: 'all',
+          },
+          'el-tree-transfer': {
+            test: /[\\/]el-tree-transfer[\\/]/,
+            name: 'el-tree-transfer',
+            priority: 3,
+            chunks: 'all',
+          },
+          jspdf: {
+            test: /[\\/]jspdf[\\/]/,
+            name: 'jspdf',
+            priority: 3,
+            chunks: 'all',
+          },
+          jsondiffpatch: {
+            test: /[\\/]jsondiffpatch[\\/]/,
+            name: 'jsondiffpatch',
+            priority: 3,
+            chunks: 'all',
+          },
+          jsencrypt: {
+            test: /[\\/]jsencrypt[\\/]/,
+            name: 'jsencrypt',
+            priority: 3,
+            chunks: 'all',
+          },
+          mockjs: {
+            test: /[\\/]mockjs[\\/]/,
+            name: 'mockjs',
+            priority: 3,
+            chunks: 'all',
+          },
+          pinia: {
+            test: /[\\/]pinia[\\/]/,
+            name: 'pinia',
+            priority: 3,
+            chunks: 'all',
+          },
+          brace: {
+            test: /[\\/]brace[\\/]/,
+            name: 'brace',
+            priority: 3,
+            chunks: 'all',
+          },
+          echarts: {
+            test: /[\\/](echarts|zrender)[\\/]/,
+            name: 'echarts',
+            priority: 3,
+            chunks: 'all',
+          },
+        },
+      },
     },
   },
   css: {
@@ -86,5 +173,14 @@ module.exports = {
       .options({
         symbolId: 'icon-[name]',
       });
+    if (process.env.NODE_ENV === 'analyze') {
+      config.plugin('webpack-report').use(BundleAnalyzerPlugin, [
+        {
+          analyzerMode: 'static',
+          reportFilename: './webpack-report.html',
+          openAnalyzer: false,
+        },
+      ]);
+    }
   },
-};
+});

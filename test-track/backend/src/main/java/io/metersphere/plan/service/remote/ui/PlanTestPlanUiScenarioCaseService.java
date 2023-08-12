@@ -6,6 +6,7 @@ import io.metersphere.base.domain.UiScenarioReportWithBLOBs;
 import io.metersphere.commons.constants.MicroServiceName;
 import io.metersphere.commons.exception.MSException;
 import io.metersphere.commons.utils.LogUtil;
+import io.metersphere.commons.utils.SubListUtil;
 import io.metersphere.dto.*;
 import io.metersphere.plan.constant.ApiReportStatus;
 import io.metersphere.plan.dto.*;
@@ -17,6 +18,7 @@ import io.metersphere.plan.service.remote.api.PlanUiScenarioReportService;
 import io.metersphere.plan.utils.TestPlanReportUtil;
 import io.metersphere.plan.utils.TestPlanStatusCalculator;
 import io.metersphere.request.ResetOrderRequest;
+import io.metersphere.utils.BatchProcessingUtil;
 import io.metersphere.utils.DiscoveryUtil;
 import jakarta.annotation.Resource;
 import org.apache.commons.collections.CollectionUtils;
@@ -158,7 +160,13 @@ public class PlanTestPlanUiScenarioCaseService extends UiTestService {
         if (CollectionUtils.isEmpty(uiCases)) {
             return null;
         }
-        return microService.postForDataArray(serviceName, BASE_URL + "/build/response", uiCases, TestPlanUiScenarioDTO.class);
+
+        //分批处理参数时为了不影响初始参数，这里使用新的对象进行处理
+        List<TestPlanUiScenarioDTO> returnList = new ArrayList<>();
+        SubListUtil.dealForSubList(uiCases, 20, list -> {
+            returnList.addAll(microService.postForDataArray(serviceName, BASE_URL + "/build/response", list, TestPlanUiScenarioDTO.class));
+        });
+        return returnList;
     }
 
     public Object relevanceList(ApiScenarioRequest request, int pageNum, int pageSize) {

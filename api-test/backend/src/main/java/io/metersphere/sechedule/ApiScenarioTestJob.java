@@ -11,11 +11,15 @@ import io.metersphere.commons.utils.JSON;
 import io.metersphere.commons.utils.LogUtil;
 import io.metersphere.constants.RunModeConstants;
 import io.metersphere.dto.RunModeConfigDTO;
+import io.metersphere.service.ApiPoolDebugService;
 import io.metersphere.service.scenario.ApiScenarioService;
+import io.metersphere.utils.LoggerUtil;
+import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.quartz.*;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.UUID;
 
@@ -34,8 +38,11 @@ public class ApiScenarioTestJob extends MsScheduleJob {
 
     private ApiScenarioService apiAutomationService;
 
+    private ApiPoolDebugService apiPoolDebugService;
+
     public ApiScenarioTestJob() {
         apiAutomationService = CommonBeanFactory.getBean(ApiScenarioService.class);
+        apiPoolDebugService = CommonBeanFactory.getBean(ApiPoolDebugService.class);
     }
 
     @Override
@@ -73,13 +80,23 @@ public class ApiScenarioTestJob extends MsScheduleJob {
         String config = jobDataMap.getString("config");
         if (StringUtils.isNotBlank(config)) {
             RunModeConfigDTO runModeConfig = JSON.parseObject(config, RunModeConfigDTO.class);
+            if (BooleanUtils.isTrue(runModeConfig.getDefaultEnv())) {
+                runModeConfig.setEnvMap(new HashMap<>());
+            }
             request.setConfig(runModeConfig);
         } else {
             RunModeConfigDTO runModeConfigDTO = new RunModeConfigDTO();
             runModeConfigDTO.setMode(RunModeConstants.PARALLEL.toString());
             request.setConfig(runModeConfigDTO);
         }
-
+        // 兼容历史定时任务默认给一个资源池
+        if (StringUtils.isBlank(request.getConfig().getResourcePoolId())) {
+            try {
+                apiPoolDebugService.verifyPool(projectID, request.getConfig());
+            } catch (Exception e) {
+                LoggerUtil.error(e);
+            }
+        }
         apiAutomationService.run(request);
     }
 

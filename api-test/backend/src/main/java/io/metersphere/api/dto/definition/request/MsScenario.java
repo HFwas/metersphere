@@ -19,15 +19,15 @@ import io.metersphere.environment.service.BaseEnvGroupProjectService;
 import io.metersphere.environment.service.BaseEnvironmentService;
 import io.metersphere.plugin.core.MsParameter;
 import io.metersphere.plugin.core.MsTestElement;
-import io.metersphere.service.MsHashTreeService;
+import io.metersphere.utils.LoggerUtil;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.apache.commons.collections.CollectionUtils;
+import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.BooleanUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.jmeter.config.Arguments;
 import org.apache.jorphan.collections.HashTree;
-import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.HashMap;
@@ -75,10 +75,11 @@ public class MsScenario extends MsTestElement {
                 && !this.setRefScenario(hashTree)) {
             return;
         }
+
         // 设置共享cookie
         config.setEnableCookieShare(enableCookieShare);
         Map<String, EnvironmentConfig> envConfig = new HashMap<>(16);
-        if (config.getConfig() == null) {
+        if (MapUtils.isEmpty(config.getConfig())) {
             // 兼容历史数据
             if (this.environmentMap == null || this.environmentMap.isEmpty()) {
                 this.environmentMap = new HashMap<>(16);
@@ -104,18 +105,18 @@ public class MsScenario extends MsTestElement {
         }
         HashTree scenarioTree = tree;
         // 取出自身场景环境
-        ParameterConfig newConfig = new ParameterConfig();
+        ParameterConfig newConfig = new ParameterConfig(this.getProjectId(), false);
         if (this.isEnvironmentEnable()) {
             this.setNewConfig(envConfig, newConfig);
             newConfig.setRetryNum(config.getRetryNum());
         }
-        if (config != null && StringUtils.equals(this.getId(), config.getScenarioId())) {
+        if (StringUtils.equals(this.getId(), config.getScenarioId())) {
             config.setTransferVariables(this.variables);
             if (CollectionUtils.isNotEmpty(this.headers)) {
                 ElementUtil.setHeader(scenarioTree, this.headers, this.getName());
             }
         }
-        if (config != null && !config.getExcludeScenarioIds().contains(this.getId())) {
+        if (!config.getExcludeScenarioIds().contains(this.getId())) {
             scenarioTree = MsCriticalSectionController.createHashTree(tree, this.getName(), this.isEnable());
         }
         // 启用当前场景变量优先选择
@@ -130,7 +131,7 @@ public class MsScenario extends MsTestElement {
             // 这里加入自定义变量解决ForEach循环控制器取值问题，循环控制器无法从vars中取值
             if (BooleanUtils.isTrue(this.variableEnable) || BooleanUtils.isTrue(this.mixEnable)) {
                 scenarioTree.add(ElementUtil.argumentsToUserParameters(valueSupposeMock));
-            } else if (config != null && (this.isAllEnable() || config.isApi())) {
+            } else if (this.isAllEnable() || config.isApi()) {
                 valueSupposeMock.setProperty(ElementConstants.COVER, true);
                 scenarioTree.add(valueSupposeMock);
             }
@@ -188,7 +189,7 @@ public class MsScenario extends MsTestElement {
                     if (envProcessor != null) {
                         BeanUtils.copyBean(processor, envProcessor);
                     }
-                    if (processor != null && StringUtils.isNotEmpty(processor.getScript())) {
+                    if (StringUtils.isNotEmpty(processor.getScript())) {
                         processor.setType(ElementConstants.JSR223);
                         processor.setClazzName(MsJSR223Processor.class.getCanonicalName());
                         boolean isConnScenarioPre = false;
@@ -210,8 +211,7 @@ public class MsScenario extends MsTestElement {
             ApiScenarioMapper apiAutomationService = CommonBeanFactory.getBean(ApiScenarioMapper.class);
             ApiScenarioWithBLOBs scenario = apiAutomationService.selectByPrimaryKey(this.getId());
             if (scenario != null && StringUtils.isNotEmpty(scenario.getScenarioDefinition())) {
-                JSONObject elementOrg = JSONUtil.parseObject(scenario.getScenarioDefinition());
-                JSONObject element = setRefEnable(this, elementOrg);
+                JSONObject element = JSONUtil.parseObject(scenario.getScenarioDefinition());
                 // 历史数据处理
                 ElementUtil.dataFormatting(element.optJSONArray(ElementConstants.HASH_TREE));
                 this.setName(scenario.getName());
@@ -231,40 +231,9 @@ public class MsScenario extends MsTestElement {
                 return true;
             }
         } catch (Exception ex) {
-            ex.printStackTrace();
+            LoggerUtil.error(ex);
         }
         return false;
-    }
-
-    public static JSONObject setRefEnable(MsTestElement targetElement, JSONObject orgElement) {
-        if (JSONObject.NULL.equals(orgElement) || targetElement == null) {
-            return orgElement;
-        }
-        if (!orgElement.optBoolean(MsHashTreeService.ENABLE)) {
-            orgElement.put(MsHashTreeService.ENABLE, false);
-        } else {
-            orgElement.put(MsHashTreeService.ENABLE, targetElement.isEnable());
-        }
-        try {
-            if (orgElement.has(MsHashTreeService.HASH_TREE)) {
-                JSONArray orgJSONArray = orgElement.optJSONArray(MsHashTreeService.HASH_TREE);
-                LinkedList<MsTestElement> hashTree = targetElement.getHashTree();
-                if (orgJSONArray != null && CollectionUtils.isNotEmpty(hashTree)) {
-                    orgJSONArray.forEach(obj -> {
-                        JSONObject orgJsonObject = (JSONObject) obj;
-                        hashTree.forEach(targetObj -> {
-                            if (StringUtils.equals(orgJsonObject.optString(MsHashTreeService.RESOURCE_ID), targetObj.getResourceId())) {
-                                setRefEnable(targetObj, orgJsonObject);
-                            }
-                        });
-                    });
-                }
-            }
-        } catch (Exception ex) {
-            LogUtil.error(ex, ex.getMessage());
-            return orgElement;
-        }
-        return orgElement;
     }
 
     private void setNewConfig(Map<String, EnvironmentConfig> envConfig, ParameterConfig newConfig) {

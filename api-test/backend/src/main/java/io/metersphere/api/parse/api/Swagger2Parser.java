@@ -221,28 +221,30 @@ public class Swagger2Parser extends SwaggerAbstractParser {
         // todo 路径变量 {xxx} 是否要转换
 
         for (Parameter parameter : parameters) {
-            switch (parameter.getIn()) {
-                case SwaggerParameterType.PATH:
-                    parsePathParameters(parameter, request.getRest());
-                    break;
-                case SwaggerParameterType.QUERY:
-                    parseQueryParameters(parameter, request.getArguments());
-                    break;
-                case SwaggerParameterType.FORM_DATA:
-                    parseFormDataParameters((FormParameter) parameter, request.getBody());
-                    break;
-                case SwaggerParameterType.BODY:
-                    parseRequestBodyParameters(parameter, request.getBody());
-                    break;
-                case SwaggerParameterType.HEADER:
-                    parseHeaderParameters(parameter, request.getHeaders());
-                    break;
-                case SwaggerParameterType.COOKIE:
-                    parseCookieParameters(parameter, request.getHeaders());
-                    break;
+            if (StringUtils.isNotBlank(parameter.getIn())) {
+                switch (parameter.getIn()) {
+                    case SwaggerParameterType.PATH:
+                        parsePathParameters(parameter, request.getRest());
+                        break;
+                    case SwaggerParameterType.QUERY:
+                        parseQueryParameters(parameter, request.getArguments());
+                        break;
+                    case SwaggerParameterType.FORM_DATA:
+                        parseFormDataParameters((FormParameter) parameter, request.getBody());
+                        break;
+                    case SwaggerParameterType.BODY:
+                        parseRequestBodyParameters(parameter, request.getBody());
+                        break;
+                    case SwaggerParameterType.HEADER:
+                        parseHeaderParameters(parameter, request.getHeaders());
+                        break;
+                    case SwaggerParameterType.COOKIE:
+                        parseCookieParameters(parameter, request.getHeaders());
+                        break;
 //                case SwaggerParameterType.FILE:
 //                    parsePathParameters(parameter, request);
 //                    break;
+                }
             }
         }
     }
@@ -565,6 +567,13 @@ public class Swagger2Parser extends SwaggerAbstractParser {
         } else if (value instanceof ObjectProperty) {
             subItem.setType(PropertyConstant.OBJECT);
             subItem.setProperties(parseSchemaProperties(((ObjectProperty) value).getProperties(), refSet));
+            List<String> required = new ArrayList<>();
+            ((ObjectProperty) value).getProperties().forEach((key, property) -> {
+                if (property.getRequired()) {
+                    required.add(key);
+                }
+            });
+            subItem.setRequired(required);
         } else {
             handleBaseProperties(subItem, value);
         }

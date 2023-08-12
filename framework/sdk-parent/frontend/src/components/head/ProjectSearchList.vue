@@ -32,6 +32,7 @@ import {hasPermissions} from "../../utils/permission";
 import {getUserProjectList, switchProject} from "../../api/project";
 import {useUserStore} from "@/store";
 import {getDefaultSecondLevelMenu} from "../../router";
+import {PROJECT_ID, WORKSPACE_ID} from '../../utils/constants';
 
 export default {
   name: "SearchList",
@@ -66,7 +67,7 @@ export default {
     init() {
       let data = {
         userId: getCurrentUserId(),
-        workspaceId: getCurrentWorkspaceId()
+        workspaceId: this.$route.params.workspaceId || getCurrentWorkspaceId()
       };
       this.loading = true;
       getUserProjectList(data)
@@ -76,6 +77,10 @@ export default {
           this.searchArray = response.data;
           let projectId = getCurrentProjectID();
           if (projectId) {
+            // 路由跳转的项目ID与当前项目ID不一致时, 切换项目(API跨工作空间的场景)
+            if (this.$route.fullPath.startsWith("/api") && this.$route.params.projectId && this.$route.params.projectId !== projectId && this.$route.params.projectId !== 'all') {
+              this.change(this.$route.params.projectId);
+            }
             // 保存的 projectId 在当前项目列表是否存在; 切换工作空间后
             if (this.searchArray.length > 0 && this.searchArray.map(p => p.id).indexOf(projectId) === -1) {
               this.change(this.items[0].id);

@@ -179,6 +179,7 @@
 </template>
 
 <script>
+import Vue from 'vue';
 import ApiBaseComponent from '../common/ApiBaseComponent';
 import ApiResponseComponent from './ApiResponseComponent';
 import formCreate from '@form-create/element-ui';
@@ -196,6 +197,7 @@ const store = useApiStore();
 formCreate.component('msUpload', MsUpload);
 formCreate.component('msPluginContentAssertions', MsPluginContentAssertions);
 
+Vue.use(formCreate);
 export default {
   name: 'PluginComponent',
   components: {
@@ -368,6 +370,10 @@ export default {
       }
     },
     run() {
+      if (this.request.plugin_del) {
+        this.$error(this.$t('automation.scenario_plugin_save_warning'));
+        return;
+      }
       this.request.debug = true;
       this.loading = true;
       this.runData = [];

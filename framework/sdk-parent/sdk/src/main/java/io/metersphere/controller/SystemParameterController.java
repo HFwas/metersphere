@@ -6,6 +6,7 @@ import io.metersphere.base.domain.UserHeader;
 import io.metersphere.commons.constants.OperLogConstants;
 import io.metersphere.commons.constants.OperLogModule;
 import io.metersphere.commons.constants.ParamConstants;
+import io.metersphere.commons.constants.PermissionConstants;
 import io.metersphere.request.HeaderRequest;
 import io.metersphere.dto.BaseSystemConfigDTO;
 import io.metersphere.ldap.domain.LdapInfo;
@@ -13,6 +14,8 @@ import io.metersphere.log.annotation.MsAuditLog;
 import io.metersphere.notice.domain.MailInfo;
 import io.metersphere.service.BaseUserService;
 import io.metersphere.service.SystemParameterService;
+import org.apache.shiro.authz.annotation.Logical;
+import org.apache.shiro.authz.annotation.RequiresPermissions;
 import org.springframework.core.env.Environment;
 import org.springframework.web.bind.annotation.*;
 
@@ -33,6 +36,7 @@ public class SystemParameterController {
 
 
     @PostMapping("/edit/email")
+    @RequiresPermissions(PermissionConstants.SYSTEM_SETTING_READ_EDIT)
     @MsAuditLog(module = OperLogModule.SYSTEM_PARAMETER_SETTING, type = OperLogConstants.UPDATE, title = "邮件设置", beforeEvent = "#msClass.getMailLogDetails()", content = "#msClass.getMailLogDetails()", msClass = SystemParameterService.class)
     public void editMail(@RequestBody List<SystemParameter> systemParameter) {
         systemParameterService.editMail(systemParameter);
@@ -59,11 +63,19 @@ public class SystemParameterController {
     }
 
     @GetMapping("/mail/info")
+    @RequiresPermissions(PermissionConstants.SYSTEM_SETTING_READ)
     public MailInfo mailInfo() {
         return systemParameterService.mailInfo(ParamConstants.Classify.MAIL.getValue());
     }
 
     @GetMapping("/base/info")
+    @RequiresPermissions(value = {PermissionConstants.SYSTEM_SETTING_READ,
+            PermissionConstants.PROJECT_TRACK_PLAN_READ_RUN,
+            PermissionConstants.PROJECT_API_SCENARIO_READ_RUN,
+            PermissionConstants.PROJECT_API_DEFINITION_READ_RUN,
+            PermissionConstants.PROJECT_PERFORMANCE_TEST_READ_RUN,
+            PermissionConstants.PROJECT_UI_SCENARIO_READ_RUN
+    }, logical = Logical.OR)
     public BaseSystemConfigDTO getBaseInfo() {
         return systemParameterService.getBaseInfo();
     }
@@ -74,6 +86,7 @@ public class SystemParameterController {
     }
 
     @PostMapping("/save/base")
+    @RequiresPermissions(PermissionConstants.SYSTEM_SETTING_READ_EDIT)
     @MsAuditLog(module = OperLogModule.SYSTEM_PARAMETER_SETTING, type = OperLogConstants.UPDATE, beforeEvent = "#msClass.getBaseLogDetails()", content = "#msClass.getBaseLogDetails()", msClass = SystemParameterService.class)
     public void saveBaseInfo(@RequestBody List<SystemParameter> systemParameter) {
         systemParameterService.saveBaseInfo(systemParameter);
@@ -85,17 +98,20 @@ public class SystemParameterController {
     }
 
     @PostMapping("/save/ldap")
+    @RequiresPermissions(PermissionConstants.SYSTEM_SETTING_READ_EDIT)
     @MsAuditLog(module = OperLogModule.SYSTEM_PARAMETER_SETTING, type = OperLogConstants.UPDATE, beforeEvent = "#msClass.getLogDetails()", content = "#msClass.getLogDetails()", msClass = SystemParameterService.class)
     public void saveLdap(@RequestBody List<SystemParameter> systemParameter) {
         systemParameterService.saveLdap(systemParameter);
     }
 
     @GetMapping("/ldap/info")
+    @RequiresPermissions(PermissionConstants.SYSTEM_SETTING_READ)
     public LdapInfo getLdapInfo() {
         return systemParameterService.getLdapInfo(ParamConstants.Classify.LDAP.getValue());
     }
 
     @PostMapping("save/header")
+    @RequiresPermissions(PermissionConstants.SYSTEM_SETTING_READ_EDIT)
     @MsAuditLog(module = OperLogModule.SYSTEM_PARAMETER_SETTING, type = OperLogConstants.UPDATE, title = "显示设置")
     public void saveHeader(@RequestBody UserHeader userHeader) {
         systemParameterService.saveHeader(userHeader);
@@ -117,6 +133,7 @@ public class SystemParameterController {
     }
 
     @PostMapping("/edit/info")
+    @RequiresPermissions(PermissionConstants.SYSTEM_SETTING_READ_EDIT)
     public SystemParameter editInfo(@RequestBody SystemParameter systemParameter) {
         systemParameterService.editInfo(systemParameter);
         return systemParameter;

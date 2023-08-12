@@ -95,7 +95,6 @@ import MsSelectTree from 'metersphere-frontend/src/components/select-tree/Select
 import MsInputTag from 'metersphere-frontend/src/components/MsInputTag';
 import CustomFiledFormRow from 'metersphere-frontend/src/components/form/CustomFiledFormRow';
 import { useApiStore } from '@/store';
-import { hasLicense } from 'metersphere-frontend/src/utils/permission';
 import { API_STATUS, REQ_METHOD } from '../../model/JsonData';
 
 const store = useApiStore();
@@ -217,8 +216,8 @@ export default {
     },
     customFieldForm: {
       handler(v, v1) {
-        if (v && v1 && store.apiMap && this.basicForm.id) {
-          this.apiMapStatus();
+        if (v && v1 ) {
+          this.customApiMapStatus();
         }
       },
       deep: true,
@@ -230,6 +229,33 @@ export default {
       if (this.basicForm.id) {
         store.apiMap.set(this.basicForm.id, store.apiStatus);
       }
+    },
+    /**
+     * 自定义字段的状态
+     * 有此方法是因为自定义字段点击保存按钮后会再次触发watch方法，导致customFromChange为true
+     */
+    customApiMapStatus() {
+      if(store.saveMap.has(this.basicForm.id) === false){
+        // 首次进入页面，若saveMap不存在，初始化saveMap,
+        store.saveMap.set(this.basicForm.id, false);
+        if (this.basicForm.id && this.isFormAlive) {
+           // 初始化 customFromChange 为true
+          store.apiStatus.set('customFormChange', true);
+          store.apiMap.set(this.basicForm.id, store.apiStatus);
+        }
+      } else {
+        // 不是首次进入页面，若 saveMap 为True，说明已经保存过
+        if(store.saveMap.get(this.basicForm.id) === true){
+          store.saveMap.set(this.basicForm.id,false);
+          return;
+        }
+        // 不是首次进入页面，若 saveMap 为False，说明未保存过
+        if (this.basicForm.id && this.isFormAlive) {
+          store.apiStatus.set('customFormChange', true);
+          store.apiMap.set(this.basicForm.id, store.apiStatus);
+        }
+      }
+
     },
     setModule(id, data) {
       this.basicForm.moduleId = id;

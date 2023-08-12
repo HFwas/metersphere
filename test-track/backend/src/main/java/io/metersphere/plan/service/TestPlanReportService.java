@@ -33,6 +33,7 @@ import io.metersphere.service.BaseProjectService;
 import io.metersphere.service.BaseUserService;
 import io.metersphere.service.IssuesService;
 import io.metersphere.service.ServiceUtils;
+import io.metersphere.task.service.TaskService;
 import io.metersphere.utils.BatchProcessingUtil;
 import io.metersphere.utils.DiscoveryUtil;
 import io.metersphere.utils.LoggerUtil;
@@ -48,6 +49,7 @@ import org.apache.ibatis.session.SqlSession;
 import org.apache.ibatis.session.SqlSessionFactory;
 import org.mybatis.spring.SqlSessionUtils;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -85,7 +87,7 @@ public class TestPlanReportService {
     @Resource
     private TestPlanPrincipalMapper testPlanPrincipalMapper;
     @Resource
-    ExtTestPlanTestCaseMapper extTestPlanTestCaseMapper;
+    private TaskService taskService;
     @Resource
     private TestResourcePoolMapper testResourcePoolMapper;
     @Resource
@@ -132,6 +134,17 @@ public class TestPlanReportService {
     private ExtApiExecutionQueueMapper extApiExecutionQueueMapper;
 
     private final String GROUP = "GROUP";
+
+    //这个方法是消息通知时获取报告内容的。
+    public List<TestPlanReport> getReports(List<String> reportIdList) {
+        List<TestPlanReport> reportList = new ArrayList<>();
+        if (CollectionUtils.isNotEmpty(reportIdList)) {
+            TestPlanReportExample example = new TestPlanReportExample();
+            example.createCriteria().andIdIn(reportIdList);
+            reportList = testPlanReportMapper.selectByExample(example);
+        }
+        return reportList;
+    }
 
     public List<TestPlanReportDTO> list(QueryTestPlanReportRequest request) {
         if (StringUtils.isBlank(request.getProjectId())) {
@@ -586,25 +599,31 @@ public class TestPlanReportService {
                 isSendMessage = true;
             }
             TestPlanReportContentWithBLOBs content = null;
+            TestPlanWithBLOBs testPlanWithBLOBs = null;
             try {
                 HttpHeaderUtils.runAsUser(testPlanReport.getCreator());
                 boolean isRerunningTestPlan = BooleanUtils.isTrue(StringUtils.equalsIgnoreCase(testPlanReport.getStatus(), APITestStatus.Rerunning.name()));
                 //测试计划报告结果数据初始化
                 testPlanReport.setStatus(finishStatus);
+                //统计并保存报告
                 content = this.countAndSaveTestPlanReport(testPlanReport, isRerunningTestPlan);
-                this.setReportExecuteResult(testPlanReport, finishStatus);
+                //更新测试计划的执行相关信息(状态、执行率等）
+                testPlanWithBLOBs = testPlanService.selectAndChangeTestPlanExecuteInfo(testPlanReport.getTestPlanId());
             } catch (Exception e) {
                 testPlanReport.setStatus(finishStatus);
                 LogUtil.error("统计测试计划状态失败！", e);
             } finally {
                 HttpHeaderUtils.clearUser();
                 testPlanReportMapper.updateByPrimaryKey(testPlanReport);
-                testPlanMessageService.checkTestPlanStatusAndSendMessage(testPlanReport, content, isSendMessage);
+                if (testPlanWithBLOBs != null) {
+                    testPlanMessageService.checkTestPlanStatusAndSendMessage(testPlanReport, content, testPlanWithBLOBs, isSendMessage);
+                }
                 this.executeTestPlanByQueue(testPlanReportId);
             }
         }
     }
 
+    @Async
     public void testPlanUnExecute(TestPlanReport testPlanReport) {
         if (testPlanReport != null && !StringUtils.equalsIgnoreCase(testPlanReport.getStatus(), TestPlanReportStatus.COMPLETED.name())) {
             testPlanReport.setIsApiCaseExecuting(false);
@@ -615,17 +634,6 @@ public class TestPlanReportService {
             testPlanReportMapper.updateByPrimaryKey(testPlanReport);
             this.executeTestPlanByQueue(testPlanReport.getId());
         }
-    }
-
-    /**
-     * 测试计划报告设置最终执行状态
-     */
-    private void setReportExecuteResult(TestPlanReport testPlanReport, String finishStatus) {
-        //计算测试计划状态
-        testPlanReport.setStatus(StringUtils.equalsIgnoreCase(finishStatus, TestPlanReportStatus.COMPLETED.name()) ?
-                TestPlanReportStatus.SUCCESS.name() : finishStatus);
-        //检查更新测试计划状态
-        testPlanService.checkTestPlanStatusWhenExecuteOver(testPlanReport.getTestPlanId());
     }
 
     /**
@@ -689,6 +697,7 @@ public class TestPlanReportService {
                 runRequest.setTestPlanId(testPlanExecutionQueue.getTestPlanId());
                 runRequest.setReportId(testPlanExecutionQueue.getReportId());
                 runRequest.setTestPlanId(testPlan.getId());
+                runRequest.setTriggerMode(TriggerMode.BATCH.name());
                 try {
                     if (SessionUtils.getUser() == null) {
                         HttpHeaderUtils.runAsUser("admin");
@@ -920,11 +929,19 @@ public class TestPlanReportService {
     //删除执行测试计划产生的UI报告
     private void deleteUiReportByTestPlanExecute(List<String> testPlanReportIdList) {
         if (CollectionUtils.isNotEmpty(testPlanReportIdList)) {
+            // 如果 UI 的表没有初始化，则不删除
+            if (!taskService.checkUiPermission()) {
+                return;
+            }
             List<String> scenarioReportIds = extTestPlanReportContentMapper.selectUiReportByTestPlanReportIds(testPlanReportIdList);
             if (CollectionUtils.isNotEmpty(scenarioReportIds)) {
-                extTestPlanReportContentMapper.deleteUiReportByIds(scenarioReportIds);
-                extTestPlanReportContentMapper.deleteUiReportResultByIds(scenarioReportIds);
-                extTestPlanReportContentMapper.deleteUiReportStructureByIds(scenarioReportIds);
+                try {
+                    extTestPlanReportContentMapper.deleteUiReportByIds(scenarioReportIds);
+                    extTestPlanReportContentMapper.deleteUiReportResultByIds(scenarioReportIds);
+                    extTestPlanReportContentMapper.deleteUiReportStructureByIds(scenarioReportIds);
+                } catch (Exception e) {
+                    LogUtil.error("删除UI报告出错!", e);
+                }
             }
         }
     }
@@ -945,10 +962,6 @@ public class TestPlanReportService {
         TestPlanReportMapper planReportMapper = sqlSession.getMapper(TestPlanReportMapper.class);
         TestPlanReportDataMapper planReportDataMapper = sqlSession.getMapper(TestPlanReportDataMapper.class);
         TestPlanReportContentMapper planReportContentMapper = sqlSession.getMapper(TestPlanReportContentMapper.class);
-
-        //        ApiDefinitionExecResultMapper batchDefinitionExecResultMapper = sqlSession.getMapper(ApiDefinitionExecResultMapper.class);
-        //        ApiScenarioReportMapper batchScenarioReportMapper = sqlSession.getMapper(ApiScenarioReportMapper.class);
-        //        LoadTestReportMapper batchLoadTestReportMapper = sqlSession.getMapper(LoadTestReportMapper.class);
 
         try {
             while (reportIds.size() > handleCount) {
@@ -1114,6 +1127,8 @@ public class TestPlanReportService {
         if (this.isDynamicallyGenerateReports(testPlanReportContent) || StringUtils.isNotEmpty(testPlanReportContent.getApiBaseCount())) {
             TestPlanWithBLOBs testPlan = testPlanMapper.selectByPrimaryKey(testPlanReport.getTestPlanId());
             testPlanReportDTO = testPlanService.generateReportStruct(testPlan, testPlanReport, testPlanReportContent, false);
+        } else {
+            testPlanReportDTO = new TestPlanReportDataStruct(testPlanReportContent);
         }
         if (StringUtils.isNotEmpty(testPlanReportContent.getSummary())) {
             testPlanReportDTO.setSummary(testPlanReportContent.getSummary());
@@ -1227,55 +1242,40 @@ public class TestPlanReportService {
             } else {
                 Map<String, List<String>> requestEnvMap = new HashMap<>();
                 if (MapUtils.isEmpty(runInfoDTO.getRequestEnvMap())) {
-                    if (MapUtils.isNotEmpty(runInfoDTO.getApiCaseRunInfo())) {
-                        for (Map<String, String> map : runInfoDTO.getApiCaseRunInfo().values()) {
-                            requestEnvMap = TestPlanReportUtil.mergeEnvironmentMap(requestEnvMap, map);
-                        }
-                    }
-                    if (MapUtils.isNotEmpty(runInfoDTO.getScenarioRunInfo())) {
-                        for (Map<String, List<String>> map : runInfoDTO.getScenarioRunInfo().values()) {
-                            requestEnvMap = TestPlanReportUtil.mergeProjectEnvMap(requestEnvMap, map);
-                        }
-                    }
-                    if (MapUtils.isNotEmpty(runInfoDTO.getUiScenarioRunInfo())) {
-                        for (Map<String, List<String>> map : runInfoDTO.getUiScenarioRunInfo().values()) {
-                            requestEnvMap = TestPlanReportUtil.mergeProjectEnvMap(requestEnvMap, map);
-                        }
-                    }
+                    testPlanReportDTO.setProjectEnvMap(requestEnvMap);
                 } else {
                     requestEnvMap = runInfoDTO.getRequestEnvMap();
-                }
-
-                Map<String, List<String>> projectEnvMap = new HashMap<>();
-                for (Map.Entry<String, List<String>> entry : requestEnvMap.entrySet()) {
-                    String projectId = entry.getKey();
-                    List<String> envIdList = entry.getValue();
-                    Project project = baseProjectService.getProjectById(projectId);
-                    String projectName = project == null ? null : project.getName();
-                    if (StringUtils.isNotEmpty(projectName)) {
-                        List<String> envNameList = new ArrayList<>();
-                        for (String envId : envIdList) {
-                            String envName = apiTestEnvironmentService.selectNameById(envId);
-                            if (StringUtils.isNoneBlank(envName)) {
-                                envNameList.add(envName);
+                    Map<String, List<String>> projectEnvMap = new HashMap<>();
+                    for (Map.Entry<String, List<String>> entry : requestEnvMap.entrySet()) {
+                        String projectId = entry.getKey();
+                        List<String> envIdList = entry.getValue();
+                        Project project = baseProjectService.getProjectById(projectId);
+                        String projectName = project == null ? null : project.getName();
+                        if (StringUtils.isNotEmpty(projectName)) {
+                            List<String> envNameList = new ArrayList<>();
+                            for (String envId : envIdList) {
+                                String envName = apiTestEnvironmentService.selectNameById(envId);
+                                if (StringUtils.isNoneBlank(envName)) {
+                                    envNameList.add(envName);
+                                }
+                            }
+                            //考虑到存在不同工作空间下有相同名称的项目，这里还是要检查一下项目名称是否已被记录
+                            if (projectEnvMap.containsKey(projectName)) {
+                                envNameList.forEach(envName -> {
+                                    if (!projectEnvMap.get(projectName).contains(envName)) {
+                                        projectEnvMap.get(projectName).add(envName);
+                                    }
+                                });
+                            } else {
+                                projectEnvMap.put(projectName, new ArrayList<>() {{
+                                    this.addAll(envNameList);
+                                }});
                             }
                         }
-                        //考虑到存在不同工作空间下有相同名称的项目，这里还是要检查一下项目名称是否已被记录
-                        if (projectEnvMap.containsKey(projectName)) {
-                            envNameList.forEach(envName -> {
-                                if (!projectEnvMap.get(projectName).contains(envName)) {
-                                    projectEnvMap.get(projectName).add(envName);
-                                }
-                            });
-                        } else {
-                            projectEnvMap.put(projectName, new ArrayList<>() {{
-                                this.addAll(envNameList);
-                            }});
-                        }
                     }
-                }
-                if (MapUtils.isNotEmpty(projectEnvMap)) {
-                    testPlanReportDTO.setProjectEnvMap(projectEnvMap);
+                    if (MapUtils.isNotEmpty(projectEnvMap)) {
+                        testPlanReportDTO.setProjectEnvMap(projectEnvMap);
+                    }
                 }
             }
             //运行模式
@@ -1760,5 +1760,9 @@ public class TestPlanReportService {
             example.createCriteria().andTestPlanReportIdEqualTo(reportContentWithBLOBs.getTestPlanReportId());
             testPlanReportContentMapper.updateByExampleSelective(reportContentWithBLOBs, example);
         }
+    }
+
+    public String selectLastReportByTestPlanId(String testPlanId) {
+        return extTestPlanReportMapper.selectLastReportByTestPlanId(testPlanId);
     }
 }

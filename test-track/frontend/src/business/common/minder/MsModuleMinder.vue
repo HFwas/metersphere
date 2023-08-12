@@ -10,11 +10,15 @@
         :tags="tags"
         :height="height"
         :move-enable="moveEnable"
+        :move-confirm="moveConfirm"
         :tag-edit-check="tagEditCheck"
         :priority-disable-check="priorityDisableCheck"
         :distinct-tags="distinctTags"
         :default-mold="defaultMode"
         :del-confirm="delConfirm"
+        :font-enable="false"
+        :arrange-enable="false"
+        :style-enable="false"
         @afterMount="$emit('afterMount')"
         @moldChange="handleMoldChange"
         :disabled="disabled"
@@ -29,11 +33,17 @@
 </template>
 
 <script>
-
+import Vue from "vue"
+import vueMinderEditor from 'vue-minder-editor-plus'
+import i18n from "@/i18n";
 import MsFullScreenButton from "metersphere-frontend/src/components/MsFullScreenButton";
 import IsChangeConfirm from "metersphere-frontend/src/components/IsChangeConfirm";
 import {minderPageInfoMap} from "@/api/testCase";
-import {useStore} from "@/store";
+import { useStore } from "@/store";
+
+Vue.use(vueMinderEditor, {
+  i18n: (key, value) => i18n.t(key, value)
+});
 
 export default {
   name: "MsModuleMinder",
@@ -87,6 +97,10 @@ export default {
       type: Function
     },
     delConfirm: {
+      type: Function,
+      default: null
+    },
+    moveConfirm: {
       type: Function,
       default: null
     }

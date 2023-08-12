@@ -192,7 +192,7 @@
             min-width="100px"
             :label="$t('api_test.definition.api_case_status')">
             <template v-slot:default="{ row }">
-              <ms-api-report-status :status="row.caseStatus"/>
+              <ms-api-report-status :status="row.caseStatus" style="text-align: left;"/>
             </template>
           </ms-table-column>
 
@@ -287,6 +287,7 @@ import {API_DEFINITION_CONFIGS} from 'metersphere-frontend/src/components/search
 import {API_DEFINITION_CONFIGS_TRASH, getProtocolFilter} from '@/business/definition/api-definition';
 import MsTipButton from 'metersphere-frontend/src/components/MsTipButton';
 import CaseBatchMove from '@/business/definition/components/basis/BatchMove';
+import {getProjectMember} from "@/api/user";
 import {
   buildBatchParam,
   deepClone,
@@ -305,6 +306,8 @@ import {buildNodePath} from 'metersphere-frontend/src/model/NodeTree';
 import VersionSelector from '@/business/definition/components/version/VersionSelector';
 import TableExtendBtns from "@/business/definition/components/complete/table/TableExtendBtns";
 import MsShowReference from "@/business/definition/components/reference/ShowReference";
+import {getApiTemplate} from "@/api/api-template";
+import {getAdvSearchCustomField} from "metersphere-frontend/src/components/search/custom-component";
 
 export default {
   name: 'ApiList',
@@ -505,6 +508,7 @@ export default {
       versionEnable: false,
       isFirstInitTable: true,
       visibleSearch: true,
+      members: [],
     };
   },
   props: {
@@ -597,7 +601,14 @@ export default {
         this.editApi(response.data);
       });
     }
+    for (let i = 0; i < this.condition.components.length; i++) {
+      if (this.condition.components[i].custom) {
+        this.condition.components.splice(i, 1);
+        break;
+      }
+    }
     this.setAdvSearchParam();
+    this.getTemplateField();
   },
   watch: {
     selectNodeIds() {
@@ -641,6 +652,36 @@ export default {
     },
   },
   methods: {
+    async getTemplateField() {
+      this.loading = true;
+      // 防止第一次渲染版本字段展示顺序错乱
+      let p1 = getProjectMember()
+        .then((response) => {
+          this.members = response.data;
+        });
+      let p2 = getApiTemplate(this.projectId);
+      Promise.all([p1, p2]).then((data) => {
+        this.loading = false;
+        let template = data[1];
+        this.getCustomFields(template.customFields, this.members);
+        let comp = getAdvSearchCustomField(this.condition, template.customFields);
+        this.condition.components.push(...comp)
+      });
+    },
+    getCustomFields(customFields, projectMembers = []) {
+      projectMembers.forEach(member => {
+        member['text'] = member.name;
+        // 高级搜索使用
+        member['label'] = member.name;
+        member['value'] = member.id;
+        member['showLabel'] = member.name + "(" + member.id + ")";
+      })
+      customFields.forEach(item => {
+        if ((item.type === 'member' || item.type === 'multipleMember') && projectMembers && projectMembers.length > 0) {
+          item.options = projectMembers;
+        }
+      });
+    },
     setAdvSearchParam() {
       let comp = this.condition.components.find((c) => c.key === 'moduleIds');
       if (comp) {
@@ -826,7 +867,7 @@ export default {
     },
     refreshTable() {
       this.initTableCondition();
-      if (this.condition.projectId) {
+      if (this.condition.projectId && this.condition.protocol) {
         this.result = getDefinitionPage(this.currentPage, this.pageSize, this.condition).then((response) => {
           getProtocolFilter(this.condition.protocol);
           this.total = response.data.itemCount;
@@ -840,7 +881,7 @@ export default {
     },
     initTable(currentProtocol) {
       this.initTableCondition(currentProtocol);
-      if (this.condition.projectId) {
+      if (this.condition.projectId && this.condition.protocol) {
         this.result = getDefinitionPage(this.currentPage, this.pageSize, this.condition).then((response) => {
           getProtocolFilter(this.condition.protocol);
           this.total = response.data.itemCount;

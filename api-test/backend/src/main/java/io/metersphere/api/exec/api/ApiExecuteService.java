@@ -27,6 +27,7 @@ import io.metersphere.commons.utils.*;
 import io.metersphere.dto.*;
 import io.metersphere.environment.service.BaseEnvironmentService;
 import io.metersphere.plugin.core.MsTestElement;
+import io.metersphere.service.MsHashTreeService;
 import io.metersphere.service.RemakeReportService;
 import io.metersphere.service.SystemParameterService;
 import io.metersphere.service.definition.TcpApiParamService;
@@ -133,11 +134,10 @@ public class ApiExecuteService {
                         : request.getReportId(), request.getRunMode(), null);
         if (testCase != null && StringUtils.isNotEmpty(testCase.getRequest())) {
             try {
-                HashTree jmeterHashTree = this.generateHashTree(request, testCase, runModeConfigDTO);
-                // 调用执行方法
-                runRequest.setHashTree(jmeterHashTree);
-                if (MapUtils.isNotEmpty(extendedParameters)) {
-                    runRequest.setExtendedParameters(extendedParameters);
+                if (!StringUtils.equals(request.getRunMode(), ApiRunMode.JENKINS.name())) {
+                    HashTree jmeterHashTree = this.generateHashTree(request, testCase, runModeConfigDTO);
+                    // 调用执行方法
+                    runRequest.setHashTree(jmeterHashTree);
                 }
                 if (StringUtils.isNotBlank(runModeConfigDTO.getResourcePoolId())) {
                     runRequest.setPoolId(runModeConfigDTO.getResourcePoolId());
@@ -147,6 +147,14 @@ public class ApiExecuteService {
                     runRequest.setPlatformUrl(GenerateHashTreeUtil.getPlatformUrl(baseInfo, runRequest, null));
                 }
                 String projectId = testCase.getProjectId();
+                if (MapUtils.isNotEmpty(extendedParameters)) {
+                    extendedParameters.put(MsHashTreeService.PROJECT_ID, projectId);
+                    runRequest.setExtendedParameters(extendedParameters);
+                } else {
+                    runRequest.setExtendedParameters(new HashMap<>() {{
+                        this.put(MsHashTreeService.PROJECT_ID, projectId);
+                    }});
+                }
                 runRequest.setFakeErrorMap(ApiFakeErrorUtil.get(new ArrayList<>() {{
                     this.add(projectId);
                 }}));
@@ -188,18 +196,17 @@ public class ApiExecuteService {
             this.add(request.getProjectId());
         }}, new BooleanPool()).keySet().stream().toList());
         threadGroup.getHashTree().add(request);
-        ParameterConfig config = new ParameterConfig();
-        config.setProjectId(request.getProjectId());
+        ParameterConfig config = new ParameterConfig(request.getProjectId(), true);
+        config.setCurrentProjectId(request.getProjectId());
         return testPlan.generateHashTree(config);
     }
 
     private JmeterRunRequestDTO initRunRequest(RunDefinitionRequest request, List<MultipartFile> bodyFiles) {
-        ParameterConfig config = new ParameterConfig();
-        config.setProjectId(request.getProjectId());
+        ParameterConfig config = new ParameterConfig(request.getProjectId(), true);
         config.setApi(true);
         Map<String, EnvironmentConfig> envConfig = new HashMap<>();
         Map<String, String> map = request.getEnvironmentMap();
-        if (map != null && map.size() > 0) {
+        if (MapUtils.isNotEmpty(map)) {
             for (String key : map.keySet()) {
                 ApiTestEnvironmentWithBLOBs environment = apiTestEnvironmentService.get(map.get(key));
                 if (environment != null) {
@@ -249,6 +256,7 @@ public class ApiExecuteService {
             this.put(ExtendedParameter.SYNC_STATUS, request.isSyncResult());
             this.put(CommonConstants.USER_ID, SessionUtils.getUser().getId());
             this.put("userName", SessionUtils.getUser().getName());
+            this.put(MsHashTreeService.PROJECT_ID, request.getProjectId());
         }});
         // 开始执行
         if (StringUtils.isNotEmpty(request.getConfig().getResourcePoolId())) {
@@ -279,8 +287,16 @@ public class ApiExecuteService {
             TestPlanApiCaseExample example = new TestPlanApiCaseExample();
             example.createCriteria().andTestPlanIdEqualTo(request.getTestPlanId()).andApiCaseIdEqualTo(request.getCaseId());
             List<TestPlanApiCase> list = testPlanApiCaseMapper.selectByExample(example);
-            request.setEnvironmentId(list.get(0).getEnvironmentId());
-            element.setName(list.get(0).getId());
+            if (CollectionUtils.isNotEmpty(list)) {
+                request.setEnvironmentId(list.get(0).getEnvironmentId());
+                element.setName(list.get(0).getId());
+            } else {
+                TestPlanApiCase apiCase = testPlanApiCaseMapper.selectByPrimaryKey(request.getCaseId());
+                if (apiCase != null) {
+                    request.setEnvironmentId(apiCase.getEnvironmentId());
+                    element.setName(request.getCaseId());
+                }
+            }
         } else {
             element.setName(request.getCaseId());
         }
@@ -308,8 +324,7 @@ public class ApiExecuteService {
 
         BaseEnvironmentService apiTestEnvironmentService = CommonBeanFactory.getBean(BaseEnvironmentService.class);
         ApiTestEnvironmentWithBLOBs environment = apiTestEnvironmentService.get(request.getEnvironmentId());
-        ParameterConfig parameterConfig = new ParameterConfig();
-        parameterConfig.setApi(true);
+        ParameterConfig parameterConfig = new ParameterConfig(projectId, true);
         Map<String, EnvironmentConfig> envConfig = new HashMap<>(16);
         if (environment != null && environment.getConfig() != null) {
             EnvironmentConfig environmentConfig = JSONUtil.parseObject(environment.getConfig(), EnvironmentConfig.class);

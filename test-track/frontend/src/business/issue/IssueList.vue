@@ -172,7 +172,12 @@ import {
 import {
   getCustomFieldValue,
   getCustomTableWidth,
-  getPageInfo, getTableHeaderWithCustomFields, getLastTableSortField, getCustomFieldFilter, parseCustomFilesForList
+  getPageInfo,
+  getTableHeaderWithCustomFields,
+  getLastTableSortField,
+  getCustomFieldFilter,
+  parseCustomFilesForList,
+  parseCustomFilesForItem
 } from "metersphere-frontend/src/utils/tableUtils";
 import MsContainer from "metersphere-frontend/src/components/MsContainer";
 import MsMainContainer from "metersphere-frontend/src/components/MsMainContainer";
@@ -296,6 +301,8 @@ export default {
   activated() {
     if (this.$route.params.dataSelectRange) {
       this.dataSelectRange = this.$route.params.dataSelectRange;
+    } else {
+      this.dataSelectRange = "";
     }
     this.loading = true;
     this.$nextTick(() => {
@@ -464,6 +471,10 @@ export default {
         this.page.condition.unClosedTestPlanIssue = true;
       } else if (this.dataSelectRange === 'AllRelatedTestPlan') {
         this.page.condition.allTestPlanIssue = true;
+      } else {
+        delete this.page.condition['thisWeekUnClosedTestPlanIssue'];
+        delete this.page.condition['unClosedTestPlanIssue'];
+        delete this.page.condition['allTestPlanIssue'];
       }
       this.page.condition.projectId = this.projectId;
       this.page.condition.workspaceId = this.workspaceId;
@@ -519,7 +530,11 @@ export default {
       this.$refs.issueEdit.open(copyData, 'copy');
     },
     handleDelete(data) {
-      this.$alert(this.$t('test_track.issue.delete_tip') + ' ' + data.title + " ？", '', {
+      let tip = this.$t('test_track.issue.delete_tip') + ' ' + data.title + " ？";
+      if (this.isThirdPart) {
+        tip = this.$t('test_track.issue.delete_third_part_tip') + ", " + tip;
+      }
+      this.$alert(tip, '', {
         confirmButtonText: this.$t('commons.confirm'),
         callback: (action) => {
           if (action === 'confirm') {
@@ -535,7 +550,11 @@ export default {
       })
     },
     handleBatchDelete() {
-      this.$alert(this.$t('test_track.issue.batch_delete_tip') + " ？", '', {
+      let tip = this.$t('test_track.issue.batch_delete_tip') + " ？";
+      if (this.isThirdPart) {
+        tip = this.$t('test_track.issue.delete_third_part_tip') + ", " + tip;
+      }
+      this.$alert(tip, '', {
         confirmButtonText: this.$t('commons.confirm'),
         callback: (action) => {
           if (action === 'confirm') {
@@ -635,6 +654,9 @@ export default {
       let id = this.$route.query.id;
       if (id) {
         getIssuesById(id).then((response) => {
+          response.data.fields.forEach(field => {
+            parseCustomFilesForItem(field);
+          });
           this.handleEdit(response.data)
         });
       } else {
